@@ -1,12 +1,12 @@
 # STEPSS
 
-**Static and Transient Electric Power System Simulator**
+**Static and Transient Electric Power Systems Simulation**
 
 STEPSS is a graphical user interface (GUI) application for the RAMSES power system simulator, providing an intuitive interface for power system analysis and simulation.
 
 ## About
 
-STEPSS (Static and Transient Electric Power System Simulator) is a Java-based GUI application that interfaces with the RAMSES simulation engine. It provides a user-friendly environment for performing static and transient analysis of electric power systems.
+STEPSS (Static and Transient Electric Power Systems Simulation) is a Java-based GUI application that interfaces with the RAMSES simulation engine. It provides a user-friendly environment for performing static and transient analysis of electric power systems.
 
 ## Features
 
@@ -18,7 +18,7 @@ STEPSS (Static and Transient Electric Power System Simulator) is a Java-based GU
 
 ## Requirements
 
-- Java Runtime Environment (JRE) 64-bit
+- Java Runtime Environment (JRE) 64-bit, version 11 or later
 - RAMSES simulation engine
 
 ## Installation

@@ -395,7 +395,7 @@ public class RamsesUI extends javax.swing.JFrame {
         logo.setName("logo"); // NOI18N
         logo.setPreferredSize(new java.awt.Dimension(763, 545));
 
-        jLabel2.setText("<html>Static and Transient Electric Power System Simulator</html>");
+        jLabel2.setText("<html>Static and Transient Electric Power Systems Simulation</html>");
         jLabel2.setName("jLabel2"); // NOI18N
 
         jLabel3.setFont(new java.awt.Font("Bitstream Vera Sans", 0, 24)); // NOI18N
@@ -3100,7 +3100,7 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_showGnupCopyrightButtonActionPerformed
 
     private void webpageLabelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_webpageLabelMouseClicked
-        String url = "http://stepss.sps-lab.org";
+        String url = "https://stepss.sps-lab.org";
         BareBonesBrowserLaunch.openURL(url);
     }//GEN-LAST:event_webpageLabelMouseClicked
 
