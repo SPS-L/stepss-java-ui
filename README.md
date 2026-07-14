@@ -27,13 +27,13 @@ STEPSS (Static and Transient Electric Power System Simulator) is a Java-based GU
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/SPS-L/STEPSS.git
-   cd STEPSS
+   git clone https://github.com/SPS-L/stepss-java-ui.git
+   cd stepss-java-ui
    ```
 
 2. Build the project using the provided build system (Ant/NetBeans project structure):
    ```bash
-   ant build
+   ant jar
    ```
 
 3. The compiled JAR file will be available in the `dist` folder as `stepss.jar`.
@@ -78,8 +78,8 @@ This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE
 
 ## Related Projects
 
-- [PyRAMSES](https://pyramses.sps-lab.org/) - Python interface for RAMSES
-- [URAMSES](https://github.com/SPS-L/URAMSES) - User models for PyRAMSES
+- [PyRAMSES](https://stepss.sps-lab.org/pyramses/) - Python interface for RAMSES
+- [URAMSES](https://github.com/SPS-L/stepss-uramses) - User models for PyRAMSES
 
 ## Contributing
 
