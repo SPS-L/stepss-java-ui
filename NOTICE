@@ -1,15 +1,19 @@
 NOTICE
 
 This repository is part of the STEPSS (Static and Transient Electric Power
-Systems Simulation) suite developed by the Sustainable Power Systems Lab (SPS-L).
+Systems Simulation) platform.
 
-The source code in this repository is licensed under the Apache License,
-Version 2.0. See the LICENSE file for details.
+The Java source code in this repository is Copyright (c) Petros Aristidou and
+is licensed under the Apache License, Version 2.0. See the LICENSE file for
+details. The Apache License covers the Java source code only; the bundled
+components listed below remain under their own terms. The license texts of the
+bundled tools are embedded in the application resources
+(src/my/ramses/*License.txt) and are displayed by the application.
 
-IMPORTANT — Proprietary Components
-====================================
+IMPORTANT - Proprietary STEPSS Components
+=========================================
 
-The STEPSS suite includes compiled executables of the following components that
+The application bundles compiled executables of the following components that
 are NOT covered by the Apache License 2.0:
 
 RAMSES (Dynamic Simulator)
@@ -34,13 +38,53 @@ license:
 
   - RAMSES is provided "as is", without warranty of any kind.
 
+RAMSES internally uses the KLU sparse linear solver from SuiteSparse
+(Timothy A. Davis and Ekanathan Palamadai Natarajan), distributed under the
+GNU LGPL; see the bundled KLU license text.
+
 PFC (Power Flow Computation) and CODEGEN (Model Generator)
------------------------------------------------------------
+----------------------------------------------------------
 
 PFC and CODEGEN are the property of Dr. Thierry Van Cutsem. They are
 distributed as compiled executables that are free to use but are not
 open-source. Their source code is not included in any of the STEPSS
 repositories.
+
+DYNGRAPH (Curve Viewer)
+-----------------------
+
+DYNGRAPH, the post-processing tool for extracting and plotting RAMSES
+simulation curves, is distributed as a compiled executable that is free to
+use but is not open-source.
+
+Bundled Third-Party Tools
+=========================
+
+  - gnuplot - real-time plotting; distributed unmodified under the gnuplot
+    license (see the bundled gnuplot license text).
+
+  - Notepad++ - data file editor (Don Ho); free software distributed under
+    the GNU GPL (see the bundled Notepad++ license text). Its source code is
+    available at https://github.com/notepad-plus-plus/notepad-plus-plus.
+
+  - vswhere (Microsoft) - locates Visual Studio installations on Windows;
+    distributed under the MIT License
+    (https://github.com/microsoft/vswhere).
+
+Third-Party Java Libraries
+==========================
+
+The following libraries are distributed with the application (merged into
+stepss.jar and/or shipped in dist/lib):
+
+  - Apache Commons Exec (https://commons.apache.org/proper/commons-exec/),
+    Apache License 2.0. Copyright The Apache Software Foundation.
+
+  - Apache Commons IO (https://commons.apache.org/proper/commons-io/),
+    Apache License 2.0. Copyright The Apache Software Foundation.
+
+  - NetBeans AbsoluteLayout (org.netbeans.lib.awtextra), distributed under
+    the terms of the NetBeans/Apache licensing of the NetBeans platform.
 
 Authors:
   - Dr. Petros Aristidou (petros.aristidou@cut.ac.cy)

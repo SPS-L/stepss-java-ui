@@ -60,10 +60,13 @@ The jar embeds the toolchain executables (Windows and Linux) and extracts them a
 | DYNGRAPH | Curve viewer for output trajectories |
 | gnuplot | Real-time plotting during simulation |
 | Notepad++ | Data file editing (runs via Wine on Linux) |
+| vswhere (Microsoft) | Locates Visual Studio for CODEGEN compilation on Windows |
 | URAMSES | Skeleton project for user models |
 | User guide | PDF opened from the Help menu |
 
 The bundled RAMSES is the free *Limited* build (up to 1000 buses, 2 cores) — see [NOTICE](NOTICE).
+
+In addition, the application distributes the following third-party Java libraries (merged into `stepss.jar` and shipped in `dist/lib/`): Apache Commons Exec, Apache Commons IO (both Apache License 2.0), and NetBeans AbsoluteLayout.
 
 ## Related Projects
 
@@ -81,7 +84,7 @@ The bundled RAMSES is the free *Limited* build (up to 1000 buses, 2 cores) — s
 
 STEPSS is distributed under the **Apache License 2.0** — see [LICENSE](LICENSE). Copyright © Petros Aristidou.
 
-The Apache license covers the Java source code in this repository only. The bundled RAMSES, PFC, and CODEGEN executables are proprietary components under their own terms — see [NOTICE](NOTICE) for details.
+The Apache license covers the Java source code in this repository only. The bundled RAMSES, PFC, CODEGEN, and DYNGRAPH executables are proprietary components under their own terms, and the bundled third-party tools and libraries (gnuplot, Notepad++, vswhere, KLU, Apache Commons Exec/IO, NetBeans AbsoluteLayout) remain under their respective licenses — see [NOTICE](NOTICE) for the complete list. The license texts of the bundled tools are also embedded in the application.
 
 ## Authors
 
