@@ -2,23 +2,23 @@
 
 **Static and Transient Electric Power Systems Simulation**
 
-STEPSS is the Java (Swing) desktop GUI for the RAMSES dynamic power system simulator — part of the [STEPSS](https://stepss.sps-lab.org/) power system simulation platform. It bundles the complete simulation toolchain (RAMSES, PFC, CODEGEN, DYNGRAPH, gnuplot) into a single application, so users can load a network, run static and dynamic simulations, and analyse the results without touching the command line.
+STEPSS is the Java (Swing) desktop GUI for the RAMSES dynamic power system simulator, part of the [STEPSS](https://stepss.sps-lab.org/) power system simulation platform. It bundles the complete simulation toolchain (RAMSES, PFC, CODEGEN, DYNGRAPH, gnuplot) into a single application, so users can load a network, run static and dynamic simulations, and analyse the results without touching the command line.
 
 Current release: **3.40**.
 
 ## Features
 
-- **Complete workflow in tabs** — System Data, Observables, Initialization, Dynamic Simulation, Analysis, and Codegen
-- **Dynamic simulation** — runs the bundled RAMSES engine on the loaded data and disturbance files
-- **Power flow** — drives the bundled PFC (Power Flow Computation) executable
-- **Real-time plotting** — live curves during simulation via gnuplot (bus voltages, machine speeds, branch flows, wall time, and more)
-- **Result extraction** — "Extract Curves" launches the bundled DYNGRAPH viewer on saved output trajectories
-- **Analysis tools** — Jacobian matrix extraction and small-signal stability analysis
-- **User models** — the Codegen tab compiles user-written models with CODEGEN and saves a custom simulator executable
-- **Observable wizard** — dialog for selecting buses, machines, shunts, branches, and injectors to record
-- **Integrated editing** — opens data and disturbance files in the bundled Notepad++ (via Wine on Linux)
-- **Built-in help** — embedded user guide PDF, online changelog viewer, and update checker
-- **Cross-platform** — 64-bit Windows and Linux
+- **Complete workflow in tabs**: System Data, Observables, Initialization, Dynamic Simulation, Analysis, and Codegen
+- **Dynamic simulation**: runs the bundled RAMSES engine on the loaded data and disturbance files
+- **Power flow**: drives the bundled PFC (Power Flow Computation) executable
+- **Real-time plotting**: live curves during simulation via gnuplot (bus voltages, machine speeds, branch flows, wall time, and more)
+- **Result extraction**: "Extract Curves" launches the bundled DYNGRAPH viewer on saved output trajectories
+- **Analysis tools**: Jacobian matrix extraction and small-signal stability analysis
+- **User models**: the Codegen tab compiles user-written models with CODEGEN and saves a custom simulator executable
+- **Observable wizard**: dialog for selecting buses, machines, shunts, branches, and injectors to record
+- **Integrated editing**: opens data and disturbance files in the bundled Notepad++ (via Wine on Linux)
+- **Built-in help**: embedded user guide PDF, online changelog viewer, and update checker
+- **Cross-platform**: 64-bit Windows and Linux
 
 ## Installation
 
@@ -32,7 +32,7 @@ cd stepss-java-ui
 ant jar
 ```
 
-The build (a NetBeans/Ant project) produces `dist/stepss.jar` — a self-contained jar with the Commons Exec and Commons IO libraries merged in.
+The build (a NetBeans/Ant project) produces `dist/stepss.jar`, a self-contained jar with the Commons Exec and Commons IO libraries merged in.
 
 ## Quick Start
 
@@ -64,27 +64,27 @@ The jar embeds the toolchain executables (Windows and Linux) and extracts them a
 | URAMSES | Skeleton project for user models |
 | User guide | PDF opened from the Help menu |
 
-The bundled RAMSES is the free *Limited* build (up to 1000 buses, 2 cores) — see [NOTICE](NOTICE).
+The bundled RAMSES is the free *Limited* build (up to 1000 buses, 2 cores). See [NOTICE](NOTICE).
 
 In addition, the application distributes the following third-party Java libraries (merged into `stepss.jar` and shipped in `dist/lib/`): Apache Commons Exec, Apache Commons IO (both Apache License 2.0), and NetBeans AbsoluteLayout.
 
 ## Related Projects
 
-- [PyRAMSES](https://stepss.sps-lab.org/pyramses/) — Python interface for RAMSES
-- [URAMSES](https://github.com/SPS-L/stepss-uramses) — user models for PyRAMSES
+- [PyRAMSES](https://stepss.sps-lab.org/pyramses/): Python interface for RAMSES
+- [URAMSES](https://github.com/SPS-L/stepss-uramses): user models for PyRAMSES
 
 ## Documentation
 
-- [Installation guide](https://stepss.sps-lab.org/getting-started/installation/) — GUI and Java setup
-- [Quick start](https://stepss.sps-lab.org/getting-started/quickstart/) — running simulations from the GUI
-- [STEPSS documentation site](https://stepss.sps-lab.org/) — user guide, file formats, model reference
+- [Installation guide](https://stepss.sps-lab.org/getting-started/installation/): GUI and Java setup
+- [Quick start](https://stepss.sps-lab.org/getting-started/quickstart/): running simulations from the GUI
+- [STEPSS documentation site](https://stepss.sps-lab.org/): user guide, file formats, model reference
 - In-app: **Help → User Guide** (bundled PDF) and **Help → Changelog**
 
 ## License
 
-STEPSS is distributed under the **Apache License 2.0** — see [LICENSE](LICENSE). Copyright © Petros Aristidou.
+STEPSS is distributed under the **Apache License 2.0**. See [LICENSE](LICENSE). Copyright © Petros Aristidou.
 
-The Apache license covers the Java source code in this repository only. The bundled RAMSES, PFC, CODEGEN, and DYNGRAPH executables are proprietary components under their own terms, and the bundled third-party tools and libraries (gnuplot, Notepad++, vswhere, KLU, Apache Commons Exec/IO, NetBeans AbsoluteLayout) remain under their respective licenses — see [NOTICE](NOTICE) for the complete list. The license texts of the bundled tools are also embedded in the application.
+The Apache license covers the Java source code in this repository only. The bundled RAMSES, PFC, CODEGEN, and DYNGRAPH executables are proprietary components under their own terms, and the bundled third-party tools and libraries (gnuplot, Notepad++, vswhere, KLU, Apache Commons Exec/IO, NetBeans AbsoluteLayout) remain under their respective licenses. See [NOTICE](NOTICE) for the complete list. The license texts of the bundled tools are also embedded in the application.
 
 ## Authors
 
