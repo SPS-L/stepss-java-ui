@@ -1,3 +1,8 @@
 # Local Claude Code / MCP configuration
 /.claude/
 .mcp.json
+/.superpowers/
+
+# Ant build outputs
+/build/
+/dist/
