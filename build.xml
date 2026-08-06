@@ -78,4 +78,71 @@
 	<zipfileset src="dist/lib/commons-io-2.11.0.jar" excludes="META-INF/*" />
   </jar>  
  </target>  
+
+ <property file="versions.properties"/>
+ <property name="payload.cache" location="payload-cache"/>
+
+ <macrodef name="fetch-asset">
+  <attribute name="repo"/>
+  <attribute name="tag"/>
+  <attribute name="asset"/>
+  <attribute name="sha256"/>
+  <sequential>
+   <mkdir dir="${payload.cache}"/>
+   <!-- SPS-L/@{repo} release assets live in a private repo: the plain
+        https://github.com/OWNER/REPO/releases/download/... URL only serves
+        browser sessions and returns 404 to anonymous or bearer-token requests
+        (verified). The GitHub REST API's asset-redirect endpoint accepts
+        token auth, but reaching it needs a JSON lookup of the numeric asset
+        id that stock Ant cannot do. `gh release download` performs that
+        lookup and the authenticated download in one step, reusing the
+        caller's existing `gh auth login` session. Requires: gh CLI installed
+        and authenticated with access to the SPS-L org. -->
+   <exec executable="gh" failonerror="true" failifexecutionfails="true">
+    <arg value="release"/>
+    <arg value="download"/>
+    <arg value="@{tag}"/>
+    <arg value="--repo"/>
+    <arg value="@{repo}"/>
+    <arg value="--pattern"/>
+    <arg value="@{asset}"/>
+    <arg value="--dir"/>
+    <arg value="${payload.cache}"/>
+    <arg value="--skip-existing"/>
+   </exec>
+   <checksum file="${payload.cache}/@{asset}" algorithm="SHA-256"
+             property="@{asset}.actual"/>
+   <fail message="Digest mismatch for @{asset}: expected @{sha256}, got ${@{asset}.actual}">
+    <condition>
+     <not><equals arg1="${@{asset}.actual}" arg2="@{sha256}"/></not>
+    </condition>
+   </fail>
+   <echo message="verified @{asset}"/>
+  </sequential>
+ </macrodef>
+
+ <target name="fetch-payloads" description="Download and verify pinned release payloads">
+  <fetch-asset repo="${ramses.repo}" tag="${ramses.tag}"
+               asset="${ramses.windows.asset}" sha256="${ramses.windows.sha256}"/>
+  <fetch-asset repo="${ramses.repo}" tag="${ramses.tag}"
+               asset="${ramses.linux.asset}" sha256="${ramses.linux.sha256}"/>
+  <fetch-asset repo="${ramses.repo}" tag="${ramses.tag}"
+               asset="${ramses.macos.asset}" sha256="${ramses.macos.sha256}"/>
+  <fetch-asset repo="${helios.repo}" tag="${helios.tag}"
+               asset="${helios.windows.asset}" sha256="${helios.windows.sha256}"/>
+  <fetch-asset repo="${helios.repo}" tag="${helios.tag}"
+               asset="${helios.linux.asset}" sha256="${helios.linux.sha256}"/>
+  <fetch-asset repo="${helios.repo}" tag="${helios.tag}"
+               asset="${helios.macos.asset}" sha256="${helios.macos.sha256}"/>
+  <fetch-asset repo="${dyngraph.repo}" tag="${dyngraph.tag}"
+               asset="${dyngraph.linux.asset}" sha256="${dyngraph.linux.sha256}"/>
+  <fetch-asset repo="${dyngraph.repo}" tag="${dyngraph.tag}"
+               asset="${dyngraph.macos.asset}" sha256="${dyngraph.macos.sha256}"/>
+  <fetch-asset repo="${codegen.repo}" tag="${codegen.tag}"
+               asset="${codegen.windows.asset}" sha256="${codegen.windows.sha256}"/>
+  <fetch-asset repo="${codegen.repo}" tag="${codegen.tag}"
+               asset="${codegen.linux.asset}" sha256="${codegen.linux.sha256}"/>
+  <fetch-asset repo="${codegen.repo}" tag="${codegen.tag}"
+               asset="${codegen.macos.asset}" sha256="${codegen.macos.sha256}"/>
+ </target>
 </project>

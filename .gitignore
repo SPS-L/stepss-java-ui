@@ -6,3 +6,6 @@
 # Ant build outputs
 /build/
 /dist/
+
+# Fetched release payloads (see versions.properties)
+/payload-cache/
