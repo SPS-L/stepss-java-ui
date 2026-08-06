@@ -42,7 +42,7 @@ causes them:
 | 1 | macOS = arm64 only | `ramses-macos-arm64` is single-arch; Rosetta translates x86_64→arm64, not the reverse. Helios goes arm64-only from its next release. |
 | 2 | Static macOS builds are fixed upstream | ramses, dyngraph and codegen macOS builds currently need `brew install gcc` (+`openblas` for ramses). Their Linux and Windows counterparts are already statically linked, so this is a build-config gap, not an inherent constraint. The jar consumes uniform static builds. |
 | 3 | Platform resolver + tool manifest | Collapses 34 branch sites into one enum and one table. |
-| 4 | Archives stay committed to git | Keeps builds offline-capable and the workflow unchanged. Accepted cost: repo growth per refresh. |
+| 4 | Archives fetched from GitHub releases at build time, checksum-verified | The repo stops carrying binaries, and a commit plus network reproduces the jar exactly — today no commit reproduces the published jar. Accepted cost: a clean build needs network once; thereafter a local cache serves it. |
 | 5 | Editor → OS default | Replaces bundled Notepad++ and the Wine dependency; gives macOS the feature for free. |
 | 6 | gnuplot bundled on Windows, resolved from `PATH` elsewhere | No gnuplot in any release; the current hardcoded `/usr/bin/gnuplot` is fragile. |
 | 7 | Per-platform terminal launcher | `xterm` is absent on stock macOS, and `OS.isFamilyUnix()` is true there. |
@@ -153,12 +153,29 @@ switching to `stepss-helios-macos-arm64.tar.gz` is a one-line change.
 Note that the ramses release names its executable `ramses`, while the code currently
 looks for `dynsim`/`dynsim.exe`. The manifest's extracted-filename field absorbs this.
 
+### Build and update process
+
+`versions.properties` pins a version and a SHA-256 per asset. An Ant target
+(`fetch-payloads`) downloads each archive from its GitHub release into a
+gitignored cache directory, verifies the digest, and fails the build on mismatch.
+A second run reuses the cache and needs no network. `package` depends on
+`fetch-payloads`.
+
+Updating a component is then a two-line edit: bump the version, update the digest.
+
+Two payloads stay committed because no release publishes them: the Windows Intel
+dyngraph build and `gpwin.zip`. `DOC.zip` also stays committed, as it is generated
+from `stepss-userguide` rather than released.
+
 ### URAMSES kit packaging
 
 `stepss-uramses` publishes no binary assets; it is a source kit, and its `modules_*`
-directories and project files live in the repo. An Ant target assembles `URAMSES.zip`
-from a pinned uramses tag — `modules_wi/` plus `src/` plus the msvs project files —
-restructured into the flat `URAMSES/` layout the Codegen tab expects.
+directories and project files live in the repo. The same Ant target fetches the
+source tarball for the pinned uramses tag from GitHub and assembles `URAMSES.zip`
+from it — `modules_wi/` plus `src/` plus the msvs project files — restructured into
+the flat `URAMSES/` layout the Codegen tab expects. Building from the fetched tag
+rather than a local checkout means the kit does not depend on the state of a
+sibling working copy.
 
 This replaces hand assembly and refreshes the bundled kit from its current 2022-01-24
 modules to v3.55, closing the defect where compiling a custom model silently swaps the
@@ -166,8 +183,8 @@ modules to v3.55, closing the defect where compiling a custom model silently swa
 `modules_l`/`modules_m`/`modules_wg` variants, so both specs share one packaging
 mechanism.
 
-The local `stepss-uramses` checkout is at `v3.52-8-g82fc463` while the release tag is
-v3.55; it must be synced before anything packages from it.
+This also removes the dependency on the local `stepss-uramses` checkout, which sits at
+`v3.52-8-g82fc463` while the release tag is v3.55.
 
 ## Platform behavior
 
@@ -245,13 +262,20 @@ against current behavior.
 | Refactor changes behavior on Windows/Linux | No-op proof in step 2 |
 | Gatekeeper blocks extracted binaries | Spike first; clear the attribute if needed |
 | `Desktop.open()` has no editor association for `.dat`/`.dst` | Fall back to a platform default (`notepad`, `xdg-open`, `open -t`) |
+| Build now needs network to fetch payloads | Digests are pinned, and a gitignored cache makes only the first build network-bound; CI caches it between runs |
+| A release tag is re-cut with different bytes | SHA-256 verification fails the build loudly rather than silently shipping different binaries |
 
 ## Payload changes
 
-Removed: `npp.zip`, `nppLicense.txt`, `PFC`, `PFC.exe`, `pfcLicense.txt`, the old
-`dynsim.zip`, and the *Install Intel redistributables* menu item.
+Deleted from git: `npp.zip`, `nppLicense.txt`, `PFC`, `PFC.exe`, `pfcLicense.txt`,
+`dynsim.zip`, `codegen.exe`, `CODEGEN`, `URAMSES.zip`, the Linux `dyngraph` binary,
+and the *Install Intel redistributables* menu item.
 
-Added: per-platform ramses, helios, dyngraph and codegen archives; helios license text.
+Fetched at build time: per-platform ramses, helios, dyngraph and codegen archives,
+plus the uramses source tarball.
+
+Still committed: `gpwin.zip`, `DOC.zip`, `vswhere.exe`, the Windows Intel
+`dyngraph.exe`, and helios license text.
 
 Net payload falls from 49.5 MB to roughly 32 MB even while carrying three platforms
 instead of two, because the 30 MB Intel `dynsim.zip` is replaced by an 11.6 MB static
