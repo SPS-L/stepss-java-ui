@@ -70,7 +70,7 @@ The jar embeds the toolchain executables for the platform it runs on and extract
 
 DYNGRAPH on Windows is the one exception to "fetched from a release": its published binaries are console-only, so the GUI still ships the committed Intel dialog build.
 
-The bundled RAMSES is the free *Limited* build (up to 1000 buses, 2 cores). See [NOTICE](NOTICE).
+The bundled RAMSES is the free *Limited* build (up to 1000 buses, 2 cores).
 
 In addition, the application distributes the following third-party Java libraries (merged into `stepss.jar` and shipped in `dist/lib/`): Apache Commons Exec, Apache Commons IO (both Apache License 2.0), and NetBeans AbsoluteLayout.
 
@@ -90,7 +90,7 @@ In addition, the application distributes the following third-party Java librarie
 
 STEPSS is distributed under the **Apache License 2.0**. See [LICENSE](LICENSE). Copyright © Petros Aristidou.
 
-The Apache license covers the Java source code in this repository only. The bundled RAMSES, Helios, CODEGEN, and DYNGRAPH executables are proprietary components under their own terms, and the bundled third-party tools and libraries (gnuplot, KLU, Apache Commons Exec/IO, NetBeans AbsoluteLayout) remain under their respective licenses. See [NOTICE](NOTICE) for the complete list. The license texts of the bundled tools are also embedded in the application.
+The Apache license covers the Java source code in this repository only. The bundled RAMSES, Helios, CODEGEN, and DYNGRAPH executables are proprietary components under their own terms, and the bundled third-party tools and libraries (gnuplot, KLU, Apache Commons Exec/IO, NetBeans AbsoluteLayout) remain under their respective licenses. The license text of each bundled component is embedded in the application and viewable from the About dialog.
 
 ## Authors
 
