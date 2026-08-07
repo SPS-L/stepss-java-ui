@@ -12,6 +12,19 @@ import java.util.zip.ZipInputStream;
 
 public final class ToolExtractor {
 
+    /**
+     * Fixed classpath base that bundled tool payloads resolve against.
+     * {@code ToolExtractor} lives one package deeper than the payloads
+     * (which ship under {@code my/ramses/}, alongside {@code RamsesUI}), so
+     * a class-relative {@code getResourceAsStream} would look under
+     * {@code my/ramses/platform/} instead. Resolving against this absolute
+     * base keeps ToolExtractor free of any dependency on the GUI class, and
+     * composes correctly if payload resource strings later move into a
+     * subdirectory (e.g. {@code "payload/ramses-linux-x86_64-v3.55.tar.gz"}
+     * resolves to {@code /my/ramses/payload/ramses-linux-x86_64-v3.55.tar.gz}).
+     */
+    private static final String PAYLOAD_BASE = "/my/ramses/";
+
     private ToolExtractor() {
     }
 
@@ -44,9 +57,10 @@ public final class ToolExtractor {
 
     private static void unpack(ToolSpec spec, ToolSpec.Payload payload, File dir,
             Platform platform) throws IOException {
-        InputStream in = ToolExtractor.class.getResourceAsStream(payload.resource);
+        String resolved = PAYLOAD_BASE + payload.resource;
+        InputStream in = ToolExtractor.class.getResourceAsStream(resolved);
         if (in == null) {
-            throw new IOException("Missing bundled resource '" + payload.resource
+            throw new IOException("Missing bundled resource '" + resolved
                     + "' for tool '" + spec.id() + "'");
         }
         try {
