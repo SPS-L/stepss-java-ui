@@ -66,28 +66,8 @@ public class RamsesUI extends javax.swing.JFrame {
                 licenseAgreement(null);
             }
             prefs.putBoolean(ramsesFirtsTime, false);
-            //installRedLibMenuItemActionPerformed(null);
         }
 //        prefs.remove(ramsesFirtsTime);
-
-        String realArch;
-        realArch = "";
-        if (OS.isFamilyWindows()) {
-            String arch = System.getenv("PROCESSOR_ARCHITECTURE");
-            String wow64Arch = System.getenv("PROCESSOR_ARCHITEW6432");
-            realArch = arch.endsWith("64") || wow64Arch != null && wow64Arch.endsWith("64") ? "64" : "32";
-        } else {
-            String arch = System.getProperty("os.arch");
-            realArch = arch.endsWith("64") ? "64" : "32";
-        }
-        if (!realArch.endsWith("64")) {
-            JOptionPane.showMessageDialog(this,
-                    "The simulator is compiled for 64-bit processors.\n"
-                    + "Your computer reports that is not 64-bit.\n"
-                    + "You can procceed but probably the simulator will not work.",
-                    "Warning",
-                    JOptionPane.WARNING_MESSAGE);
-        }
 
 //        KeyStroke ctrlGKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_G,InputEvent.CTRL_DOWN_MASK);
 //        jPanel1.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(ctrlGKeyStroke, "KILLGP");
@@ -132,24 +112,42 @@ public class RamsesUI extends javax.swing.JFrame {
     }
 
     private String getVersion() {
+        InputStream in = RamsesUI.class.getResourceAsStream("version.txt");
+        if (in == null) {
+            return "0.0";
+        }
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
         try {
-            InputStream in = RamsesUI.class.getResourceAsStream("version.txt");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-            return reader.readLine().trim();
+            String line = reader.readLine();
+            return (line == null || line.trim().isEmpty()) ? "0.0" : line.trim();
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-            return null;
+            return "0.0";
+        } finally {
+            try {
+                reader.close();
+            } catch (IOException ignore) {
+            }
         }
     }
 
     private String getRamsesType() {
+        InputStream in = RamsesUI.class.getResourceAsStream("type.txt");
+        if (in == null) {
+            return "Limited";
+        }
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
         try {
-            InputStream in = RamsesUI.class.getResourceAsStream("type.txt");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-            return reader.readLine().trim();
+            String line = reader.readLine();
+            return (line == null || line.trim().isEmpty()) ? "Limited" : line.trim();
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-            return null;
+            return "Limited";
+        } finally {
+            try {
+                reader.close();
+            } catch (IOException ignore) {
+            }
         }
     }
 
@@ -368,7 +366,6 @@ public class RamsesUI extends javax.swing.JFrame {
         toolsMenu = new javax.swing.JMenu();
         saveCommandFileMenuItem = new javax.swing.JMenuItem();
         saveObsFileMenuItem = new javax.swing.JMenuItem();
-        installRedLibMenuItem = new javax.swing.JMenuItem();
         openNppButton = new javax.swing.JMenuItem();
         loadExtSimButton = new javax.swing.JMenuItem();
         selWorkDirButton = new javax.swing.JMenuItem();
@@ -2140,15 +2137,6 @@ public class RamsesUI extends javax.swing.JFrame {
         });
         toolsMenu.add(saveObsFileMenuItem);
 
-        installRedLibMenuItem.setText("Install Intel Redistributable Libraries");
-        installRedLibMenuItem.setName("installRedLibMenuItem"); // NOI18N
-        installRedLibMenuItem.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                installRedLibMenuItemActionPerformed(evt);
-            }
-        });
-        toolsMenu.add(installRedLibMenuItem);
-
         openNppButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         openNppButton.setText("Open Notepad++");
         openNppButton.setName("openNppButton"); // NOI18N
@@ -2769,42 +2757,6 @@ public class RamsesUI extends javax.swing.JFrame {
 
     }//GEN-LAST:event_saveCommandFileMenuItemActionPerformed
 
-    private void installRedLibMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_installRedLibMenuItemActionPerformed
-        String msg = "<html><center>Welcome to RAMSES</center><br /><br />"
-                + "In order for the simulator to work you need to have <i>Intel Fortran Compiler</i> or <i>Intel Fortran<br />"
-                + "redistributable libraries</i> installed.<br /><br />"
-                + "The latter can be installed freely from Intel Website:"
-                + "<ul>"
-                + "<li>Press the <i>Install Libraries</i> button to go to Intel Website</li>"
-                + "<li>Download and install the latest <i>Fortran Redistributable library</i> (64-bit)</li>"
-                + "<li>Restart this program for the changes in the Path to be recognized</li>"
-                + "</ul>"
-                + "This window can be accessed at any time from Tools->Install Intel Redistributable Libraries.<br /><br />"
-                + "Currently the simulator supports <i>only</i> 64-bit MS Windows versions and Linux distributions.<br /><br />"
-                + "Please feel free to inform us of any bugs you might find.</html>";
-        int response = JOptionPane.showOptionDialog(null,
-                msg,
-                "Install Redistributable Libraries",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.INFORMATION_MESSAGE,
-                null,
-                new String[]{"Install Libraries", "Cancel"}, // this is the array
-                "default");
-        if (response == JOptionPane.NO_OPTION) {
-            return;
-        }
-        if (response == JOptionPane.CANCEL_OPTION) {
-            return;
-        }
-        String url = null;
-        if (OS.isFamilyUnix()) {
-            url = "https://software.intel.com/en-us/articles/redistributables-for-intel-parallel-studio-xe-2015-composer-edition-for-linux";
-        } else if (OS.isFamilyWindows()) {
-            url = "https://software.intel.com/en-us/articles/redistributables-for-intel-parallel-studio-xe-2015-composer-edition-for-windows";
-        }
-        BareBonesBrowserLaunch.openURL(url);
-    }//GEN-LAST:event_installRedLibMenuItemActionPerformed
-
     private void saveObsFileMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveObsFileMenuItemActionPerformed
         try {
             fileChooser.setSelectedFile(new File(""));
@@ -2865,23 +2817,7 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void openTermButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openTermButtonActionPerformed
         try {
-            CommandLine command;
-            if (OS.isFamilyWindows()) {
-                command = new CommandLine("cmd.exe");
-                command.addArgument("/c");
-                command.addArgument("start");
-
-            } else {
-                command = new CommandLine("xterm");
-            }
-            DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-            DefaultExecutor executor = new DefaultExecutor();
-            ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-            executor.setProcessDestroyer(processDestroyer);
-            executor.setWorkingDirectory(myTempDir);
-            executor.execute(command, resultHandler);
-        } catch (ExecuteException ex) {
-            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
+            PlatformLauncher.openTerminal(myTempDir);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -2892,48 +2828,26 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_openNppButtonActionPerformed
 
     private void nppOpen(java.awt.event.ActionEvent evt, String filename) {
+        File target = filename.isEmpty() ? myTempDir : new File(filename);
+        if (!target.exists()) {
+            JOptionPane.showMessageDialog(this,
+                    "<html>The file <B>" + target.getName() + "</B> does not exist.</html>",
+                    "File not found", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
         try {
-            if (nppExec.exists()) {
-                CommandLine command;
-                if (OS.isFamilyWindows()) {
-                    command = new CommandLine(nppExec.getAbsolutePath());
-                } else {
-                    command = new CommandLine("wine");
-                    command.addArgument(nppExec.getAbsolutePath());
-                }
-                command.addArgument(filename);
-                DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-                DefaultExecutor executor = new DefaultExecutor();
-                ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-                executor.setProcessDestroyer(processDestroyer);
-                executor.execute(command, resultHandler);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>notepad++.exe</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
-            }
+            PlatformLauncher.openInEditor(target);
         } catch (IOException ex) {
-            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this,
+                    "Could not open an editor for " + target.getAbsolutePath()
+                    + "\n\n" + ex.getMessage(),
+                    "Editor error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private void openExplButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openExplButtonActionPerformed
         try {
-            CommandLine command;
-            if (OS.isFamilyWindows()) {
-                command = new CommandLine("explorer.exe");
-                command.addArgument("/root," + myTempDir.getAbsolutePath());
-
-            } else {
-                command = new CommandLine("xdg-open");
-                command.addArgument(myTempDir.getAbsolutePath());
-            }
-            DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-            DefaultExecutor executor = new DefaultExecutor();
-            ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-            executor.setProcessDestroyer(processDestroyer);
-            executor.setWorkingDirectory(myTempDir);
-            executor.execute(command, resultHandler);
-        } catch (ExecuteException ex) {
-            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
+            PlatformLauncher.openFileManager(myTempDir);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -2942,7 +2856,7 @@ public class RamsesUI extends javax.swing.JFrame {
     private void loadExtSimButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadExtSimButtonActionPerformed
         fileChooser.setSelectedFile(new File(""));
         fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-        if (OS.isFamilyWindows()) {
+        if (platform == Platform.WINDOWS_X86_64) {
             FileNameExtensionFilter filter = new FileNameExtensionFilter("Executable", "exe");
             fileChooser.setFileFilter(filter);
         } else {
@@ -2968,7 +2882,8 @@ public class RamsesUI extends javax.swing.JFrame {
             BufferedReader in;
             in = new BufferedReader(new InputStreamReader(url.openStream()));
             String str;
-            BufferedWriter out = new BufferedWriter(new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "ChangeLog.txt"));
+            File changeLogFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "ChangeLog.txt");
+            BufferedWriter out = new BufferedWriter(new FileWriter(changeLogFile));
             out.write("");
             out.flush();
             while ((str = in.readLine()) != null) {
@@ -2977,22 +2892,13 @@ public class RamsesUI extends javax.swing.JFrame {
             }
             out.close();
             in.close();
-            if (nppExec.exists()) {
-                CommandLine command;
-                if (OS.isFamilyWindows()) {
-                    command = new CommandLine(nppExec.getAbsolutePath());
-                } else {
-                    command = new CommandLine("wine");
-                    command.addArgument(nppExec.getAbsolutePath());
-                }
-                command.addArgument(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "ChangeLog.txt");
-                DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-                DefaultExecutor executor = new DefaultExecutor();
-                ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-                executor.setProcessDestroyer(processDestroyer);
-                executor.execute(command, resultHandler);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>notepad++.exe</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
+            try {
+                PlatformLauncher.openInEditor(changeLogFile);
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(this,
+                        "Could not open an editor for " + changeLogFile.getAbsolutePath()
+                        + "\n\n" + ex.getMessage(),
+                        "Editor error", JOptionPane.ERROR_MESSAGE);
             }
         } catch (IOException e) {
             JOptionPane.showMessageDialog(null, "<html>The online Changelog file can not be accessed <br /> If you are sure you have internet connection, please report this.</html>", "Limited internet access", JOptionPane.ERROR_MESSAGE);
@@ -3077,23 +2983,7 @@ public class RamsesUI extends javax.swing.JFrame {
             IOUtils.copy(in, streamOut);
             in.close();
             streamOut.close();
-            if (nppExec.exists()) {
-                CommandLine command;
-                if (OS.isFamilyWindows()) {
-                    command = new CommandLine(nppExec.getAbsolutePath());
-                } else {
-                    command = new CommandLine("wine");
-                    command.addArgument(nppExec.getAbsolutePath());
-                }
-                command.addArgument(gnupCopyrightFile.getAbsolutePath());
-                DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-                DefaultExecutor executor = new DefaultExecutor();
-                ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-                executor.setProcessDestroyer(processDestroyer);
-                executor.execute(command, resultHandler);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>notepad++.exe</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
-            }
+            PlatformLauncher.openInEditor(gnupCopyrightFile);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -3116,23 +3006,7 @@ public class RamsesUI extends javax.swing.JFrame {
             IOUtils.copy(in, streamOut);
             in.close();
             streamOut.close();
-            if (nppExec.exists()) {
-                CommandLine command;
-                if (OS.isFamilyWindows()) {
-                    command = new CommandLine(nppExec.getAbsolutePath());
-                } else {
-                    command = new CommandLine("wine");
-                    command.addArgument(nppExec.getAbsolutePath());
-                }
-                command.addArgument(gnupCopyrightFile.getAbsolutePath());
-                DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-                DefaultExecutor executor = new DefaultExecutor();
-                ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-                executor.setProcessDestroyer(processDestroyer);
-                executor.execute(command, resultHandler);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>notepad++.exe</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
-            }
+            PlatformLauncher.openInEditor(gnupCopyrightFile);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -3152,23 +3026,7 @@ public class RamsesUI extends javax.swing.JFrame {
             IOUtils.copy(in, streamOut);
             in.close();
             streamOut.close();
-            if (nppExec.exists()) {
-                CommandLine command;
-                if (OS.isFamilyWindows()) {
-                    command = new CommandLine(nppExec.getAbsolutePath());
-                } else {
-                    command = new CommandLine("wine");
-                    command.addArgument(nppExec.getAbsolutePath());
-                }
-                command.addArgument(gnupCopyrightFile.getAbsolutePath());
-                DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-                DefaultExecutor executor = new DefaultExecutor();
-                ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-                executor.setProcessDestroyer(processDestroyer);
-                executor.execute(command, resultHandler);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>notepad++.exe</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
-            }
+            PlatformLauncher.openInEditor(gnupCopyrightFile);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -3192,23 +3050,7 @@ public class RamsesUI extends javax.swing.JFrame {
             IOUtils.copy(in, streamOut);
             in.close();
             streamOut.close();
-            if (nppExec.exists()) {
-                CommandLine command;
-                if (OS.isFamilyWindows()) {
-                    command = new CommandLine(nppExec.getAbsolutePath());
-                } else {
-                    command = new CommandLine("wine");
-                    command.addArgument(nppExec.getAbsolutePath());
-                }
-                command.addArgument(kluCopyrightFile.getAbsolutePath());
-                DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-                DefaultExecutor executor = new DefaultExecutor();
-                ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-                executor.setProcessDestroyer(processDestroyer);
-                executor.execute(command, resultHandler);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>notepad++.exe</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
-            }
+            PlatformLauncher.openInEditor(kluCopyrightFile);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -3250,7 +3092,7 @@ public class RamsesUI extends javax.swing.JFrame {
             runSimulationActionPerformed(evt);
             simulExecutorResultHandler.waitFor();
             fileDist.setText(tmpString);
-            if (OS.isFamilyWindows()) {
+            if (platform == Platform.WINDOWS_X86_64) {
                 matlabProcessBuilder = new ProcessBuilder("matlab.exe", "-desktop", "-r", "ssa");
             } else {
                 matlabProcessBuilder = new ProcessBuilder("matlab", "-desktop", "-r", "ssa");
@@ -3377,19 +3219,10 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_saveCurrentCurveButtonActionPerformed
 
     private void clearGnuplotButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearGnuplotButtonActionPerformed
-        try {
-            Runtime rt = Runtime.getRuntime();
-            if (OS.isFamilyWindows()) {
-                rt.exec("taskkill /F /IM wgnuplot.exe");
-                rt.exec("taskkill /F /IM wgnuplotR.exe");
-                rt.exec("taskkill /F /IM pgnuplot.exe");
-                rt.exec("taskkill /F /IM gnuplot.exe");
-            } else {
-                rt.exec("killall -9 gnuplot");
-            }
-        } catch (IOException ex) {
-            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        PlatformLauncher.killByName(platform, "wgnuplot");
+        PlatformLauncher.killByName(platform, "wgnuplotR");
+        PlatformLauncher.killByName(platform, "pgnuplot");
+        PlatformLauncher.killByName(platform, "gnuplot");
     }//GEN-LAST:event_clearGnuplotButtonActionPerformed
 
     private void saveTrajToFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveTrajToFileButtonActionPerformed
@@ -3449,11 +3282,7 @@ public class RamsesUI extends javax.swing.JFrame {
                 exec.setStreamHandler(streamHandler);
                 exec.setProcessDestroyer(processDestroyer);
                 exec.setWorkingDirectory(myTempDir);
-                if (OS.isFamilyWindows()) {
-                    exec.execute(command, WinEnvironment, resultHandler);
-                } else {
-                    exec.execute(command, resultHandler);
-                }
+                exec.execute(command, WinEnvironment, resultHandler);
             } else {
                 JOptionPane.showMessageDialog(this, "<html>The file <B>gnuplot</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
             }
@@ -3465,32 +3294,20 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void runDyngraphButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runDyngraphButtonActionPerformed
         try {
-            CommandLine command = null;
             if (!dyngraphExec.exists()) {
                 JOptionPane.showMessageDialog(this, "<html>The file <B>dyngraph</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
                 return;
-            } else {
-                if (OS.isFamilyUnix()) {
-                    command = new CommandLine("xterm");
-                    command.addArgument("-e");
-                    command.addArgument(dyngraphExec.getAbsolutePath());
-                    command.addArgument("-c");
-
-                } else if (OS.isFamilyWindows()) {
-                    command = new CommandLine(dyngraphExec.getAbsolutePath());
-                }
             }
-            command.addArgument("-a" + myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "output.trj");
-            command.addArgument("-o" + myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut");
+            java.util.List<String> argv = new java.util.ArrayList<String>();
+            argv.add(dyngraphExec.getAbsolutePath());
+            if (platform != Platform.WINDOWS_X86_64) {
+                argv.add("-c");
+            }
+            argv.add("-a" + myTempDir.getAbsolutePath() + File.separator + "output.trj");
+            argv.add("-o" + myTempDir.getAbsolutePath() + File.separator + "tempGnupOut");
             viewCurvesButton.setEnabled(true);
-            DefaultExecutor executor = new DefaultExecutor();
-            ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-            PumpStreamHandler streamHandler = new PumpStreamHandler();
-            executor.setStreamHandler(streamHandler);
-            executor.setProcessDestroyer(processDestroyer);
-            executor.setWorkingDirectory(myTempDir);
             saveCurrentCurveButton.setEnabled(true);
-            executor.execute(command);
+            PlatformLauncher.runInTerminal(platform, argv, myTempDir);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -3542,11 +3359,7 @@ public class RamsesUI extends javax.swing.JFrame {
             File fileTemp = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + ".kill_RAMSES");
             if (fileTemp.exists()) {
                 fileTemp.delete();
-                if (OS.isFamilyWindows()) {
-                    Runtime.getRuntime().exec("taskkill /F /IM dynsim.exe");
-                } else {
-                    Runtime.getRuntime().exec("killall -9 dynsim");
-                }
+                PlatformLauncher.killByName(platform, "dynsim");
                 fileTemp = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + ".lock_RAMSES");
                 if (fileTemp.exists()) {
                     fileTemp.delete();
@@ -3745,11 +3558,7 @@ public class RamsesUI extends javax.swing.JFrame {
         simulExecutor.setWorkingDirectory(myTempDir);
         simulExecutor.setProcessDestroyer(processDestroyer);
         try {
-            if (OS.isFamilyWindows()) {
-                simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
-            } else {
-                simulExecutor.execute(command, simulExecutorResultHandler);
-            }
+            simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
             runSimulation.setEnabled(false);
             runDyngraphButton.setEnabled(false);
             saveTrajToFileButton.setEnabled(false);
@@ -4244,11 +4053,7 @@ public class RamsesUI extends javax.swing.JFrame {
         simulExecutor.setWorkingDirectory(myTempDir);
         simulExecutor.setProcessDestroyer(processDestroyer);
         try {
-            if (OS.isFamilyWindows()) {
-                simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
-            } else {
-                simulExecutor.execute(command, simulExecutorResultHandler);
-            }
+            simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -4441,11 +4246,7 @@ public class RamsesUI extends javax.swing.JFrame {
     simulExecutor.setWorkingDirectory(myTempDir);
     simulExecutor.setProcessDestroyer(processDestroyer);
     try {
-        if (OS.isFamilyWindows()) {
-            simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
-        } else {
-            simulExecutor.execute(command, simulExecutorResultHandler);
-        }
+        simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
         InputStream in = RamsesUI.class.getResourceAsStream("URAMSES.zip");
         fileOps.extractToFolder(new ZipInputStream(in), myTempDir);
     } catch (IOException ex) {
@@ -4491,7 +4292,15 @@ public class RamsesUI extends javax.swing.JFrame {
     
     
     private void CompileActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_CompileActionPerformed
-        try {   
+        if (platform != Platform.WINDOWS_X86_64) {
+            JOptionPane.showMessageDialog(this,
+                    "<html>Compiling custom models requires the Intel Fortran and "
+                    + "Visual Studio toolchain, which is available on Windows only."
+                    + "<br>Model generation works on this platform; compilation does not.</html>",
+                    "Not available on this platform", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        try {
             codegenPane.setText("Starting compilation...\n");
             String vfproj = "";
             for (File temp : codeGenFiles) {
@@ -4686,23 +4495,7 @@ public class RamsesUI extends javax.swing.JFrame {
             IOUtils.copy(in, streamOut);
             in.close();
             streamOut.close();
-            if (nppExec.exists()) {
-                CommandLine command;
-                if (OS.isFamilyWindows()) {
-                    command = new CommandLine(nppExec.getAbsolutePath());
-                } else {
-                    command = new CommandLine("wine");
-                    command.addArgument(nppExec.getAbsolutePath());
-                }
-                command.addArgument(kluCopyrightFile.getAbsolutePath());
-                DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-                DefaultExecutor executor = new DefaultExecutor();
-                ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-                executor.setProcessDestroyer(processDestroyer);
-                executor.execute(command, resultHandler);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>notepad++.exe</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
-            }
+            PlatformLauncher.openInEditor(kluCopyrightFile);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -4722,23 +4515,7 @@ public class RamsesUI extends javax.swing.JFrame {
             IOUtils.copy(in, streamOut);
             in.close();
             streamOut.close();
-            if (nppExec.exists()) {
-                CommandLine command;
-                if (OS.isFamilyWindows()) {
-                    command = new CommandLine(nppExec.getAbsolutePath());
-                } else {
-                    command = new CommandLine("wine");
-                    command.addArgument(nppExec.getAbsolutePath());
-                }
-                command.addArgument(kluCopyrightFile.getAbsolutePath());
-                DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-                DefaultExecutor executor = new DefaultExecutor();
-                ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-                executor.setProcessDestroyer(processDestroyer);
-                executor.execute(command, resultHandler);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>notepad++.exe</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
-            }
+            PlatformLauncher.openInEditor(kluCopyrightFile);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -4758,23 +4535,7 @@ public class RamsesUI extends javax.swing.JFrame {
             IOUtils.copy(in, streamOut);
             in.close();
             streamOut.close();
-            if (nppExec.exists()) {
-                CommandLine command;
-                if (OS.isFamilyWindows()) {
-                    command = new CommandLine(nppExec.getAbsolutePath());
-                } else {
-                    command = new CommandLine("wine");
-                    command.addArgument(nppExec.getAbsolutePath());
-                }
-                command.addArgument(kluCopyrightFile.getAbsolutePath());
-                DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-                DefaultExecutor executor = new DefaultExecutor();
-                ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-                executor.setProcessDestroyer(processDestroyer);
-                executor.execute(command, resultHandler);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>notepad++.exe</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
-            }
+            PlatformLauncher.openInEditor(kluCopyrightFile);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -4926,7 +4687,6 @@ public class RamsesUI extends javax.swing.JFrame {
     private javax.swing.JMenu helpMenu;
     private javax.swing.JTextField injObsField;
     private javax.swing.JComboBox injObsList;
-    private javax.swing.JMenuItem installRedLibMenuItem;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel2;
