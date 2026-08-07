@@ -11,7 +11,6 @@
 package my.ramses;
 
 import java.awt.Component;
-import java.awt.Desktop;
 import java.awt.HeadlessException;
 import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
@@ -2906,16 +2905,7 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_showChangeLogButtonActionPerformed
 
     private void showUserGuideButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showUserGuideButtonActionPerformed
-        try {
-            if (userguide.exists()) {
-                Desktop.getDesktop().open(userguide);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>userguide.pdf</B> does not exist.</html>", "File not found!", JOptionPane.ERROR_MESSAGE);
-            }
-        } catch (IOException ex) {
-            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
+        BareBonesBrowserLaunch.openURL("https://stepss.sps-lab.org/");
     }//GEN-LAST:event_showUserGuideButtonActionPerformed
 
     private void selWorkDirButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_selWorkDirButtonActionPerformed
@@ -4623,7 +4613,6 @@ public class RamsesUI extends javax.swing.JFrame {
     private File gnuplotExec = null;
     private File nppExec = null;
     private File codegenExec = null;
-    private File userguide = null;
     private double this_version = 0.0;
     private boolean ssa = false;
     private ProcessBuilder matlabProcessBuilder;
@@ -4911,7 +4900,6 @@ public class RamsesUI extends javax.swing.JFrame {
             dyngraphExec = toolchain.dyngraph();
             codegenExec = toolchain.codegen();
             nppExec = toolchain.npp();
-            userguide = toolchain.userGuide();
             gnuplotExec = toolchain.gnuplot();
             WinEnvironment = PlatformLauncher.execEnvironment(platform, toolDir);
 

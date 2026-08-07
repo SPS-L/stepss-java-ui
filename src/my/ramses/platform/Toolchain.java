@@ -15,7 +15,6 @@ public final class Toolchain {
     public static final String CODEGEN = "codegen";
     public static final String GNUPLOT = "gnuplot";
     public static final String VSWHERE = "vswhere";
-    public static final String USERGUIDE = "userguide";
     public static final String URAMSES = "uramses";
     public static final String NPP = "npp";
 
@@ -61,12 +60,6 @@ public final class Toolchain {
                 "npp.zip", ToolSpec.Kind.ZIP, null, "notepad++.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
                 "npp.zip", ToolSpec.Kind.ZIP, null, "notepad++.exe", true)));
-
-        s.add(new ToolSpec(USERGUIDE)
-            .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "DOC.zip", ToolSpec.Kind.ZIP, null, "DOC/userguide.pdf", false))
-            .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "DOC.zip", ToolSpec.Kind.ZIP, null, "DOC/userguide.pdf", false)));
 
         s.add(new ToolSpec(URAMSES)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
@@ -122,7 +115,6 @@ public final class Toolchain {
     public File codegen()   { return get(CODEGEN); }
     public File vswhere()   { return get(VSWHERE); }
     public File npp()       { return get(NPP); }
-    public File userGuide() { return get(USERGUIDE); }
 
     /**
      * Windows bundles gnuplot; elsewhere it is resolved from PATH.
