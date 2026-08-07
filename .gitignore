@@ -1,3 +1,14 @@
 # Local Claude Code / MCP configuration
 /.claude/
 .mcp.json
+/.superpowers/
+
+# Ant build outputs
+/build/
+/dist/
+
+# Fetched release payloads (see versions.properties)
+/payload-cache/
+
+# Staged build inputs copied from payload-cache/ (see build.xml stage-payloads)
+/src/my/ramses/payload/

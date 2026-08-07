@@ -7,7 +7,7 @@
 <!-- the Compile on Save feature is turned off for the project. -->
 <!-- You can turn off the Compile on Save (or Deploy on Save) setting -->
 <!-- in the project's Project Properties dialog box.-->
-<project name="ramses" default="default" basedir=".">
+<project name="ramses" default="default" basedir="." xmlns:unless="ant:unless" xmlns:if="ant:if">
     <description>Builds, tests, and runs the project ramses.</description>
     <import file="nbproject/build-impl.xml"/>
     <!--
@@ -71,11 +71,184 @@
     nbproject/build-impl.xml file. 
 
     -->
- <target name="-post-jar">  
-  <jar jarfile="dist/stepss.jar" update="true">  
-	<zipfileset src="${dist.jar}" excludes="META-INF/*" />  
+ <target name="-post-jar">
+  <jar jarfile="dist/stepss.jar" update="true">
+	<zipfileset src="${dist.jar}" excludes="META-INF/*" />
 	<zipfileset src="dist/lib/commons-exec-1.3.jar" excludes="META-INF/*" />
 	<zipfileset src="dist/lib/commons-io-2.11.0.jar" excludes="META-INF/*" />
-  </jar>  
- </target>  
+  </jar>
+ </target>
+
+ <!-- Runs after javac, once my.ramses.platform.Toolchain and friends are
+      compiled, and after stage-payloads (a -pre-compile dependency, so it
+      has already run by the time -post-compile does) has populated
+      src/my/ramses/payload/. Catches the case versions.properties' own
+      header used to invite: bumping a component's version there fetches
+      and stages the new asset under its new name and leaves the build
+      green, but Toolchain.java's hardcoded, version-suffixed resource
+      names still point at the old one, so every launch would fail with
+      "Missing bundled resource" once the jar shipped. See
+      PayloadManifestCheck's class comment for the full rationale. -->
+ <target name="-post-compile"
+         description="Fail the build if Toolchain.java's payload manifest and the staged payload directory disagree">
+  <java classname="my.ramses.platform.PayloadManifestCheck"
+        classpath="${build.classes.dir}"
+        fork="true" failonerror="true">
+   <arg value="src/my/ramses/payload"/>
+  </java>
+ </target>
+
+ <property file="versions.properties"/>
+ <property name="payload.cache" location="payload-cache"/>
+
+ <macrodef name="fetch-asset">
+  <attribute name="repo"/>
+  <attribute name="tag"/>
+  <attribute name="asset"/>
+  <attribute name="sha256"/>
+  <sequential>
+   <mkdir dir="${payload.cache}"/>
+   <!-- Skip the network call entirely when the asset is already sitting in
+        the cache: `gh release download` still resolves the release against
+        api.github.com before deciding whether the "skip existing" flag
+        applies, so calling it unconditionally would mean every build needs
+        network and `gh` auth, not just the first one. The digest check
+        below still runs on both paths, so a corrupt or tampered cached file
+        fails the build exactly as it would after a fresh download. -->
+   <available file="${payload.cache}/@{asset}" property="@{asset}.cached"/>
+
+   <!-- The cache is keyed on filename only, and not every asset's filename
+        carries its version: helios' Linux and Windows assets, for example,
+        are named identically release to release. A cache hit can therefore
+        be a stale file left over from a previous version pin, sitting under
+        the name the current pin expects. Verify a cached file before
+        trusting it: a match means it's genuinely reusable (stop here, no
+        network); a mismatch means the file is stale, not corrupt or
+        tampered, so discard it and fall through to the fresh download below
+        instead of failing the build on what would otherwise look like a bad
+        release. verifyproperty (rather than the property-and-<equals> form
+        used for the final check below) is the natural fit for this
+        test-then-branch. -->
+   <checksum file="${payload.cache}/@{asset}" algorithm="SHA-256"
+             property="@{sha256}" verifyproperty="@{asset}.cache.ok"
+             if:set="@{asset}.cached"/>
+   <condition property="@{asset}.stale">
+    <and>
+     <isset property="@{asset}.cached"/>
+     <not><istrue value="${@{asset}.cache.ok}"/></not>
+    </and>
+   </condition>
+   <delete file="${payload.cache}/@{asset}" quiet="true" if:set="@{asset}.stale"/>
+   <!-- Re-check availability post-discard: the exec below (and the final
+        verification further down) gate on this, so a stale cache hit that
+        just got deleted behaves exactly like a cold cache miss from here
+        on. -->
+   <available file="${payload.cache}/@{asset}" property="@{asset}.still-cached"/>
+
+   <!-- SPS-L/@{repo} release assets live in a private repo: the plain
+        https://github.com/OWNER/REPO/releases/download/... URL only serves
+        browser sessions and returns 404 to anonymous or bearer-token requests
+        (verified). The GitHub REST API's asset-redirect endpoint accepts
+        token auth, but reaching it needs a JSON lookup of the numeric asset
+        id that stock Ant cannot do. `gh release download` performs that
+        lookup and the authenticated download in one step, reusing the
+        caller's existing `gh auth login` session. Requires: gh CLI installed
+        and authenticated with access to the SPS-L org. -->
+   <exec executable="gh" failonerror="true" failifexecutionfails="true"
+         unless:set="@{asset}.still-cached">
+    <arg value="release"/>
+    <arg value="download"/>
+    <arg value="@{tag}"/>
+    <arg value="--repo"/>
+    <arg value="@{repo}"/>
+    <arg value="--pattern"/>
+    <arg value="@{asset}"/>
+    <arg value="--dir"/>
+    <arg value="${payload.cache}"/>
+    <arg value="--skip-existing"/>
+   </exec>
+
+   <!-- Only re-hash when a download just happened above: a cache hit that
+        already matched the pinned digest is known-good from the check
+        above and doesn't need a second pass. -->
+   <checksum file="${payload.cache}/@{asset}" algorithm="SHA-256"
+             property="@{asset}.actual" unless:set="@{asset}.still-cached"/>
+   <fail message="Digest mismatch for @{asset}: expected @{sha256}, got ${@{asset}.actual}">
+    <condition>
+     <and>
+      <isset property="@{asset}.actual"/>
+      <not><isset property="@{asset}.stale"/></not>
+      <not><equals arg1="${@{asset}.actual}" arg2="@{sha256}"/></not>
+     </and>
+    </condition>
+   </fail>
+   <!-- Same check, but reached only after a stale cache entry was already
+        discarded and re-downloaded once: a mismatch here is not the stale
+        cache biting us a second time, it means the release itself changed
+        or the pin is wrong, so say that plainly instead of leaving it to
+        read like the plain case above. -->
+   <fail message="Digest mismatch for @{asset} even after discarding a stale cached copy and re-downloading fresh: expected @{sha256}, got ${@{asset}.actual}. This is not a stale-cache symptom -- the pinned digest or the released asset itself needs checking.">
+    <condition>
+     <and>
+      <isset property="@{asset}.stale"/>
+      <not><equals arg1="${@{asset}.actual}" arg2="@{sha256}"/></not>
+     </and>
+    </condition>
+   </fail>
+   <echo message="verified @{asset}"/>
+  </sequential>
+ </macrodef>
+
+ <target name="fetch-payloads" description="Download and verify pinned release payloads">
+  <fetch-asset repo="${ramses.repo}" tag="${ramses.tag}"
+               asset="${ramses.windows.asset}" sha256="${ramses.windows.sha256}"/>
+  <fetch-asset repo="${ramses.repo}" tag="${ramses.tag}"
+               asset="${ramses.linux.asset}" sha256="${ramses.linux.sha256}"/>
+  <fetch-asset repo="${ramses.repo}" tag="${ramses.tag}"
+               asset="${ramses.macos.asset}" sha256="${ramses.macos.sha256}"/>
+  <fetch-asset repo="${helios.repo}" tag="${helios.tag}"
+               asset="${helios.windows.asset}" sha256="${helios.windows.sha256}"/>
+  <fetch-asset repo="${helios.repo}" tag="${helios.tag}"
+               asset="${helios.linux.asset}" sha256="${helios.linux.sha256}"/>
+  <fetch-asset repo="${helios.repo}" tag="${helios.tag}"
+               asset="${helios.macos.asset}" sha256="${helios.macos.sha256}"/>
+  <fetch-asset repo="${dyngraph.repo}" tag="${dyngraph.tag}"
+               asset="${dyngraph.linux.asset}" sha256="${dyngraph.linux.sha256}"/>
+  <fetch-asset repo="${dyngraph.repo}" tag="${dyngraph.tag}"
+               asset="${dyngraph.macos.asset}" sha256="${dyngraph.macos.sha256}"/>
+  <fetch-asset repo="${codegen.repo}" tag="${codegen.tag}"
+               asset="${codegen.windows.asset}" sha256="${codegen.windows.sha256}"/>
+  <fetch-asset repo="${codegen.repo}" tag="${codegen.tag}"
+               asset="${codegen.linux.asset}" sha256="${codegen.linux.sha256}"/>
+  <fetch-asset repo="${codegen.repo}" tag="${codegen.tag}"
+               asset="${codegen.macos.asset}" sha256="${codegen.macos.sha256}"/>
+ </target>
+
+ <target name="stage-payloads" depends="fetch-payloads"
+         description="Copy verified payloads into the source tree for packaging">
+  <!-- Nothing else prunes this directory, so a stale payload left over from
+       a previous version pin (e.g. after bumping versions.properties) would
+       otherwise survive indefinitely and ship in the jar alongside the
+       current one. Clearing it here means it always reflects exactly the
+       pinned set in payload-cache/, never a superset. This only touches the
+       staged copies under src/my/ramses/payload/ - payload-cache/ itself
+       (the download cache Finding 1 relies on) is left untouched. -->
+  <delete dir="src/my/ramses/payload" quiet="true"/>
+  <mkdir dir="src/my/ramses/payload"/>
+  <copy todir="src/my/ramses/payload" flatten="true">
+   <fileset dir="${payload.cache}">
+    <include name="ramses-*"/>
+    <include name="stepss-helios-*"/>
+    <include name="dyngraph-linux-*"/>
+    <include name="dyngraph-macos-*"/>
+    <include name="codegen-*"/>
+   </fileset>
+  </copy>
+ </target>
+
+ <target name="-pre-compile" depends="stage-payloads"/>
+
+ <target name="-post-clean" description="Remove staged payload copies so ant clean leaves no residue">
+  <delete dir="src/my/ramses/payload" quiet="true"/>
+ </target>
 </project>

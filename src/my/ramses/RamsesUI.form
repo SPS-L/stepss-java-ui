@@ -54,11 +54,7 @@
                           <Group type="103" groupAlignment="0" attributes="0">
                               <Group type="102" alignment="0" attributes="0">
                                   <Group type="103" groupAlignment="0" attributes="0">
-                                      <Group type="102" alignment="0" attributes="0">
-                                          <Component id="showKLULicenseButton" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace max="-2" attributes="0"/>
-                                          <Component id="showNppLicenseButton" min="-2" max="-2" attributes="0"/>
-                                      </Group>
+                                      <Component id="showKLULicenseButton" min="-2" max="-2" attributes="0"/>
                                       <Component id="versionLabel1" alignment="0" min="-2" pref="121" max="-2" attributes="0"/>
                                   </Group>
                                   <EmptySpace max="-2" attributes="0"/>
@@ -119,7 +115,6 @@
                   <Group type="103" groupAlignment="3" attributes="0">
                       <Component id="showGnupCopyrightButton" alignment="3" max="-2" attributes="0"/>
                       <Component id="showApacheLicenseButton" alignment="3" max="-2" attributes="0"/>
-                      <Component id="showNppLicenseButton" alignment="3" max="-2" attributes="0"/>
                       <Component id="showKLULicenseButton" alignment="3" max="-2" attributes="0"/>
                   </Group>
                   <EmptySpace max="32767" attributes="0"/>
@@ -199,15 +194,6 @@
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="showApacheLicenseButtonActionPerformed"/>
           </Events>
         </Component>
-        <Component class="javax.swing.JButton" name="showNppLicenseButton">
-          <Properties>
-            <Property name="text" type="java.lang.String" value="Notepad++"/>
-            <Property name="name" type="java.lang.String" value="showNppLicenseButton" noResource="true"/>
-          </Properties>
-          <Events>
-            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="showNppLicenseButtonActionPerformed"/>
-          </Events>
-        </Component>
         <Component class="javax.swing.JButton" name="showKLULicenseButton">
           <Properties>
             <Property name="text" type="java.lang.String" value="KLU solver"/>
@@ -234,7 +220,7 @@
         </Component>
         <Component class="javax.swing.JButton" name="showPFCLicenseButton">
           <Properties>
-            <Property name="text" type="java.lang.String" value="PFC"/>
+            <Property name="text" type="java.lang.String" value="Helios"/>
             <Property name="name" type="java.lang.String" value="showPFCLicenseButton" noResource="true"/>
           </Properties>
           <Events>
@@ -333,21 +319,12 @@
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="saveObsFileMenuItemActionPerformed"/>
               </Events>
             </MenuItem>
-            <MenuItem class="javax.swing.JMenuItem" name="installRedLibMenuItem">
-              <Properties>
-                <Property name="text" type="java.lang.String" value="Install Intel Redistributable Libraries"/>
-                <Property name="name" type="java.lang.String" value="installRedLibMenuItem" noResource="true"/>
-              </Properties>
-              <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="installRedLibMenuItemActionPerformed"/>
-              </Events>
-            </MenuItem>
             <MenuItem class="javax.swing.JMenuItem" name="openNppButton">
               <Properties>
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="Ctrl+N"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="Open Notepad++"/>
+                <Property name="text" type="java.lang.String" value="Open in Editor"/>
                 <Property name="name" type="java.lang.String" value="openNppButton" noResource="true"/>
               </Properties>
               <Events>
@@ -1978,7 +1955,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadLFRESV2DAT">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Add PFC Results to Data"/>
+                    <Property name="text" type="java.lang.String" value="Add Helios Results to Data"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the discrete trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the discrete changes happening during the simulation.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadLFRESV2DAT" noResource="true"/>

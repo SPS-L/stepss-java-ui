@@ -1,0 +1,58 @@
+ACADEMIC PUBLIC LICENSE FOR THE USE OF STEPSS-HELIOS
+=====================================================
+
+1. Definitions related to the software
+---------------------------------------
+
+"Software" means a copy of STEPSS-Helios, which is distributed under this
+Academic Public License. "Work based on the Software" means either the Software
+or any derivative work under copyright law: that is to say, a work containing
+the Software or a portion of it, either verbatim or with modifications. "Using
+the Software" means any act of creating executables that contain or directly
+use libraries that are part of the Software, running any of the tools that are
+part of the Software, or creating works based on the Software. "You" refers to
+each licensee.
+
+2. Authors
+-----------
+
+STEPSS-Helios has been developed by the Sustainable Power Systems Laboratory
+(SPS-L) at the Cyprus University of Technology, under the direction of
+Dr Petros Aristidou (email: petros.aristidou@cut.ac.cy), hereafter referred to
+as the "Authors".
+
+3. Intellectual property rights
+---------------------------------
+
+STEPSS-Helios is the property of Dr Petros Aristidou. Third-party libraries
+bundled with or built into the Software remain the property of their
+respective owners and are distributed under their own licenses; see the
+THIRD_PARTY_LICENSES file.
+
+4. License terms
+-----------------
+
+Permission is hereby granted to use the Software free of charge for any
+non-commercial purpose, including teaching and research at universities,
+colleges and other educational institutions, research at non-profit research
+institutions, and personal non-profit purposes. For using the Software for
+commercial purposes, including but not restricted to consulting activities,
+design of commercial hardware or software products, or if you are a commercial
+entity participating in research projects, you have to contact the Authors
+(email: info@sps-lab.org) for a commercial license; see LICENSE-COMMERCIAL.md.
+
+You are not required to accept this License. Nothing else grants you permission
+to use the Software; the law prohibits this action if you do not accept this
+License. Therefore, by using the Software (or any work based on the Software),
+you indicate your acceptance of this License and all its terms and conditions.
+
+5. Warranty
+------------
+
+The Software is provided "as is", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability,
+fitness for a particular purpose and non-infringement. In no event shall the
+Authors nor the Intellectual property owners be liable for any claim, damages
+or other liability, whether in an action of contract, tort or otherwise,
+arising from, out of or in connection with the software or the use or other
+dealings in the Software.
