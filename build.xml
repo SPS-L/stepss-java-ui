@@ -7,7 +7,7 @@
 <!-- the Compile on Save feature is turned off for the project. -->
 <!-- You can turn off the Compile on Save (or Deploy on Save) setting -->
 <!-- in the project's Project Properties dialog box.-->
-<project name="ramses" default="default" basedir="." xmlns:unless="ant:unless">
+<project name="ramses" default="default" basedir="." xmlns:unless="ant:unless" xmlns:if="ant:if">
     <description>Builds, tests, and runs the project ramses.</description>
     <import file="nbproject/build-impl.xml"/>
     <!--
@@ -116,6 +116,35 @@
         below still runs on both paths, so a corrupt or tampered cached file
         fails the build exactly as it would after a fresh download. -->
    <available file="${payload.cache}/@{asset}" property="@{asset}.cached"/>
+
+   <!-- The cache is keyed on filename only, and not every asset's filename
+        carries its version: helios' Linux and Windows assets, for example,
+        are named identically release to release. A cache hit can therefore
+        be a stale file left over from a previous version pin, sitting under
+        the name the current pin expects. Verify a cached file before
+        trusting it: a match means it's genuinely reusable (stop here, no
+        network); a mismatch means the file is stale, not corrupt or
+        tampered, so discard it and fall through to the fresh download below
+        instead of failing the build on what would otherwise look like a bad
+        release. verifyproperty (rather than the property-and-<equals> form
+        used for the final check below) is the natural fit for this
+        test-then-branch. -->
+   <checksum file="${payload.cache}/@{asset}" algorithm="SHA-256"
+             property="@{sha256}" verifyproperty="@{asset}.cache.ok"
+             if:set="@{asset}.cached"/>
+   <condition property="@{asset}.stale">
+    <and>
+     <isset property="@{asset}.cached"/>
+     <not><istrue value="${@{asset}.cache.ok}"/></not>
+    </and>
+   </condition>
+   <delete file="${payload.cache}/@{asset}" quiet="true" if:set="@{asset}.stale"/>
+   <!-- Re-check availability post-discard: the exec below (and the final
+        verification further down) gate on this, so a stale cache hit that
+        just got deleted behaves exactly like a cold cache miss from here
+        on. -->
+   <available file="${payload.cache}/@{asset}" property="@{asset}.still-cached"/>
+
    <!-- SPS-L/@{repo} release assets live in a private repo: the plain
         https://github.com/OWNER/REPO/releases/download/... URL only serves
         browser sessions and returns 404 to anonymous or bearer-token requests
@@ -126,7 +155,7 @@
         caller's existing `gh auth login` session. Requires: gh CLI installed
         and authenticated with access to the SPS-L org. -->
    <exec executable="gh" failonerror="true" failifexecutionfails="true"
-         unless:set="@{asset}.cached">
+         unless:set="@{asset}.still-cached">
     <arg value="release"/>
     <arg value="download"/>
     <arg value="@{tag}"/>
@@ -138,11 +167,32 @@
     <arg value="${payload.cache}"/>
     <arg value="--skip-existing"/>
    </exec>
+
+   <!-- Only re-hash when a download just happened above: a cache hit that
+        already matched the pinned digest is known-good from the check
+        above and doesn't need a second pass. -->
    <checksum file="${payload.cache}/@{asset}" algorithm="SHA-256"
-             property="@{asset}.actual"/>
+             property="@{asset}.actual" unless:set="@{asset}.still-cached"/>
    <fail message="Digest mismatch for @{asset}: expected @{sha256}, got ${@{asset}.actual}">
     <condition>
-     <not><equals arg1="${@{asset}.actual}" arg2="@{sha256}"/></not>
+     <and>
+      <isset property="@{asset}.actual"/>
+      <not><isset property="@{asset}.stale"/></not>
+      <not><equals arg1="${@{asset}.actual}" arg2="@{sha256}"/></not>
+     </and>
+    </condition>
+   </fail>
+   <!-- Same check, but reached only after a stale cache entry was already
+        discarded and re-downloaded once: a mismatch here is not the stale
+        cache biting us a second time, it means the release itself changed
+        or the pin is wrong, so say that plainly instead of leaving it to
+        read like the plain case above. -->
+   <fail message="Digest mismatch for @{asset} even after discarding a stale cached copy and re-downloading fresh: expected @{sha256}, got ${@{asset}.actual}. This is not a stale-cache symptom -- the pinned digest or the released asset itself needs checking.">
+    <condition>
+     <and>
+      <isset property="@{asset}.stale"/>
+      <not><equals arg1="${@{asset}.actual}" arg2="@{sha256}"/></not>
+     </and>
     </condition>
    </fail>
    <echo message="verified @{asset}"/>
