@@ -32,6 +32,7 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
+import my.ramses.compile.ModelCompiler;
 import my.ramses.platform.Platform;
 import my.ramses.platform.PlatformLauncher;
 import my.ramses.platform.Toolchain;
@@ -4409,6 +4410,7 @@ public class RamsesUI extends javax.swing.JFrame {
         Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
     }
     saveCGFiles.setEnabled(true);
+    Compile.setEnabled(true);
     }//GEN-LAST:event_execCodegenActionPerformed
 
     private void saveCGFilesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveCGFilesActionPerformed
@@ -4447,12 +4449,99 @@ public class RamsesUI extends javax.swing.JFrame {
     
     
     private void CompileActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_CompileActionPerformed
-        JOptionPane.showMessageDialog(this,
-                "<html>Compiling custom models is not available in this release."
-                + "<br>Model generation works as usual; compilation returns in a"
-                + " later release built on gfortran.</html>",
-                "Not available", JOptionPane.INFORMATION_MESSAGE);
+        if (codeGenFiles == null || codeGenFiles.length == 0) {
+            JOptionPane.showMessageDialog(this,
+                    "<html>No generated models to compile. Run Codegen first.</html>",
+                    "Nothing to compile", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        java.util.List<File> generated = new java.util.ArrayList<File>();
+        for (File temp : codeGenFiles) {
+            String base = temp.getName().replaceFirst("[.][^.]+$", "");
+            File f90 = new File(myTempDir, base + ".f90");
+            if (!f90.isFile()) {
+                JOptionPane.showMessageDialog(this,
+                        "<html>Generated source <B>" + base + ".f90</B> was not found."
+                        + "<br>Run Codegen again before compiling.</html>",
+                        "Generated source missing", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            generated.add(f90);
+        }
+
+        codegenPane.setText("Preparing the build kit...\n");
+        Compile.setEnabled(false);
+        modelCompiler = new ModelCompiler(toolchain.platform(), toolchain);
+        try {
+            modelCompiler.prepare(generated);
+        } catch (IOException ex) {
+            Compile.setEnabled(true);
+            codegenPane.append(ex.getMessage() + "\n");
+            JOptionPane.showMessageDialog(this,
+                    "<html>Could not prepare the build:<br>" + ex.getMessage() + "</html>",
+                    "Compilation failed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        codegenPane.append("Building custom simulator with gfortran...\n\n");
+        try {
+            modelCompiler.build(new ModelCompiler.Listener() {
+                public void onOutput(final String line) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            codegenPane.append(line + "\n");
+                        }
+                    });
+                }
+
+                public void onFinished(final int exitCode, final File dynsim,
+                        final String problem) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            reportCompileOutcome(exitCode, dynsim, problem);
+                        }
+                    });
+                }
+            });
+        } catch (IOException ex) {
+            Compile.setEnabled(true);
+            JOptionPane.showMessageDialog(this,
+                    "<html>Could not start the build:<br>" + ex.getMessage() + "</html>",
+                    "Compilation failed", JOptionPane.ERROR_MESSAGE);
+        }
     }//GEN-LAST:event_CompileActionPerformed
+
+    /**
+     * Adopts a freshly built simulator, or reports why there is not one. Always
+     * runs on the EDT. On any failure {@code ramsesExec} is left pointing at the
+     * bundled engine, so a failed compile never leaves the app unable to
+     * simulate.
+     */
+    private void reportCompileOutcome(int exitCode, File dynsim, String problem) {
+        Compile.setEnabled(true);
+        if (problem != null || dynsim == null) {
+            codegenPane.append("\n" + (problem == null ? "Compilation failed." : problem) + "\n");
+            JOptionPane.showMessageDialog(this,
+                    "<html>" + (problem == null ? "Compilation failed." : escapeHtml(problem))
+                    + "</html>", "Compilation failed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        ramsesExec = dynsim;
+        savedynsim.setEnabled(true);
+        codegenPane.append("\nBuild succeeded: " + dynsim.getAbsolutePath() + "\n");
+        codegenPane.append("Simulations will now run on this custom simulator.\n");
+        JOptionPane.showMessageDialog(this,
+                "<html>Custom simulator built.<br>Simulations will now run on it"
+                + " instead of the bundled engine.</html>",
+                "Compilation complete", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    /** Renders a multi-line plain-text message safely inside an HTML dialog. */
+    private static String escapeHtml(String text) {
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                   .replace("\n", "<br>");
+    }
 
     private void clearPFCOutputActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearPFCOutputActionPerformed
         pfcPane.setText("");
@@ -4511,11 +4600,35 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_showCODEGENLicenseButtonActionPerformed
 
     private void savedynsimActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_savedynsimActionPerformed
-        JOptionPane.showMessageDialog(this,
-                "<html>Saving a compiled executable is not available in this release."
-                + "<br>Model generation works as usual; compilation returns in a"
-                + " later release built on gfortran.</html>",
-                "Not available", JOptionPane.INFORMATION_MESSAGE);
+        if (modelCompiler == null || modelCompiler.builtExecutable() == null) {
+            JOptionPane.showMessageDialog(this,
+                    "<html>No compiled simulator to save. Compile first.</html>",
+                    "Nothing to save", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        File source = modelCompiler.builtExecutable();
+        fileChooser.setSelectedFile(new File(source.getName()));
+        fileChooser.setDialogTitle("Save Compiled Simulator");
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        if (fileChooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        File dest = fileChooser.getSelectedFile();
+        if (dest.exists() && JOptionPane.showConfirmDialog(this, "Overwrite existing file?",
+                "Confirm Overwrite", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.QUESTION_MESSAGE) == JOptionPane.CANCEL_OPTION) {
+            return;
+        }
+        try {
+            fileOps.copyFiletoFile(source, dest);
+            dest.setExecutable(true);
+            codegenPane.append("Saved simulator to " + dest.getAbsolutePath() + "\n");
+        } catch (IOException ex) {
+            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this,
+                    "<html>Could not save the simulator:<br>" + ex.getMessage() + "</html>",
+                    "Save failed", JOptionPane.ERROR_MESSAGE);
+        }
     }//GEN-LAST:event_savedynsimActionPerformed
     /**
      * @param args the command line arguments
@@ -4567,6 +4680,7 @@ public class RamsesUI extends javax.swing.JFrame {
     private File dyngraphExec = null;
     private File gnuplotExec = null;
     private File codegenExec = null;
+    private ModelCompiler modelCompiler = null;
     // initRamses() re-runs on every working-directory change, but the
     // "gnuplot not found" warning only needs to be told once per session.
     private boolean gnuplotMissingWarned = false;
