@@ -220,7 +220,7 @@
         </Component>
         <Component class="javax.swing.JButton" name="showPFCLicenseButton">
           <Properties>
-            <Property name="text" type="java.lang.String" value="PFC"/>
+            <Property name="text" type="java.lang.String" value="Helios"/>
             <Property name="name" type="java.lang.String" value="showPFCLicenseButton" noResource="true"/>
           </Properties>
           <Events>
@@ -324,7 +324,7 @@
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="Ctrl+N"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="Open Notepad++"/>
+                <Property name="text" type="java.lang.String" value="Open in Editor"/>
                 <Property name="name" type="java.lang.String" value="openNppButton" noResource="true"/>
               </Properties>
               <Events>
@@ -1955,7 +1955,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadLFRESV2DAT">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Add PFC Results to Data"/>
+                    <Property name="text" type="java.lang.String" value="Add Helios Results to Data"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the discrete trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the discrete changes happening during the simulation.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadLFRESV2DAT" noResource="true"/>

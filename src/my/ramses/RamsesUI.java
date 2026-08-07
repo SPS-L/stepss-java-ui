@@ -447,7 +447,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        showPFCLicenseButton.setText("PFC");
+        showPFCLicenseButton.setText("Helios");
         showPFCLicenseButton.setName("showPFCLicenseButton"); // NOI18N
         showPFCLicenseButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1533,7 +1533,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadLFRESV2DAT.setText("Add PFC Results to Data");
+        loadLFRESV2DAT.setText("Add Helios Results to Data");
         loadLFRESV2DAT.setToolTipText("<html>Click to see the discrete trace of the simulation.<br>\nThis involves a detailed view on the discrete changes happening during the simulation.</html>");
         loadLFRESV2DAT.setEnabled(false);
         loadLFRESV2DAT.setName("loadLFRESV2DAT"); // NOI18N
@@ -2123,7 +2123,7 @@ public class RamsesUI extends javax.swing.JFrame {
         toolsMenu.add(saveObsFileMenuItem);
 
         openNppButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        openNppButton.setText("Open Notepad++");
+        openNppButton.setText("Open in Editor");
         openNppButton.setName("openNppButton"); // NOI18N
         openNppButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2525,35 +2525,37 @@ public class RamsesUI extends javax.swing.JFrame {
             }
 
             out.newLine();
-            out.append("O\n");
+            // helios has no working output redirection ("O" on the main menu is a
+            // stub), so results are captured with the display sub-menu's "X"
+            // eXport command: build a table, leave its item sub-menu with a blank
+            // line, then "X" plus the target file name. "X" overwrites, so every
+            // table needs its own file. A single "D" keeps us in the display
+            // sub-menu for all five exports.
+            out.append("D\n");
+            out.append("O\n");           // bus Overview
+            out.append("A\n");           // all buses
+            out.newLine();               // leave the item sub-menu
+            out.append("X\n");
             out.append("in_net.res\n");
-            out.append("D\n");
-            out.append("O\n");
+            out.append("T\n");           // adjustable Transformers
             out.append("A\n");
             out.newLine();
-            out.newLine();
-            out.append("O\n");
+            out.append("X\n");
             out.append("in_trfo.res\n");
-            out.append("D\n");
-            out.append("T\n");
+            out.append("G\n");           // Generators
             out.append("A\n");
             out.newLine();
-            out.newLine();
-            out.append("O\n");
+            out.append("X\n");
             out.append("in_gen.res\n");
-            out.append("D\n");
-            out.append("G\n");
+            out.append("S\n");           // SVCs
             out.append("A\n");
             out.newLine();
-            out.append("S\n");
-            out.append("A\n");
-            out.newLine();
-            out.newLine();
-            out.append("O\n");
+            out.append("X\n");
+            out.append("in_svc.res\n");
+            out.append("P\n");           // global Power balance (no item sub-menu)
+            out.append("X\n");
             out.append("in_bal.res\n");
-            out.append("D\n");
-            out.append("P\n");
-            out.newLine();
+            out.newLine();               // leave the display sub-menu
             out.append("VT\n");
             out.append("in_volt_trfo.dat\n");
             out.append("E\n");
@@ -3961,7 +3963,7 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void runPFActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runPFActionPerformed
         if (!createPFCCommandFile()) {
-            JOptionPane.showMessageDialog(this, "<html>Command File for PFC not created.</html>", "Command File Error!", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "<html>Command File for Helios not created.</html>", "Command File Error!", JOptionPane.ERROR_MESSAGE);
             return;
         }
         CommandLine command;
@@ -3979,14 +3981,17 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         }
 
-        if (!pfcExec.exists()) {
-            JOptionPane.showMessageDialog(this, "<html>The file <B>PFC</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
+        if (heliosExec == null || !heliosExec.exists()) {
+            JOptionPane.showMessageDialog(this, "<html>The file <B>helios</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
             return;
         } else {
-            command = new CommandLine(pfcExec.getAbsolutePath());
+            command = new CommandLine(heliosExec.getAbsolutePath());
         }
 
-        command.addArgument("-t" + myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "PFCcmd.txt");
+        // helios matches "-t" as its own argv token and takes the path as the next
+        // one; the concatenated Fortran form "-t<path>" is never recognised.
+        command.addArgument("-t");
+        command.addArgument(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "PFCcmd.txt");
 
         simulExecutorResultHandler = new DefaultExecuteResultHandler();
         simulExecutor = new DefaultExecutor();
@@ -4069,6 +4074,19 @@ public class RamsesUI extends javax.swing.JFrame {
                 pfcPane.append("\n");
             }
             traceFileBufReader.close();
+
+            // helios' export command overwrites, so the SVC table cannot share a
+            // file with the generators the way it did under PFC; show it here.
+            File svcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "in_svc.res");
+            if (svcFile.exists() && svcFile.length() > 0) {
+                BufferedReader svcBufReader = new BufferedReader(new FileReader(svcFile));
+                pfcPane.append("\n");
+                while ((line = svcBufReader.readLine()) != null) {
+                    pfcPane.append(line);
+                    pfcPane.append("\n");
+                }
+                svcBufReader.close();
+            }
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -4270,8 +4288,8 @@ public class RamsesUI extends javax.swing.JFrame {
     private void showPFCLicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showPFCLicenseButtonActionPerformed
         try {
             InputStream in;
-            in = RamsesUI.class.getResourceAsStream("pfcLicense.txt");
-            File kluCopyrightFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "pfcLicense.txt");
+            in = RamsesUI.class.getResourceAsStream("heliosLicense.txt");
+            File kluCopyrightFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "heliosLicense.txt");
             OutputStream streamOut = FileUtils.openOutputStream(kluCopyrightFile);
             IOUtils.copy(in, streamOut);
             in.close();
@@ -4350,7 +4368,7 @@ public class RamsesUI extends javax.swing.JFrame {
     private File myTempDir = null;
     private File selWorkDir = null;
     private File ramsesExec = null;
-    private File pfcExec = null;
+    private File heliosExec = null;
     private File dyngraphExec = null;
     private File gnuplotExec = null;
     private File codegenExec = null;
@@ -4636,7 +4654,7 @@ public class RamsesUI extends javax.swing.JFrame {
             openTermButton.setEnabled(true);
 
             ramsesExec = toolchain.ramses();
-            pfcExec = toolchain.pfc();
+            heliosExec = toolchain.helios();
             dyngraphExec = toolchain.dyngraph();
             codegenExec = toolchain.codegen();
             gnuplotExec = toolchain.gnuplot();

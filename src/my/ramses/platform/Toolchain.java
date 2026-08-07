@@ -10,7 +10,7 @@ import java.util.Map;
 public final class Toolchain {
 
     public static final String RAMSES = "ramses";
-    public static final String PFC = "pfc";
+    public static final String HELIOS = "helios";
     public static final String DYNGRAPH = "dyngraph";
     public static final String CODEGEN = "codegen";
     public static final String GNUPLOT = "gnuplot";
@@ -31,11 +31,16 @@ public final class Toolchain {
                 "payload/ramses-macos-arm64-v3.55.tar.gz", ToolSpec.Kind.TGZ,
                 "ramses", "dynsim", true)));
 
-        s.add(new ToolSpec(PFC)
+        s.add(new ToolSpec(HELIOS)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "PFC.exe", ToolSpec.Kind.RAW, null, "PFC.exe", true))
+                "payload/stepss-helios-windows-x64.zip", ToolSpec.Kind.ZIP,
+                "helios.exe", "helios.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "PFC", ToolSpec.Kind.RAW, null, "PFC", true)));
+                "payload/stepss-helios-linux-x86_64.tar.gz", ToolSpec.Kind.TGZ,
+                "stepss-helios-linux-x86_64/helios", "helios", true))
+            .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
+                "payload/stepss-helios-macos-universal.tar.gz", ToolSpec.Kind.TGZ,
+                "stepss-helios-macos-universal/helios", "helios", true)));
 
         s.add(new ToolSpec(DYNGRAPH)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
@@ -107,7 +112,7 @@ public final class Toolchain {
     }
 
     public File ramses()    { return get(RAMSES); }
-    public File pfc()       { return get(PFC); }
+    public File helios()    { return get(HELIOS); }
     public File dyngraph()  { return get(DYNGRAPH); }
     public File codegen()   { return get(CODEGEN); }
 
