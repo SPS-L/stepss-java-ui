@@ -25,6 +25,18 @@ public final class ToolExtractor {
      */
     private static final String PAYLOAD_BASE = "/my/ramses/";
 
+    /**
+     * Fallback recorded in the stamp when the version file is missing or
+     * empty, so a broken/absent version resource degrades the staleness
+     * check rather than making the toolchain unusable.
+     */
+    private static final String UNKNOWN_VERSION = "unknown";
+
+    /**
+     * Resolved once per JVM run and cached; see {@link #appVersion()}.
+     */
+    private static volatile String cachedVersion;
+
     private ToolExtractor() {
     }
 
@@ -39,10 +51,17 @@ public final class ToolExtractor {
         File stamp = new File(dir, ".stepss-payload-" + spec.id());
         File target = new File(dir, payload.extractedName);
 
-        if (!isCurrent(stamp, payload.resource) || !target.exists()) {
+        // Every payload.resource in Toolchain.java is version-invariant
+        // ("dynsim.zip", "DOC.zip", ...), so the resource name alone cannot
+        // tell a rebuilt payload from an old one shipped under the same
+        // release. Folding in the application version means an upgrade that
+        // rebuilds a same-named archive still busts the stamp.
+        String stampValue = payload.resource + "|" + appVersion();
+
+        if (!isCurrent(stamp, stampValue) || !target.exists()) {
             deleteRecursively(new File(dir, topLevelOf(payload.extractedName)));
             unpack(spec, payload, dir, platform);
-            writeStamp(stamp, payload.resource);
+            writeStamp(stamp, stampValue);
         }
 
         if (!target.exists()) {
@@ -138,11 +157,11 @@ public final class ToolExtractor {
                 if (name.isEmpty()) {
                     break;
                 }
-                long size = octal(header, 124, 12);
+                long size = octal(header, 124, 12, "size", name);
                 char type = (char) header[156];
 
                 boolean wanted = payload.member == null || name.equals(payload.member);
-                if (wanted && type == '0') {
+                if (wanted && isRegularFileType(type)) {
                     File out = payload.member != null
                             ? new File(dir, payload.extractedName)
                             : safeChild(dir, name);
@@ -151,7 +170,7 @@ public final class ToolExtractor {
                 } else if (wanted && type == '5') {
                     mkdirs(safeChild(dir, name));
                     skipExactly(gz, size);
-                } else if (type == '0' || type == '5') {
+                } else if (isRegularFileType(type) || type == '5') {
                     skipExactly(gz, size);
                 } else {
                     throw new IOException("Unsupported tar entry type '" + type
@@ -165,6 +184,17 @@ public final class ToolExtractor {
         }
     }
 
+    /**
+     * ustar type {@code '0'} (REGTYPE) and the historic POSIX synonym
+     * {@code '\0'} (AREGTYPE, a zero byte rather than the character '0')
+     * both denote a plain file; some writers still emit AREGTYPE, and
+     * `tar tzvf` cannot distinguish it from REGTYPE (both list as '-'), so
+     * both must be accepted rather than only REGTYPE.
+     */
+    private static boolean isRegularFileType(char type) {
+        return type == '0' || type == 0;
+    }
+
     /** Rejects entries that would escape the extraction directory. */
     private static File safeChild(File dir, String entryName) throws IOException {
         File out = new File(dir, entryName);
@@ -175,12 +205,27 @@ public final class ToolExtractor {
         return out;
     }
 
-    private static String topLevelOf(String extractedName) {
+    /**
+     * Returns the first path segment of {@code extractedName}, which the
+     * caller deletes before unpacking. Rejects a segment that would resolve
+     * to the extraction directory itself or its parent ({@code ""}, from a
+     * leading slash; {@code "."}; {@code ".."}) so a malformed manifest
+     * entry fails loudly instead of {@code deleteRecursively} wiping the
+     * whole extraction directory (which may be the user's own working
+     * directory) or reaching outside it.
+     */
+    private static String topLevelOf(String extractedName) throws IOException {
         int slash = extractedName.indexOf('/');
-        return slash < 0 ? extractedName : extractedName.substring(0, slash);
+        String top = slash < 0 ? extractedName : extractedName.substring(0, slash);
+        if (top.isEmpty() || top.equals(".") || top.equals("..")) {
+            throw new IOException("Tool payload has an unsafe extractedName '"
+                    + extractedName + "': top-level segment '" + top
+                    + "' would resolve to the extraction directory itself or its parent");
+        }
+        return top;
     }
 
-    private static boolean isCurrent(File stamp, String resource) {
+    private static boolean isCurrent(File stamp, String value) {
         if (!stamp.isFile()) {
             return false;
         }
@@ -194,18 +239,59 @@ public final class ToolExtractor {
             } finally {
                 fin.close();
             }
-            return new String(buf, "UTF-8").trim().equals(resource);
+            return new String(buf, "UTF-8").trim().equals(value);
         } catch (IOException ex) {
             return false;
         }
     }
 
-    private static void writeStamp(File stamp, String resource) throws IOException {
+    private static void writeStamp(File stamp, String value) throws IOException {
         OutputStream out = new FileOutputStream(stamp);
         try {
-            out.write(resource.getBytes("UTF-8"));
+            out.write(value.getBytes("UTF-8"));
         } finally {
             out.close();
+        }
+    }
+
+    /**
+     * Reads and trims {@code /my/ramses/version.txt} once per JVM run and
+     * caches the result. A missing or empty version file falls back to
+     * {@link #UNKNOWN_VERSION} rather than throwing: a broken version
+     * resource must degrade the staleness check, not make the toolchain
+     * unusable. Deliberately not re-read per call or hashed from the
+     * payload streams themselves — the payloads total ~130 MB, and hashing
+     * them on every startup would be far more costly than the staleness
+     * bug this guards against.
+     */
+    private static String appVersion() {
+        String v = cachedVersion;
+        if (v != null) {
+            return v;
+        }
+        v = readVersionResource();
+        cachedVersion = v;
+        return v;
+    }
+
+    private static String readVersionResource() {
+        InputStream in = ToolExtractor.class.getResourceAsStream(PAYLOAD_BASE + "version.txt");
+        if (in == null) {
+            return UNKNOWN_VERSION;
+        }
+        try {
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                bytes.write(buf, 0, n);
+            }
+            String text = new String(bytes.toByteArray(), "UTF-8").trim();
+            return text.isEmpty() ? UNKNOWN_VERSION : text;
+        } catch (IOException ex) {
+            return UNKNOWN_VERSION;
+        } finally {
+            closeQuietly(in);
         }
     }
 
@@ -291,9 +377,27 @@ public final class ToolExtractor {
         return new String(b, off, end - off).trim();
     }
 
-    private static long octal(byte[] b, int off, int len) {
+    /**
+     * Parses a fixed-width ustar numeric field as octal ASCII. Wraps
+     * {@link NumberFormatException} (e.g. a non-octal field, or a GNU
+     * base-256-encoded size this minimal reader does not support) as an
+     * {@link IOException} naming the field and entry, since this reader
+     * only declares checked {@code IOException} and an unchecked exception
+     * here would otherwise cross that contract and crash callers that
+     * catch only {@code IOException} (such as the UI thread).
+     */
+    private static long octal(byte[] b, int off, int len, String field, String entryName)
+            throws IOException {
         String s = cString(b, off, len);
-        return s.isEmpty() ? 0L : Long.parseLong(s, 8);
+        if (s.isEmpty()) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(s, 8);
+        } catch (NumberFormatException ex) {
+            throw new IOException("Malformed tar header: field '" + field
+                    + "' ('" + s + "') is not valid octal for entry '" + entryName + "'", ex);
+        }
     }
 
     static boolean deleteRecursively(File f) {
