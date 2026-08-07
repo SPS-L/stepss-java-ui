@@ -2058,112 +2058,99 @@ removes the obsolete Intel redistributable DLL path entry."
 
 ---
 
-### Task 12: URAMSES kit build target
+### Task 12: Remove the Intel compile path from P1
 
 **Files:**
-- Create: `tools/build-uramses-kit.sh`
-- Modify: `build.xml`
-- Delete: `src/my/ramses/URAMSES.zip`
+- Modify: `src/my/ramses/platform/Toolchain.java`
+- Modify: `src/my/ramses/RamsesUI.java`
+- Modify: `src/my/ramses/RamsesUI.form`
+- Delete: `src/my/ramses/URAMSES.zip`, `src/my/ramses/vswhere.exe`
 
 **Interfaces:**
-- Consumes: `uramses.commit` from `versions.properties` (Task 2).
-- Produces: `payload-cache/URAMSES.zip`, staged into the jar as
-  `my/ramses/payload/URAMSES.zip`.
+- Consumes: the manifest and `PlatformLauncher` from earlier tasks.
+- Produces: a manifest with no `URAMSES` and no `VSWHERE` entry; `Toolchain.vswhere()`
+  removed.
 
-- [ ] **Step 1: Write the kit builder**
+**Why this replaces the original task.** P1 no longer ships the Intel runtime, so a
+Compile step driven by `vswhere` + `devenv` + Intel `.vfproj` projects has nothing
+behind it. Rather than refresh an Intel kit into a release that deliberately carries
+no Intel runtime, P1 drops custom-model *compilation* entirely. Model *generation*
+through CODEGEN keeps working on all three platforms. P2 reintroduces compilation on
+gfortran using the `modules_l`/`modules_m`/`modules_wg` kits from the pinned uramses
+tag.
+
+- [ ] **Step 1: Remove the two manifest entries**
+
+In `Toolchain.buildSpecs()`, delete the `s.add(new ToolSpec(URAMSES)…)` and
+`s.add(new ToolSpec(VSWHERE)…)` blocks. Delete the `URAMSES` and `VSWHERE` constants
+and the `vswhere()` accessor.
+
+- [ ] **Step 2: Disable Compile on every platform**
+
+Replace the body of `CompileActionPerformed` with a single message and return:
+
+```java
+    private void CompileActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_CompileActionPerformed
+        JOptionPane.showMessageDialog(this,
+                "<html>Compiling custom models is not available in this release."
+                + "<br>Model generation works as usual; compilation returns in a"
+                + " later release built on gfortran.</html>",
+                "Not available", JOptionPane.INFORMATION_MESSAGE);
+    }//GEN-LAST:event_CompileActionPerformed
+```
+
+Delete the now-unreachable body that spliced `.f90` files into `usr_*_models.f90` and
+`exeramses.vfproj`, located Visual Studio via `vswhere`, and invoked `devenv`. It
+depends on payloads that no longer ship, so leaving it would not compile.
+
+`savedynsimActionPerformed` saved the executable that Compile produced. Since nothing
+produces one, disable it the same way, and leave both buttons disabled in the UI so the
+dialog is a fallback rather than the primary signal.
+
+Leave `execCodegenActionPerformed` alone — model generation is cross-platform and must
+keep working.
+
+- [ ] **Step 3: Delete the payloads**
 
 ```bash
-#!/bin/sh
-# Assembles URAMSES.zip from the pinned stepss-uramses commit.
-# The GUI expects a flat URAMSES/ tree; the repo is organised by toolchain.
-set -e
-cd "$(dirname "$0")/.."
-
-COMMIT=$(sed -n 's/^uramses\.commit=//p' versions.properties)
-REPO=$(sed -n 's/^uramses\.repo=//p' versions.properties)
-[ -n "$COMMIT" ] || { echo "uramses.commit not set" >&2; exit 1; }
-
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
-
-echo "Fetching $REPO@$COMMIT"
-curl -fsSL "https://codeload.github.com/$REPO/tar.gz/$COMMIT" \
-  | tar xz -C "$WORK"
-SRC=$(find "$WORK" -maxdepth 1 -type d -name 'stepss-uramses-*')
-
-KIT="$WORK/URAMSES"
-mkdir -p "$KIT/modules" "$KIT/src" "$KIT/my_models"
-cp "$SRC"/modules_wi/* "$KIT/modules/"
-cp "$SRC"/src/* "$KIT/src/"
-cp "$SRC"/custom_models/* "$KIT/my_models/" 2>/dev/null || true
-cp "$SRC"/build/msvs/* "$KIT/" 2>/dev/null || true
-cp "$SRC"/LICENSE.rst "$KIT/" 2>/dev/null || true
-cp "$SRC"/README.rst "$KIT/" 2>/dev/null || true
-
-mkdir -p payload-cache
-rm -f payload-cache/URAMSES.zip
-( cd "$WORK" && zip -qr URAMSES.zip URAMSES )
-mv "$WORK/URAMSES.zip" payload-cache/URAMSES.zip
-echo "Built payload-cache/URAMSES.zip from $COMMIT"
-unzip -l payload-cache/URAMSES.zip | tail -3
+git rm src/my/ramses/URAMSES.zip src/my/ramses/vswhere.exe
 ```
 
-Then: `chmod +x tools/build-uramses-kit.sh`
+- [ ] **Step 4: Resync the form**
 
-- [ ] **Step 2: Run it and inspect the result**
+Removing or disabling widgets risks the NetBeans divergence trap. After the edit:
 
-Run: `tools/build-uramses-kit.sh`
+```sh
+for H in $(grep -o 'handler="[a-zA-Z0-9_]*"' src/my/ramses/RamsesUI.form | sed 's/handler="//;s/"//' | sort -u); do
+  grep -q "private void $H" src/my/ramses/RamsesUI.java || echo "MISSING: $H"
+done
+```
 
-Expected: a `URAMSES.zip` whose listing contains `URAMSES/modules/`,
-`URAMSES/src/`, `URAMSES/my_models/` and `URAMSES/URAMSES.sln`. Confirm the modules are
-current, not the 2022 set:
+Expected: no output. Keep any form edit surgical and confirm the file is still
+well-formed XML.
+
+- [ ] **Step 5: Verify**
 
 ```bash
-unzip -l payload-cache/URAMSES.zip | grep -m3 "modules/"
-```
-Expected: 2026 dates, not `2022-01-24`.
-
-- [ ] **Step 3: Wire it into the build**
-
-Add to `build.xml`, and add `uramses-kit` to `stage-payloads`' `depends`:
-
-```xml
- <target name="uramses-kit" description="Build URAMSES.zip from the pinned uramses commit">
-  <exec executable="tools/build-uramses-kit.sh" failonerror="true"/>
- </target>
-```
-
-and add to the `stage-payloads` copy fileset:
-
-```xml
-    <include name="URAMSES.zip"/>
-```
-
-- [ ] **Step 4: Point the manifest at the staged kit and delete the committed one**
-
-In `Toolchain.buildSpecs()`, change the `URAMSES` payload resource from
-`"URAMSES.zip"` to `"payload/URAMSES.zip"`. Then:
-
-```bash
-git rm src/my/ramses/URAMSES.zip
 ant clean jar
+tools/dump-toolchain.sh
+grep -rn "vswhere\|URAMSES" src/my/ramses/*.java
 ```
-Expected: `BUILD SUCCESSFUL`, and `unzip -l dist/stepss.jar | grep URAMSES` shows
-`my/ramses/payload/URAMSES.zip`.
 
-- [ ] **Step 5: Commit**
+Expected: build succeeds; the fingerprint loses nothing on Linux (neither payload
+extracted there anyway) and loses `vswhere.exe` on Windows; the grep finds no
+references to the removed payloads. Confirm both are absent from the built jar.
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add tools/build-uramses-kit.sh build.xml \
-        src/my/ramses/platform/Toolchain.java
-git rm --cached src/my/ramses/URAMSES.zip 2>/dev/null || true
-git commit -m "build: assemble URAMSES kit from the pinned uramses commit
+git add -A src/my/ramses
+git commit -m "feat: drop Intel custom-model compilation from this release
 
-Replaces the hand-assembled kit whose modules dated from 2022 while the
-engine had moved to 3.55."
+P1 ships no Intel runtime, so the vswhere/devenv compile path has
+nothing behind it. Model generation is unaffected; compilation returns
+on gfortran in a later release."
 ```
-
----
 
 ### Task 13: Replace PFC with helios
 
