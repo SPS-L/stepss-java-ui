@@ -39,8 +39,8 @@ public final class Toolchain {
                 "payload/stepss-helios-linux-x86_64.tar.gz", ToolSpec.Kind.TGZ,
                 "stepss-helios-linux-x86_64/helios", "helios", true))
             .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
-                "payload/stepss-helios-macos-universal.tar.gz", ToolSpec.Kind.TGZ,
-                "stepss-helios-macos-universal/helios", "helios", true)));
+                "payload/stepss-helios-macos-arm64.tar.gz", ToolSpec.Kind.TGZ,
+                "stepss-helios-macos-arm64/helios", "helios", true)));
 
         s.add(new ToolSpec(DYNGRAPH)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
