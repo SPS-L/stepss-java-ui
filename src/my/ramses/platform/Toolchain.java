@@ -3,7 +3,9 @@ package my.ramses.platform;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class Toolchain {
 
@@ -56,9 +58,9 @@ public final class Toolchain {
 
         s.add(new ToolSpec(NPP)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "npp.zip", ToolSpec.Kind.ZIP, null, "npp/notepad++.exe", true))
+                "npp.zip", ToolSpec.Kind.ZIP, null, "notepad++.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "npp.zip", ToolSpec.Kind.ZIP, null, "npp/notepad++.exe", true)));
+                "npp.zip", ToolSpec.Kind.ZIP, null, "notepad++.exe", true)));
 
         s.add(new ToolSpec(USERGUIDE)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
@@ -84,8 +86,8 @@ public final class Toolchain {
 
     private final Platform platform;
     private final File dir;
-    private final java.util.Map<String, File> resolved =
-            new java.util.HashMap<String, File>();
+    private final Map<String, File> resolved =
+            new HashMap<String, File>();
 
     public Toolchain(Platform platform, File dir) {
         this.platform = platform;
