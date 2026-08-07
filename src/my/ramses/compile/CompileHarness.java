@@ -18,7 +18,8 @@ public final class CompileHarness {
     public static void main(String[] args) {
         checkKindParsing();
         checkSpliceInsertsBothPoints();
-        checkSpliceIsIdempotentOverPristineSource();
+        checkSpliceIsDeterministic();
+        checkSpliceOnAlreadySplicedOutputDuplicatesCase();
         checkMissingMarkerFails();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
@@ -57,18 +58,46 @@ public final class CompileHarness {
     }
 
     /**
-     * The GUI resets the kit to pristine before every compile, so splicing
-     * twice from pristine must give exactly one entry per model - never two.
-     * This is the specific defect the reset exists to prevent.
+     * splice() has no mutable state, so calling it twice from the same
+     * untouched pristine string must yield byte-identical output. This is a
+     * cheap sanity check, not proof that splicing is safe to repeat - it
+     * says nothing about what happens when the second call is fed the first
+     * call's output instead of pristine source. See
+     * {@link #checkSpliceOnAlreadySplicedOutputDuplicatesCase()} for that.
      */
-    private static void checkSpliceIsIdempotentOverPristineSource() {
+    private static void checkSpliceIsDeterministic() {
         try {
             String first = RouterSplicer.splice(pristine(), "exc", Arrays.asList("exc_ALPHA"));
             String second = RouterSplicer.splice(pristine(), "exc", Arrays.asList("exc_ALPHA"));
             expect("second splice equals first", true, first.equals(second));
-            expect("exactly one case", 1, count(second, "case('exc_ALPHA')"));
+            expect("exactly one case from pristine", 1, count(second, "case('exc_ALPHA')"));
         } catch (Exception ex) {
-            fail("idempotence check threw: " + ex);
+            fail("determinism check threw: " + ex);
+        }
+    }
+
+    /**
+     * splice() deliberately leaves both markers in its output, so splicing
+     * is not idempotent: feeding splice() its own output re-inserts the same
+     * model and produces a second, duplicate case for it rather than
+     * refusing or collapsing to one. This is real, current behaviour, not a
+     * hypothetical - it is exactly why the compile pipeline must reset the
+     * kit to pristine before every splice rather than splicing onto
+     * whatever the kit already contains. If splice() ever becomes
+     * self-idempotent, this check starts failing, which is the intended
+     * signal to revisit the reset logic rather than let it go silently
+     * redundant.
+     */
+    private static void checkSpliceOnAlreadySplicedOutputDuplicatesCase() {
+        try {
+            String once = RouterSplicer.splice(pristine(), "exc", Arrays.asList("exc_ALPHA"));
+            String twice = RouterSplicer.splice(once, "exc", Arrays.asList("exc_ALPHA"));
+            expect("splicing onto spliced output duplicates the case", 2,
+                    count(twice, "case('exc_ALPHA')"));
+            expect("splicing onto spliced output duplicates the external", 2,
+                    count(twice, "external :: exc_ALPHA"));
+        } catch (Exception ex) {
+            fail("double-splice check threw: " + ex);
         }
     }
 
