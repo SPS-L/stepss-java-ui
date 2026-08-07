@@ -142,7 +142,7 @@ Versions pinned in `versions.properties`: `ramses=3.55`, `helios=1.2.0`,
 | gnuplot | bundled / host | `gpwin.zip` | resolved from `PATH` | resolved from `PATH` |
 | URAMSES kit | built from uramses source tag | `URAMSES.zip` (Intel, `modules_wi`) | — | — |
 | vswhere | committed | `vswhere.exe` | — | — |
-| user guide | committed | `DOC.zip` | `DOC.zip` | `DOC.zip` |
+| user guide | not bundled | Help opens `https://stepss.sps-lab.org/` | same | same |
 
 Helios is the one irregular filename — no version suffix, `windows-x64` rather than
 `windows-x86_64`, and `macos-universal` until the announced arm64-only re-cut. The
@@ -163,9 +163,17 @@ A second run reuses the cache and needs no network. `package` depends on
 
 Updating a component is then a two-line edit: bump the version, update the digest.
 
+Because the four component repos are **private**, the fetch authenticates via the
+`gh` CLI rather than an anonymous HTTP GET. CI uses this repository's `STEPSS_TOKEN`
+secret, which carries cross-repo access; Actions' default `GITHUB_TOKEN` is scoped to
+this repository alone and cannot reach the component releases. Distribution is by
+release artifact: a workflow triggered on release fetches the payloads, builds, and
+attaches `stepss.jar` to the release, which is why `dist/` is no longer tracked.
+
 Two payloads stay committed because no release publishes them: the Windows Intel
-dyngraph build and `gpwin.zip`. `DOC.zip` also stays committed, as it is generated
-from `stepss-userguide` rather than released.
+dyngraph build and `gpwin.zip`. The user guide is no longer bundled at all: Help →
+User Guide opens `https://stepss.sps-lab.org/` in the browser, so documentation
+tracks the live site instead of being frozen at build time, and `DOC.zip` is deleted.
 
 ### URAMSES kit packaging
 
@@ -274,8 +282,10 @@ and the *Install Intel redistributables* menu item.
 Fetched at build time: per-platform ramses, helios, dyngraph and codegen archives,
 plus the uramses source tarball.
 
-Still committed: `gpwin.zip`, `DOC.zip`, `vswhere.exe`, the Windows Intel
-`dyngraph.exe`, and helios license text.
+Also deleted: `DOC.zip` — the user guide moves to the docs site.
+
+Still committed: `gpwin.zip`, `vswhere.exe`, the Windows Intel `dyngraph.exe`, and
+helios license text.
 
 Net payload falls from 49.5 MB to roughly 32 MB even while carrying three platforms
 instead of two, because the 30 MB Intel `dynsim.zip` is replaced by an 11.6 MB static

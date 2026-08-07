@@ -1835,33 +1835,49 @@ git commit -m "docs: record no-op proof results for the platform layer refactor"
 
 ---
 
-### Task 10: Add macOS to the platform layer
+### Task 10: Replace the bundled user guide with the docs site; enable macOS
 
 **Files:**
 - Modify: `src/my/ramses/platform/Toolchain.java`
+- Modify: `src/my/ramses/RamsesUI.java`
+- Delete: `src/my/ramses/DOC.zip`
 
 **Interfaces:**
-- Consumes: everything from Tasks 3-6.
-- Produces: `Toolchain.SPECS` entries for `Platform.MACOS_ARM64`.
+- Consumes: everything from Tasks 3-8.
+- Produces: a manifest with no `USERGUIDE` entry; `Toolchain.userGuide()` removed.
 
-`Platform.MACOS_ARM64` already exists from Task 3; this task adds its manifest rows. The
-payloads it names arrive in Task 11, so macOS is not runnable until then. This task is
-separated so the manifest change is reviewable on its own.
+The bundled 3.4 MB `DOC.zip` is dropped. Help → User Guide opens
+`https://stepss.sps-lab.org/` in the user's browser instead, so the documentation is
+always current rather than frozen at build time. `Platform.MACOS_ARM64` already exists
+from Task 3; after this task the macOS manifest is legitimately empty until Task 11
+adds the release payloads, which is the degradation path worth proving here.
 
-- [ ] **Step 1: Add macOS rows for the tools that have macOS payloads**
+- [ ] **Step 1: Remove the USERGUIDE spec**
 
-In `buildSpecs()`, add to the `USERGUIDE` spec:
+In `Toolchain.buildSpecs()`, delete the whole `s.add(new ToolSpec(USERGUIDE)…)` block.
+Delete the `USERGUIDE` constant and the `userGuide()` accessor.
+
+- [ ] **Step 2: Point the User Guide button at the docs site**
+
+Replace `showUserGuideButtonActionPerformed` (`RamsesUI.java:3000`) with:
 
 ```java
-            .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
-                "DOC.zip", ToolSpec.Kind.ZIP, null, "DOC/userguide.pdf", false))
+    private void showUserGuideButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showUserGuideButtonActionPerformed
+        BareBonesBrowserLaunch.openURL("https://stepss.sps-lab.org/");
+    }//GEN-LAST:event_showUserGuideButtonActionPerformed
 ```
 
-Leave `RAMSES`, `DYNGRAPH` and `CODEGEN` without macOS rows for now — Task 11 adds them
-together with the new payloads. `VSWHERE`, `URAMSES` and `GNUPLOT` correctly have no
-macOS row: the first two are Windows-only, and gnuplot is resolved from `PATH`.
+`BareBonesBrowserLaunch.openURL` already exists in this package and is used by
+`webpageLabelMouseClicked` for the same host. Remove the now-unused `userguide` field
+and its assignment in `initRamses()`.
 
-- [ ] **Step 2: Verify an unavailable tool degrades rather than crashes**
+- [ ] **Step 3: Delete the payload**
+
+```bash
+git rm src/my/ramses/DOC.zip
+```
+
+- [ ] **Step 4: Verify macOS resolves and degrades without throwing**
 
 ```bash
 ant clean jar
@@ -1869,15 +1885,27 @@ java -cp dist/stepss.jar -Dos.name="Mac OS X" -Dos.arch="aarch64" \
      my.ramses.platform.ToolchainDump
 ```
 
-Expected: `platform=MACOS_ARM64` and only `DOC/userguide.pdf` listed. It must not throw
-— `extractAll()` skips tools with no payload for the platform. If it throws, fix
-`Toolchain.extractAll`'s `availableOn` guard before continuing.
+Expected: `platform=MACOS_ARM64` and **no** file lines — every tool is currently
+Windows/Linux-only. It must not throw: `extractAll()` skips tools with no payload for
+the platform. If it throws, fix `Toolchain.extractAll`'s `availableOn` guard.
 
-- [ ] **Step 3: Commit**
+Then confirm Linux is unaffected apart from the removed PDF:
 
 ```bash
-git add src/my/ramses/platform/Toolchain.java
-git commit -m "feat: add macOS arm64 rows to the tool manifest"
+tools/dump-toolchain.sh | awk '{print $1}' | tail -n +2 | sort
+```
+
+Expected: the same list as Task 9 minus `DOC/userguide.pdf`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/my/ramses/platform/Toolchain.java src/my/ramses/RamsesUI.java
+git rm --cached src/my/ramses/DOC.zip 2>/dev/null || true
+git commit -m "feat: link Help > User Guide to the docs site; enable macOS manifest
+
+Drops the bundled 3.4 MB DOC.zip so documentation tracks the live site
+instead of the build."
 ```
 
 ---
@@ -2303,9 +2331,19 @@ Replace the "Current release" line with `3.55`. Replace the bundled-tools table 
 | Data file editing | System default editor | yes | yes | yes |
 ```
 
-Add under Installation: building requires network on first run to fetch pinned
-release payloads (`ant fetch-payloads`); thereafter `payload-cache/` serves them.
-State that Intel Macs are not supported.
+Add under Installation:
+
+- The prebuilt jar is published as a **release artifact**, not committed to the repo —
+  `dist/` and `build/` are untracked. Point users at the releases page.
+- Building from source needs network on first run to fetch pinned release payloads
+  (`ant fetch-payloads`), and because the component repos are private it needs the
+  `gh` CLI authenticated with SPS-L access. CI uses the `STEPSS_TOKEN` secret held by
+  this repository; the default `GITHUB_TOKEN` is scoped to this repo alone and cannot
+  reach the component repos.
+- Intel Macs are not supported.
+
+Also correct the Documentation section: the user guide is no longer a bundled PDF —
+Help → User Guide opens `https://stepss.sps-lab.org/`.
 
 - [ ] **Step 2: Update NOTICE**
 
