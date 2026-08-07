@@ -98,13 +98,25 @@ shape rather than working around historical drift:
   - `usr_tor_models.f90` carries a commented `tor_sultan` case. No `tor_sultan`
     symbol exists in `libramses.a` and it is not declared `external`, so this is
     dead text.
-  - `usr_twop_models.f90` carries a commented `twop_HVDC_VSC` case. That one *is*
-    declared `external` and *is* defined in `libramses.a` — the model ships, but
-    with its case commented out it cannot be reached by name from a `.dat` file.
-    Deleting the comment is what this spec does, because the comment is not what
-    makes the model unreachable. It does remove the only surviving hint that it
-    was once dispatchable, so whether `twop_HVDC_VSC` should be restored to the
-    select-case is recorded below as an open upstream question, separate from P2.
+  - `usr_twop_models.f90` carries a commented `twop_HVDC_VSC` case. That one is
+    not dead: the model is declared `external` and defined in `libramses.a`, so
+    it ships in RAMSES and only the commented case makes it unnameable from a
+    `.dat` file. It is **restored — uncommented — rather than deleted**, which
+    makes a shipped model reachable again:
+
+    ```fortran
+       case('twop_HVDC_VSC')
+             twop_ptr => twop_HVDC_VSC
+    ```
+
+    A sweep of all five routers, comparing every `external` declaration against
+    the live `=>` assignments and against the symbols defined in
+    `modules_l/libramses.a`, found `twop_HVDC_VSC` to be the *only*
+    declared-but-undispatched model. Two earlier passes over-reported: matching
+    case labels against symbol names flags models whose label differs in case
+    (`case('exc_kundur')` dispatches `exc_KUNDUR`), and failing to exclude
+    comment lines counts the commented entry itself as live. The pointer
+    assignment is the reliable test.
 
 ## Payload
 
@@ -343,9 +355,8 @@ in P1 and do not return.
 - **Statically linked macOS builds** of ramses, dyngraph and codegen, carried over
   from P1 and tracked upstream. Unrelated to compilation, which needs Homebrew
   gcc on macOS regardless.
-- **`twop_HVDC_VSC`'s dispatch entry**, upstream. The model is compiled into
-  `libramses.a` and declared `external` in `usr_twop_models.f90`, but its
-  select-case entry is commented out, so no `.dat` file can name it. P2's marker
-  patch deletes the comment without restoring the case, because restoring
-  dispatch for a model would be a behavioural change to RAMSES that nothing in
-  this spec calls for. It belongs in stepss-uramses as its own decision.
+- **Whether `twop_HVDC_VSC` behaves correctly.** The marker patch makes it
+  dispatchable again, but nothing here exercises it: no test system in
+  `stepss-test-systems` names it, and why it was commented out is not recorded.
+  Restoring the case is what makes the shipped model reachable; confirming it
+  produces sensible results is a RAMSES question, upstream.
