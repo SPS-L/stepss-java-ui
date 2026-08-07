@@ -445,16 +445,28 @@ check rather than gone green.
 **1 — HIGH, and the reason for `pass-with-gaps`: the shipped jar cannot compile anything.**
 The pinned kit carries no markers, so *Compile* fails at `prepare()` for every user until
 `stepss-uramses` tags a release containing `8e7b1de`. The failure is clean and self-explaining
-(5d), and the README this commit ships describes the feature as working — which it is, but only
-against a kit no user can obtain. **Either tag the release before shipping this branch, or hold
-the README change.** This is a release-sequencing decision for the project owner.
+(5d), but `RouterSplicer`'s wording is developer-facing and reads like a bug rather than a known
+state.
 
-**2 — minor: the ABI-mismatch dialog carries no remedy.** On 5b the dialog says only
+*Disclosed to users in fix round 1:* `README.md` now carries a one-paragraph **Known limitation in
+this release** notice, placed immediately after the Fortran-toolchain prerequisite in
+*Installation* — the point at which a reader is installing tools in order to compile, so they meet
+it before acting rather than after. It names the missing marker comments, names v3.55 as
+predating them, and says plainly that no compiler will change the outcome. The rest of the README
+still describes the feature as the plan's Step 7 specifies; that text becomes correct the moment
+an upstream release carries the markers, at which point the notice is a single clean paragraph
+deletion. Nothing else in the README references it, deliberately.
+
+**The release-sequencing decision is still the project owner's**: tag `8e7b1de` upstream and
+re-pin, or ship with the notice standing.
+
+**2 — minor, deliberately deferred: the ABI-mismatch dialog carries no remedy.** On 5b the dialog says only
 `Compilation failed (exit 2). The build log above carries the compiler's own message.` The
 actionable `sudo apt install gfortran-13` line is in the pane, not the dialog. A user who
 dismisses the dialog without reading the pane behind it is told nothing they can act on. Contrast
 5a, where the dialog carries the full install command. Not a defect in the sense of anything being
-wrong, but the two failure paths are inconsistent in how much help they give.
+wrong, but the two failure paths are inconsistent in how much help they give. **Reviewed and
+deferred deliberately in fix round 1** — recorded, not fixed.
 
 **3 — informational: `Compile` re-enables before a fast failure can be observed as "disabled".**
 On the two failing runs the driver sampled `Compile.enabled` immediately after the click and saw
@@ -482,7 +494,8 @@ fallback and the missing-marker path.
 
 1. **The pin (finding 1).** `stepss-uramses` must publish a release carrying `8e7b1de` before any
    user can use this feature. Until then Steps 1–5's evidence is about a kit built here, not the
-   one that ships — stated at the top of this document so it cannot be misread.
+   one that ships — stated at the top of this document so it cannot be misread, and disclosed to
+   users themselves by the *Known limitation in this release* paragraph in `README.md`.
 2. **Windows x86_64 and macOS arm64**, every row. No such hardware exists in this environment.
    Windows additionally holds the *only* place `extraPathEntries`/`buildEnvironment`'s MSYS2 PATH
    prepending can be exercised at all.
