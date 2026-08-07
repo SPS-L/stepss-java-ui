@@ -2152,87 +2152,77 @@ nothing behind it. Model generation is unaffected; compilation returns
 on gfortran in a later release."
 ```
 
-### Task 13: Replace PFC with helios
+### Task 13: Replace PFC with helios, on helios' export mechanism
 
 **Files:**
 - Modify: `src/my/ramses/platform/Toolchain.java`
-- Modify: `src/my/ramses/RamsesUI.java`
-- Create: `tools/diff-pfc-helios.sh`
+- Modify: `src/my/ramses/RamsesUI.java`, `src/my/ramses/RamsesUI.form`
 - Create: `src/my/ramses/heliosLicense.txt`
 - Delete: `src/my/ramses/PFC`, `src/my/ramses/PFC.exe`, `src/my/ramses/pfcLicense.txt`
 
 **Interfaces:**
-- Consumes: helios payloads staged in Task 11.
-- Produces: `Toolchain.helios()` → `File`, replacing `Toolchain.pfc()`.
+- Consumes: helios payloads staged by Task 11.
+- Produces: `Toolchain.helios()` replacing `Toolchain.pfc()`.
 
-- [ ] **Step 1: Write the differential test before changing the GUI**
+**Why this differs from the original task.** A differential test proved helios cannot
+serve the GUI's existing command file: its `O` output-redirection command is an
+acknowledged stub (`MASTER_STATUS` gap H2 — `cmd_change_output` prints "Output
+redirection not yet implemented"), so four of the five result files can never be
+written that way. The project owner chose to rebuild result capture on helios'
+**working export path** rather than wait for `O`.
 
-```bash
-#!/bin/sh
-# Runs the GUI-generated PFC command file through both engines and diffs results.
-# Usage: tools/diff-pfc-helios.sh <cmdfile> <pfc-binary> <helios-binary> <datadir>
-set -e
-CMD=$1; PFC=$2; HELIOS=$3; DATA=$4
-[ -n "$DATA" ] || { echo "usage: $0 <cmdfile> <pfc> <helios> <datadir>" >&2; exit 1; }
+Two facts make this tractable. The four `.res` files are **display text only** — each
+`load*ActionPerformed` reads lines straight into `pfcPane`, nothing parses them — so
+any readable format works. And helios' display submenu has an `X` command that exports
+the last displayed table to a file, TXT or CSV by extension.
 
-OUT=$(mktemp -d); trap 'echo "artifacts in $OUT"' EXIT
-for ENGINE in pfc helios; do
-  RUN="$OUT/$ENGINE"; mkdir -p "$RUN"
-  cp "$DATA"/* "$RUN"/ 2>/dev/null || true
-  cp "$CMD" "$RUN"/cmd.txt
-  BIN=$PFC; [ "$ENGINE" = helios ] && BIN=$HELIOS
-  ( cd "$RUN" && "$BIN" -tcmd.txt > stdout.txt 2> stderr.txt ) || \
-    echo "$ENGINE exited non-zero (recorded)"
-done
+`in_volt_trfo.dat` is the exception: `loadLFRESV2DAT` feeds it back into the data set as
+a RAMSES input, so its *format* matters, not just its content.
 
-STATUS=0
-for F in in_net.res in_trfo.res in_gen.res in_bal.res in_volt_trfo.dat; do
-  if [ ! -f "$OUT/pfc/$F" ] && [ ! -f "$OUT/helios/$F" ]; then
-    echo "SKIP  $F (neither engine produced it)"; continue
-  fi
-  if diff -q "$OUT/pfc/$F" "$OUT/helios/$F" > /dev/null 2>&1; then
-    echo "SAME  $F"
-  else
-    echo "DIFF  $F"; diff "$OUT/pfc/$F" "$OUT/helios/$F" | head -20; STATUS=1
-  fi
-done
-exit $STATUS
-```
+- [ ] **Step 1: Fix the command-line argument form**
 
-Then: `chmod +x tools/diff-pfc-helios.sh`
+helios' `main.cpp` matches `-t` exactly, so the GUI's concatenated `"-t" + path`
+does not parse. In `runPFActionPerformed`, pass `-t` and the path as two arguments.
+Leave the dynsim invocation alone — RAMSES accepts both forms.
 
-- [ ] **Step 2: Capture a real command file from the current GUI**
+- [ ] **Step 2: Rewrite `createPFCCommandFile()` around display-then-export**
 
-Run `java -jar dist/stepss.jar`, load a test system from `stepss-test-systems`, click
-*Run Power Flow*, then copy the generated file out of the tool directory:
+Replace each `O <file> / D / <type> / A` block with the equivalent that displays first
+and exports after: enter the display submenu, produce the table, then `X` with the
+target filename. Keep the same four output names so the `load*` handlers need no
+change. Keep the `VT` block for `in_volt_trfo.dat` — that command works.
 
-```bash
-find /tmp -name PFCcmd.txt -newermt '-5 minutes' 2>/dev/null
-cp <that-path> /tmp/PFCcmd.txt
-head -20 /tmp/PFCcmd.txt
-```
+Derive the exact key sequence by reading `PlainMenu::run` and its display submenu in
+`stepss-helios/src/terminal/PlainMenu.cpp`; do not guess it.
 
-Expected: the data file paths, then the `O`/`in_net.res`/`D`/`O`/`A` sequence through
-to `VT`/`in_volt_trfo.dat`/`E`.
+- [ ] **Step 3: Prove it with the differential test**
 
-- [ ] **Step 3: Run the differential test**
+Run the new command file through helios and the old one through PFC, on a case from
+`stepss-test-systems/stepss-IEEE-Nordic-Test-system/`.
 
-```bash
-tar xzf payload-cache/stepss-helios-linux-x86_64.tar.gz -C /tmp
-tools/diff-pfc-helios.sh /tmp/PFCcmd.txt \
-   src/my/ramses/PFC /tmp/stepss-helios-linux-x86_64/helios \
-   <path-to-test-system-data>
-```
+Byte-identity is **not** the criterion — different engines format differently. The
+criteria are:
 
-Expected: `SAME` for all five files. **If any line reports `DIFF`**, stop and inspect —
-the likely culprit is the top-level `S` command, which helios maps to
-`cmd_save_matlab` while PFC handles `S` in `seloutput_c.f90`. Record the divergence and
-adjust `createPFCCommandFile` in Step 5 to emit the helios-correct sequence; do not
-proceed until the five files match or a documented, deliberate difference is agreed.
+1. All five files are produced by helios.
+2. For each, the underlying **values** match PFC: bus voltages and angles, transformer
+   tap positions, generator P/Q/V, and the power balance totals. Compare numerically,
+   field by field, not as text.
+3. Any divergence is reported with its magnitude, not smoothed over.
 
-- [ ] **Step 4: Swap the manifest entry**
+A known open issue to confirm and quantify: transformer tap-position integers differed
+by one between the engines. Report it precisely; do not "fix" it in the GUI.
 
-Replace the `PFC` spec with:
+- [ ] **Step 4: Verify `in_volt_trfo.dat` is usable as RAMSES input**
+
+This is the step that protects a real workflow. helios writes C-style float exponents
+(`e-01`) where PFC writes Fortran style (`E+00`). Take helios' `in_volt_trfo.dat`, feed
+it to the bundled `dynsim` as a data file alongside a Nordic case, and confirm it loads
+without a parse error. If it does not, that is a blocking finding — report it rather
+than working around it.
+
+- [ ] **Step 5: Swap the manifest**
+
+Replace the `PFC` spec with `HELIOS`, keyed `"helios"`:
 
 ```java
         s.add(new ToolSpec(HELIOS)
@@ -2247,50 +2237,40 @@ Replace the `PFC` spec with:
                 "stepss-helios-macos-universal/helios", "helios", true)));
 ```
 
-Rename the constant `PFC` to `HELIOS` with value `"helios"`, and the accessor `pfc()`
-to `helios()`.
+Rename the accessor `pfc()` to `helios()` and the `RamsesUI` field `pfcExec` to
+`heliosExec`.
 
-- [ ] **Step 5: Update RamsesUI**
+- [ ] **Step 6: Relabel the UI and swap the licence**
 
-Rename the field `pfcExec` to `heliosExec` and assign it from `toolchain.helios()`.
-In `runPFActionPerformed` (4208) change the not-found message from `PFC` to `helios`.
-Retitle the UI strings: the tab or button label `PFC` becomes `Helios`, and
-`showPFCLicenseButton.setText("PFC")` (462) becomes `setText("Helios")`. Point
-`showPFCLicenseButtonActionPerformed` at `heliosLicense.txt`.
+Retitle the licence button and any user-visible "PFC" strings to "Helios", in both
+`RamsesUI.java` and `RamsesUI.form`. Point its handler at `heliosLicense.txt`, taken
+from the helios tarball's `LICENSE`. Update the not-found message in
+`runPFActionPerformed`.
 
-If Step 3 reported any `DIFF`, apply the corrected command sequence to
-`createPFCCommandFile` (2534) here.
+Also relabel the Tools menu item that still reads "Open Notepad++" — that path opens the
+user's default editor now.
 
-- [ ] **Step 6: Add the helios license and remove PFC**
+- [ ] **Step 7: Delete PFC and verify**
 
 ```bash
-tar xzf payload-cache/stepss-helios-linux-x86_64.tar.gz -C /tmp
-cp /tmp/stepss-helios-linux-x86_64/LICENSE src/my/ramses/heliosLicense.txt
 git rm src/my/ramses/PFC src/my/ramses/PFC.exe src/my/ramses/pfcLicense.txt
-```
-
-- [ ] **Step 7: Build and verify power flow end to end**
-
-```bash
 ant clean jar
-tools/dump-toolchain.sh | grep helios
-java -jar dist/stepss.jar
+tools/dump-toolchain.sh
 ```
 
-In the GUI: load the test system, click *Run Power Flow*, confirm the output pane fills
-and that *Add PFC Results to Data* still finds `in_volt_trfo.dat`.
+Expected: `helios` present and executable, `PFC` gone, on all three platform dumps.
+Confirm the form-handler check is clean and the form is well-formed XML.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add -A src/my/ramses tools/diff-pfc-helios.sh
-git commit -m "feat: replace PFC with helios as the power flow engine
+git add -A src/my/ramses
+git commit -m "feat: replace PFC with helios using its export mechanism
 
-Verified with tools/diff-pfc-helios.sh: the GUI-generated command file
-produces identical in_net/in_trfo/in_gen/in_bal/in_volt_trfo output."
+helios' O redirection is an unimplemented stub, so result capture is
+rebuilt on the display-then-export path. Values verified against PFC
+field by field on the Nordic test system."
 ```
-
----
 
 ### Task 14: Documentation
 
