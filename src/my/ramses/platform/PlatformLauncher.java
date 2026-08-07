@@ -26,17 +26,53 @@ public final class PlatformLauncher {
 
     /** @return the first executable named {@code exe} found on PATH, or null if none. */
     public static File findOnPath(String exe) {
+        return findOnPath(exe, java.util.Collections.<String>emptyList());
+    }
+
+    /**
+     * Like {@link #findOnPath(String)}, but searches {@code extraDirs} first.
+     *
+     * <p>PATH here is the JVM's own PATH, inherited from however STEPSS was
+     * launched. That is not always the whole story: on Windows the MSYS2
+     * installer does not put {@code C:\msys64\mingw64\bin} on the system PATH,
+     * so a user who has installed exactly the documented toolchain still has
+     * no gfortran visible to this process. Callers that know about such a
+     * location (see {@code FortranToolchain.extraPathEntries}) pass it here,
+     * so the probe sees the same directories the child build process will get
+     * prepended to its own PATH. Searching them ahead of PATH keeps the
+     * toolchain the build will actually use and the toolchain reported to the
+     * user the same one.
+     *
+     * @param extraDirs directories searched before PATH; may be null or empty,
+     *        in which case this behaves exactly like {@link #findOnPath(String)}
+     * @return the first executable named {@code exe}, or null if none
+     */
+    public static File findOnPath(String exe, List<String> extraDirs) {
+        if (extraDirs != null) {
+            for (String dir : extraDirs) {
+                File candidate = executableAt(dir, exe);
+                if (candidate != null) {
+                    return candidate;
+                }
+            }
+        }
         String path = System.getenv("PATH");
         if (path == null) {
             return null;
         }
         for (String part : path.split(File.pathSeparator)) {
-            File candidate = new File(part, exe);
-            if (candidate.isFile() && candidate.canExecute()) {
+            File candidate = executableAt(part, exe);
+            if (candidate != null) {
                 return candidate;
             }
         }
         return null;
+    }
+
+    /** @return {@code dir/exe} when it is a runnable file, or null. */
+    private static File executableAt(String dir, String exe) {
+        File candidate = new File(dir, exe);
+        return candidate.isFile() && candidate.canExecute() ? candidate : null;
     }
 
     /** Hands the file to the user's default editor. Replaces bundled Notepad++. */

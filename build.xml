@@ -224,7 +224,17 @@
                asset="${codegen.macos.asset}" sha256="${codegen.macos.sha256}"/>
  </target>
 
- <target name="stage-payloads" depends="fetch-payloads"
+ <target name="fetch-uramses"
+         description="Download the pinned stepss-uramses source archive (public, no gh needed)">
+  <mkdir dir="${payload.cache}"/>
+  <available file="${payload.cache}/stepss-uramses-${uramses.version}.zip"
+             property="uramses.cached"/>
+  <get src="${uramses.source.url}"
+       dest="${payload.cache}/stepss-uramses-${uramses.version}.zip"
+       verbose="true" unless:set="uramses.cached"/>
+ </target>
+
+ <target name="stage-payloads" depends="fetch-payloads,fetch-uramses"
          description="Copy verified payloads into the source tree for packaging">
   <!-- Nothing else prunes this directory, so a stale payload left over from
        a previous version pin (e.g. after bumping versions.properties) would
@@ -244,6 +254,16 @@
     <include name="codegen-*"/>
    </fileset>
   </copy>
+  <mkdir dir="${build.classes.dir}"/>
+  <javac srcdir="src" destdir="${build.classes.dir}" includeantruntime="false"
+         source="${javac.source}" target="${javac.target}"
+         includes="my/ramses/platform/UramsesKitPack.java"/>
+  <java classname="my.ramses.platform.UramsesKitPack"
+        classpath="${build.classes.dir}" fork="true" failonerror="true">
+   <arg value="${payload.cache}/stepss-uramses-${uramses.version}.zip"/>
+   <arg value="src/my/ramses/payload/uramses-kit-v${uramses.version}.zip"/>
+   <arg value="${uramses.manifest.sha256}"/>
+  </java>
  </target>
 
  <target name="-pre-compile" depends="stage-payloads"/>

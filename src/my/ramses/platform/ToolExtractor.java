@@ -93,6 +93,9 @@ public final class ToolExtractor {
                 case TGZ:
                     unpackTgz(in, dir, payload);
                     break;
+                case ZIP_TREE:
+                    unpackZipTree(in, dir, payload);
+                    break;
                 default:
                     throw new IOException("Unknown payload kind for " + spec.id());
             }
@@ -137,6 +140,50 @@ public final class ToolExtractor {
         } finally {
             closeQuietly(zin);
         }
+    }
+
+    /**
+     * Unpacks the entries matching {@code payload.retain} into
+     * {@code dir/payload.extractedName/}, preserving their relative paths.
+     * Used for the uramses kit, where only the running platform's module
+     * directory is wanted: shipping all three costs ~5 MB in the jar but
+     * unpacking all three would cost ~35 MB on disk for no gain.
+     */
+    private static void unpackZipTree(InputStream raw, File dir, ToolSpec.Payload payload)
+            throws IOException {
+        File root = new File(dir, payload.extractedName);
+        mkdirs(root);
+        int written = 0;
+        ZipInputStream zin = new ZipInputStream(new BufferedInputStream(raw));
+        try {
+            ZipEntry entry;
+            while ((entry = zin.getNextEntry()) != null) {
+                String name = entry.getName();
+                if (!entry.isDirectory() && retains(payload, name)) {
+                    File out = safeChild(root, name);
+                    mkdirs(out.getParentFile());
+                    writeStream(zin, out);
+                    written++;
+                }
+                zin.closeEntry();
+            }
+        } finally {
+            closeQuietly(zin);
+        }
+        if (written == 0) {
+            throw new IOException("Payload '" + payload.resource
+                    + "' produced no files for the retained prefixes " + payload.retain
+                    + ". The archive layout and the manifest disagree.");
+        }
+    }
+
+    private static boolean retains(ToolSpec.Payload payload, String name) {
+        for (String prefix : payload.retain) {
+            if (prefix.endsWith("/") ? name.startsWith(prefix) : name.equals(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

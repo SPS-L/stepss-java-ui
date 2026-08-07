@@ -14,7 +14,7 @@ Current release: **3.55**.
 - **Real-time plotting**: live curves during simulation via gnuplot (bus voltages, machine speeds, branch flows, wall time, and more)
 - **Result extraction**: "Extract Curves" launches the bundled DYNGRAPH viewer on saved output trajectories
 - **Analysis tools**: Jacobian matrix extraction and small-signal stability analysis
-- **User models**: the Codegen tab generates user-written model source with CODEGEN; compiling it into a custom simulator executable returns in a later release built on gfortran
+- **User models**: the Codegen tab generates user-written model source with CODEGEN and compiles it into a custom simulator with gfortran
 - **Observable wizard**: dialog for selecting buses, machines, shunts, branches, and injectors to record
 - **Integrated editing**: opens data and disturbance files in the operating system's default editor
 - **Built-in help**: online user guide, changelog viewer, and update checker
@@ -23,6 +23,8 @@ Current release: **3.55**.
 ## Installation
 
 **Requirements:** 64-bit Java 11 or later (JRE to run, JDK to build), [Apache Ant](https://ant.apache.org/) to build. Windows and Linux are x86_64; macOS is Apple Silicon (arm64) only, Intel Macs are not supported.
+
+**Known limitation in this release:** compiling custom models needs a [stepss-uramses](https://github.com/SPS-L/stepss-uramses) release whose model routers carry the STEPSS GUI marker comments, which is where STEPSS inserts your generated models. The pinned v3.55 predates them, so until a release carrying them is pinned in `versions.properties`, *Compile* stops with a message about the bundled kit not carrying the marker contract — no compiler you install will change that. This applies to the prebuilt jar and to a build from source alike. Simulation, power flow, and model generation itself are unaffected.
 
 The prebuilt jar is published as a **release artifact** on the [releases page](https://github.com/SPS-L/stepss-java-ui/releases), not committed to this repository — `build/` and `dist/` are untracked. Download it there if you just want to run STEPSS.
 
@@ -39,6 +41,8 @@ The build (a NetBeans/Ant project) produces `dist/stepss.jar`, a self-contained 
 Building fetches the pinned RAMSES, Helios, DYNGRAPH, and CODEGEN binaries for all three platforms (`ant fetch-payloads`, run automatically as part of `ant jar`) from their releases in the SPS-L GitHub organisation. Those component repositories are private, so the first build needs network access and the [`gh` CLI](https://cli.github.com/) authenticated with SPS-L access (`gh auth login`); downloaded archives are checksum-verified against `versions.properties` and cached in `payload-cache/`, so later builds only need network again when a pinned version changes. CI authenticates the same way, through this repository's `STEPSS_TOKEN` secret — Actions' default `GITHUB_TOKEN` is scoped to this repo alone and cannot reach the component repos.
 
 On macOS, the current RAMSES, DYNGRAPH, and CODEGEN builds are dynamically linked against gfortran and OpenBLAS; install them first with `brew install gcc openblas`. Statically linked builds that drop this requirement are expected from those projects.
+
+Compiling custom models is optional and needs a Fortran toolchain on your machine: `gfortran`, GNU `make`, and OpenBLAS. On Debian/Ubuntu that is `sudo apt install gfortran make libopenblas-dev`; on macOS `brew install gcc openblas`; on Windows install [MSYS2](https://www.msys2.org/) and run `pacman -S mingw-w64-x86_64-gcc-fortran mingw-w64-x86_64-openblas make` (STEPSS looks in `C:\msys64`, or wherever `MSYS2_ROOT` points). The bundled module kits are gfortran-ABI-specific and each platform's default compiler matches its own kit; if yours does not, STEPSS reports the exact compiler version to install. Everything else in STEPSS works without any of this.
 
 ## Quick Start
 
@@ -64,7 +68,7 @@ The jar embeds the toolchain executables for the platform it runs on and extract
 | Helios | Power flow | yes | yes | yes |
 | DYNGRAPH | Curve viewer | yes (dialog build) | yes (console) | yes (console) |
 | CODEGEN | Model generation | yes | yes | yes |
-| Model compilation | Custom models | not available this release | not available this release | not available this release |
+| Model compilation | Custom models | yes (MSYS2/MinGW) | yes (gfortran) | yes (Homebrew gcc) |
 | gnuplot | Real-time plotting | bundled | resolved from `PATH` | resolved from `PATH` |
 | Data file editing | OS default editor | yes | yes | yes |
 

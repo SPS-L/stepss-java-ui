@@ -14,6 +14,18 @@ public final class Toolchain {
     public static final String DYNGRAPH = "dyngraph";
     public static final String CODEGEN = "codegen";
     public static final String GNUPLOT = "gnuplot";
+    public static final String URAMSES = "uramses";
+
+    /**
+     * The single definition of the directory the uramses kit unpacks into,
+     * relative to {@link #directory()}. It is the {@code extractedName} of
+     * every uramses payload below <em>and</em> what callers outside this
+     * package resolve the kit against, so the name cannot drift between the
+     * manifest and the code that deletes, re-extracts or recognises the kit.
+     * Read it through {@link #uramsesKitDirectory()} rather than rebuilding
+     * the path by hand.
+     */
+    public static final String URAMSES_DIR = "uramses";
 
     public static final List<ToolSpec> SPECS = buildSpecs();
 
@@ -67,6 +79,20 @@ public final class Toolchain {
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
                 "gpwin.zip", ToolSpec.Kind.ZIP, null, "gnuplot/bin/pgnuplot.exe", false)));
 
+        s.add(new ToolSpec(URAMSES)
+            .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
+                "payload/uramses-kit-v3.55.zip", URAMSES_DIR,
+                java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
+                                        "README.md", "LICENSE.rst", "modules_wg/")))
+            .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
+                "payload/uramses-kit-v3.55.zip", URAMSES_DIR,
+                java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
+                                        "README.md", "LICENSE.rst", "modules_l/")))
+            .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
+                "payload/uramses-kit-v3.55.zip", URAMSES_DIR,
+                java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
+                                        "README.md", "LICENSE.rst", "modules_m/"))));
+
         return s;
     }
 
@@ -97,10 +123,19 @@ public final class Toolchain {
         return platform;
     }
 
-    /** Extracts every tool available on this platform. */
+    /**
+     * Tools that {@link #extractAll()} deliberately skips. The uramses kit is
+     * ~12 MB unpacked and only the Codegen tab's Compile step needs it, so
+     * paying for it on every launch would tax every user for a feature most
+     * never open.
+     */
+    private static final java.util.Set<String> LAZY =
+            java.util.Collections.singleton(URAMSES);
+
+    /** Extracts every tool available on this platform, except the lazy set. */
     public void extractAll() throws IOException {
         for (ToolSpec spec : SPECS) {
-            if (spec.availableOn(platform)) {
+            if (spec.availableOn(platform) && !LAZY.contains(spec.id())) {
                 resolved.put(spec.id(), ToolExtractor.extract(spec, platform, dir));
             }
         }
@@ -115,6 +150,59 @@ public final class Toolchain {
     public File helios()    { return get(HELIOS); }
     public File dyngraph()  { return get(DYNGRAPH); }
     public File codegen()   { return get(CODEGEN); }
+
+    /** Extracts one tool on first use and caches the result. */
+    public File extractOnDemand(String id) throws IOException {
+        File existing = resolved.get(id);
+        if (existing != null) {
+            return existing;
+        }
+        File f = ToolExtractor.extract(byId(id), platform, dir);
+        resolved.put(id, f);
+        return f;
+    }
+
+    /**
+     * Discards the cached extraction result for {@code id}, so the next
+     * {@link #extractOnDemand} call re-runs {@link ToolExtractor#extract}
+     * instead of returning the same {@code File} reference again.
+     *
+     * <p>Needed by callers that delete an extracted tree themselves (the
+     * uramses kit, reset to pristine before every compile) and then need a
+     * real re-unpack, not a cache hit against a directory that no longer
+     * exists on disk.
+     */
+    public void forgetExtracted(String id) {
+        resolved.remove(id);
+    }
+
+    /** @return the extracted uramses kit root, or null if it has not been extracted yet. */
+    public File uramsesKit() {
+        return get(URAMSES);
+    }
+
+    /**
+     * Where the uramses kit lives (or will live) under {@link #directory()},
+     * whether or not it has been extracted yet - unlike {@link #uramsesKit()},
+     * which only answers once extraction has run. The one place this path is
+     * formed, so {@code ModelCompiler.prepare} (which deletes and re-extracts
+     * it) and the UI (which recognises a previous build's output inside it)
+     * cannot disagree, and neither can drift from {@link #URAMSES_DIR} in the
+     * payload manifest.
+     */
+    public File uramsesKitDirectory() {
+        return new File(dir, URAMSES_DIR);
+    }
+
+    /** The module-kit directory name inside the uramses kit, per platform. */
+    public static String moduleKitDir(Platform p) {
+        switch (p) {
+            case WINDOWS_X86_64: return "modules_wg";
+            case LINUX_X86_64:   return "modules_l";
+            case MACOS_ARM64:    return "modules_m";
+            default: throw new IllegalArgumentException("No module kit for " + p);
+        }
+    }
 
     /**
      * Windows bundles gnuplot; elsewhere it is resolved from PATH.
