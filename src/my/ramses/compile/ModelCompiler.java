@@ -67,6 +67,12 @@ public final class ModelCompiler {
         File dir = toolchain.directory();
         File existing = new File(dir, "uramses");
         deleteRecursively(existing);
+        // extractOnDemand caches the extracted File the first time it runs
+        // and returns that cached reference on every later call without
+        // touching disk again. Without forgetExtracted first, every compile
+        // after the first would hand back a File pointing at the tree just
+        // deleted above instead of actually re-unpacking it.
+        toolchain.forgetExtracted(Toolchain.URAMSES);
         kitDir = toolchain.extractOnDemand(Toolchain.URAMSES);
         built = null;
 
@@ -211,7 +217,23 @@ public final class ModelCompiler {
         f.delete();
     }
 
-    /** Splits the merged stdout/stderr stream into lines for the listener. */
+    /**
+     * Splits the merged stdout/stderr stream into lines for the listener.
+     *
+     * <p>{@code PumpStreamHandler} pumps stdout and stderr on two separate
+     * threads, and both are wired to the same {@code LineSink} instance
+     * (make's own output on stdout, gfortran's diagnostics on stderr - both
+     * routinely active at once). Every method that touches {@code line}
+     * must therefore be synchronized, including {@code write(byte[], int,
+     * int)}: without overriding it, {@code OutputStream}'s default
+     * implementation calls {@code write(int)} once per byte with no lock
+     * held across the whole chunk, so a chunk from one thread could still
+     * interleave with a chunk from the other mid-write. Left unsynchronized,
+     * {@code append}/{@code setLength(0)} racing between the two pump
+     * threads can throw {@code StringIndexOutOfBoundsException}, which
+     * {@code StreamPumper.run} swallows - silently truncating the log
+     * rather than visibly failing.
+     */
     private static final class LineSink extends OutputStream {
         private final Listener listener;
         private final StringBuilder line = new StringBuilder();
@@ -221,8 +243,11 @@ public final class ModelCompiler {
         }
 
         @Override
-        public void write(int b) {
+        public synchronized void write(int b) {
             if (b == '\n') {
+                // Unconditional, unlike emitPending() below: a blank line in
+                // the build log is a real newline byte and must round-trip
+                // as one, not be swallowed for having an empty line buffer.
                 listener.onOutput(line.toString());
                 line.setLength(0);
             } else if (b != '\r') {
@@ -230,8 +255,36 @@ public final class ModelCompiler {
             }
         }
 
+        /**
+         * Overridden so a whole pump chunk is appended under one lock
+         * acquisition rather than one lock per byte, keeping it atomic with
+         * respect to the other stream's pump thread.
+         */
         @Override
-        public void close() {
+        public synchronized void write(byte[] b, int off, int len) {
+            for (int i = 0; i < len; i++) {
+                write(b[off + i]);
+            }
+        }
+
+        /**
+         * {@code PumpStreamHandler.stop()} flushes rather than closes a
+         * non-piped sink ({@code closeWhenExhausted} is false for these),
+         * and it does so exactly once, after both pump threads have
+         * finished - so this is where the last, newline-less partial line
+         * must be emitted, or it is silently dropped.
+         */
+        @Override
+        public synchronized void flush() {
+            emitPending();
+        }
+
+        @Override
+        public synchronized void close() {
+            emitPending();
+        }
+
+        private void emitPending() {
             if (line.length() > 0) {
                 listener.onOutput(line.toString());
                 line.setLength(0);

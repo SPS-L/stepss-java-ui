@@ -151,6 +151,20 @@ public final class Toolchain {
         return f;
     }
 
+    /**
+     * Discards the cached extraction result for {@code id}, so the next
+     * {@link #extractOnDemand} call re-runs {@link ToolExtractor#extract}
+     * instead of returning the same {@code File} reference again.
+     *
+     * <p>Needed by callers that delete an extracted tree themselves (the
+     * uramses kit, reset to pristine before every compile) and then need a
+     * real re-unpack, not a cache hit against a directory that no longer
+     * exists on disk.
+     */
+    public void forgetExtracted(String id) {
+        resolved.remove(id);
+    }
+
     /** @return the extracted uramses kit root, or null if it has not been extracted yet. */
     public File uramsesKit() {
         return get(URAMSES);

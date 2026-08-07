@@ -20,7 +20,9 @@ public final class CompileHarness {
         checkKindParsing();
         checkSpliceInsertsBothPoints();
         checkSpliceIsDeterministic();
-        checkSpliceOnAlreadySplicedOutputDuplicatesCase();
+        checkSpliceOnAlreadySplicedOutputIsIdempotent();
+        checkSpliceSkipsAlreadyRegisteredModel();
+        checkSpliceSkipsOnlyTheRegisteredModel();
         checkMissingMarkerFails();
         checkAbiParsing();
         checkCompilerSelection();
@@ -80,27 +82,76 @@ public final class CompileHarness {
     }
 
     /**
-     * splice() deliberately leaves both markers in its output, so splicing
-     * is not idempotent: feeding splice() its own output re-inserts the same
-     * model and produces a second, duplicate case for it rather than
-     * refusing or collapsing to one. This is real, current behaviour, not a
-     * hypothetical - it is exactly why the compile pipeline must reset the
-     * kit to pristine before every splice rather than splicing onto
-     * whatever the kit already contains. If splice() ever becomes
-     * self-idempotent, this check starts failing, which is the intended
-     * signal to revisit the reset logic rather than let it go silently
-     * redundant.
+     * Pins the behaviour added to close the exc_ENTSOE_lim duplicate-case
+     * defect: splice() now skips a model already registered via a live
+     * {@code <kind>_ptr=>model} assignment, and a model spliced in by an
+     * earlier call is registered exactly that way. So feeding splice() its
+     * own output for the same model is now idempotent - the second call
+     * finds {@code exc_ptr=>exc_ALPHA} already live and adds nothing more.
+     * This check used to pin the opposite (a second, duplicate case on
+     * every re-splice); that was real behaviour before the fix, not a
+     * hypothetical, and this update is the "revisit the reset logic" signal
+     * that old docstring called for. {@link ModelCompiler#prepare} still
+     * resets the kit to pristine before every compile regardless - this
+     * idempotency is a second line of defence, not a replacement for that
+     * reset, since nothing here helps two different models that happen to
+     * collide, or a router the reset failed to actually restore.
      */
-    private static void checkSpliceOnAlreadySplicedOutputDuplicatesCase() {
+    private static void checkSpliceOnAlreadySplicedOutputIsIdempotent() {
         try {
             String once = RouterSplicer.splice(pristine(), "exc", Arrays.asList("exc_ALPHA"));
             String twice = RouterSplicer.splice(once, "exc", Arrays.asList("exc_ALPHA"));
-            expect("splicing onto spliced output duplicates the case", 2,
+            expect("re-splicing an already-registered model adds no extra case", 1,
                     count(twice, "case('exc_ALPHA')"));
-            expect("splicing onto spliced output duplicates the external", 2,
+            expect("re-splicing an already-registered model adds no extra external", 1,
                     count(twice, "external :: exc_ALPHA"));
+            expect("re-splicing onto already-spliced output changes nothing further",
+                    true, once.equals(twice));
         } catch (Exception ex) {
-            fail("double-splice check threw: " + ex);
+            fail("idempotent re-splice check threw: " + ex);
+        }
+    }
+
+    /**
+     * The literal acceptance scenario: a model that arrives with the kit
+     * already registered, exactly like {@code exc_ENTSOE_lim} in the real
+     * {@code src/usr_exc_models.f90}. {@code pristine()} plays that role
+     * with its built-in {@code exc_KUNDUR}, live outside the spliced
+     * region. Splicing it again must not duplicate its external or case -
+     * upstream's Makefile fails the build on a duplicate case label, and
+     * that is exactly the failure this check exists to prevent.
+     */
+    private static void checkSpliceSkipsAlreadyRegisteredModel() {
+        try {
+            String out = RouterSplicer.splice(pristine(), "exc", Arrays.asList("exc_KUNDUR"));
+            expect("no duplicate external for an already-registered model", 1,
+                    count(out, "external :: exc_KUNDUR"));
+            expect("no duplicate pointer assignment for an already-registered model", 1,
+                    count(out, "exc_ptr=>exc_KUNDUR"));
+            expect("markers still present", 1, count(out, RouterSplicer.CASES_MARKER));
+        } catch (Exception ex) {
+            fail("already-registered skip check threw: " + ex);
+        }
+    }
+
+    /**
+     * The realistic mixed case: a user's Codegen run includes both the
+     * shipped, already-registered example and a genuinely new model.
+     * Skipping the registered one must not affect splicing the new one in
+     * beside it.
+     */
+    private static void checkSpliceSkipsOnlyTheRegisteredModel() {
+        try {
+            String out = RouterSplicer.splice(pristine(), "exc",
+                    Arrays.asList("exc_KUNDUR", "exc_ALPHA"));
+            expect("already-registered model still not duplicated", 1,
+                    count(out, "external :: exc_KUNDUR"));
+            expect("new model alongside it is still spliced in", 1,
+                    count(out, "external :: exc_ALPHA"));
+            expect("new model's case is still spliced in", 1,
+                    count(out, "case('exc_ALPHA')"));
+        } catch (Exception ex) {
+            fail("mixed registered/new splice check threw: " + ex);
         }
     }
 

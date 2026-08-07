@@ -4395,7 +4395,26 @@ public class RamsesUI extends javax.swing.JFrame {
 
     command.addArgument("-l" + myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "CGcmd.txt");
 
-    simulExecutorResultHandler = new DefaultExecuteResultHandler();
+    // Compile is enabled from onProcessComplete below, once CODEGEN has
+    // actually finished successfully, rather than unconditionally right
+    // after execute() starts it - an immediate Compile press would
+    // otherwise find no .f90 yet, or a half-written one. onProcessComplete
+    // runs on Commons Exec's own watchdog thread, so the enable is
+    // marshalled through invokeLater, and it defers to a build already in
+    // progress rather than re-enabling Compile out from under it.
+    simulExecutorResultHandler = new DefaultExecuteResultHandler() {
+        @Override
+        public void onProcessComplete(int exitValue) {
+            super.onProcessComplete(exitValue);
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    if (!compileInProgress) {
+                        Compile.setEnabled(true);
+                    }
+                }
+            });
+        }
+    };
     simulExecutor = new DefaultExecutor();
     simulExecutor.setExitValue(1);
     ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
@@ -4410,7 +4429,6 @@ public class RamsesUI extends javax.swing.JFrame {
         Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
     }
     saveCGFiles.setEnabled(true);
-    Compile.setEnabled(true);
     }//GEN-LAST:event_execCodegenActionPerformed
 
     private void saveCGFilesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveCGFilesActionPerformed
@@ -4449,6 +4467,13 @@ public class RamsesUI extends javax.swing.JFrame {
     
     
     private void CompileActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_CompileActionPerformed
+        if (compileInProgress) {
+            JOptionPane.showMessageDialog(this,
+                    "<html>A build is already running. Wait for it to finish before"
+                    + " starting another.</html>",
+                    "Build in progress", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
         if (codeGenFiles == null || codeGenFiles.length == 0) {
             JOptionPane.showMessageDialog(this,
                     "<html>No generated models to compile. Run Codegen first.</html>",
@@ -4456,7 +4481,7 @@ public class RamsesUI extends javax.swing.JFrame {
             return;
         }
 
-        java.util.List<File> generated = new java.util.ArrayList<File>();
+        final java.util.List<File> generated = new java.util.ArrayList<File>();
         for (File temp : codeGenFiles) {
             String base = temp.getName().replaceFirst("[.][^.]+$", "");
             File f90 = new File(myTempDir, base + ".f90");
@@ -4470,57 +4495,110 @@ public class RamsesUI extends javax.swing.JFrame {
             generated.add(f90);
         }
 
+        compileInProgress = true;
         codegenPane.setText("Preparing the build kit...\n");
         Compile.setEnabled(false);
-        modelCompiler = new ModelCompiler(toolchain.platform(), toolchain);
-        try {
-            modelCompiler.prepare(generated);
-        } catch (IOException ex) {
-            Compile.setEnabled(true);
-            codegenPane.append(ex.getMessage() + "\n");
-            JOptionPane.showMessageDialog(this,
-                    "<html>Could not prepare the build:<br>" + ex.getMessage() + "</html>",
-                    "Compilation failed", JOptionPane.ERROR_MESSAGE);
-            return;
+        // A stale success from an earlier compile must not look current
+        // while this one is running, and must not survive if this one fails.
+        savedynsim.setEnabled(false);
+        // prepare() is about to delete and rebuild the kit that a previous
+        // custom dynsim lives inside; point back at the bundled engine
+        // before that starts, so a simulation launched mid-build can never
+        // target a half-rebuilt or already-deleted tree. reportCompileOutcome
+        // restores this again on failure, independently, as the binding
+        // guarantee: a failed build must never leave the app unable to
+        // simulate at all.
+        File bundled = toolchain.ramses();
+        if (bundled != null) {
+            ramsesExec = bundled;
         }
 
-        codegenPane.append("Building custom simulator with gfortran...\n\n");
-        try {
-            modelCompiler.build(new ModelCompiler.Listener() {
-                public void onOutput(final String line) {
+        final ModelCompiler compiler = new ModelCompiler(toolchain.platform(), toolchain);
+        modelCompiler = compiler;
+
+        // prepare() re-unpacks the ~12 MB kit, and build() opens by probing
+        // for a Fortran toolchain, which can spawn several gfortran
+        // subprocesses each bounded at 30s - both block for long enough
+        // that running them on the EDT would freeze the GUI with no
+        // repaint (the "Preparing..." text above would never even appear).
+        // The whole sequence therefore runs on a background thread, and
+        // every Swing touch is marshalled back through invokeLater.
+        new Thread("stepss-compile") {
+            @Override
+            public void run() {
+                try {
+                    compiler.prepare(generated);
+                } catch (final IOException ex) {
                     SwingUtilities.invokeLater(new Runnable() {
                         public void run() {
-                            codegenPane.append(line + "\n");
+                            compileInProgress = false;
+                            Compile.setEnabled(true);
+                            codegenPane.append(ex.getMessage() + "\n");
+                            JOptionPane.showMessageDialog(RamsesUI.this,
+                                    "<html>Could not prepare the build:<br>"
+                                    + escapeHtml(ex.getMessage()) + "</html>",
+                                    "Compilation failed", JOptionPane.ERROR_MESSAGE);
+                        }
+                    });
+                    return;
+                }
+
+                SwingUtilities.invokeLater(new Runnable() {
+                    public void run() {
+                        codegenPane.append("Building custom simulator with gfortran...\n\n");
+                    }
+                });
+
+                try {
+                    compiler.build(new ModelCompiler.Listener() {
+                        public void onOutput(final String line) {
+                            SwingUtilities.invokeLater(new Runnable() {
+                                public void run() {
+                                    codegenPane.append(line + "\n");
+                                }
+                            });
+                        }
+
+                        public void onFinished(final int exitCode, final File dynsim,
+                                final String problem) {
+                            SwingUtilities.invokeLater(new Runnable() {
+                                public void run() {
+                                    reportCompileOutcome(exitCode, dynsim, problem);
+                                }
+                            });
+                        }
+                    });
+                } catch (final IOException ex) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            compileInProgress = false;
+                            Compile.setEnabled(true);
+                            JOptionPane.showMessageDialog(RamsesUI.this,
+                                    "<html>Could not start the build:<br>"
+                                    + escapeHtml(ex.getMessage()) + "</html>",
+                                    "Compilation failed", JOptionPane.ERROR_MESSAGE);
                         }
                     });
                 }
-
-                public void onFinished(final int exitCode, final File dynsim,
-                        final String problem) {
-                    SwingUtilities.invokeLater(new Runnable() {
-                        public void run() {
-                            reportCompileOutcome(exitCode, dynsim, problem);
-                        }
-                    });
-                }
-            });
-        } catch (IOException ex) {
-            Compile.setEnabled(true);
-            JOptionPane.showMessageDialog(this,
-                    "<html>Could not start the build:<br>" + ex.getMessage() + "</html>",
-                    "Compilation failed", JOptionPane.ERROR_MESSAGE);
-        }
+            }
+        }.start();
     }//GEN-LAST:event_CompileActionPerformed
 
     /**
      * Adopts a freshly built simulator, or reports why there is not one. Always
-     * runs on the EDT. On any failure {@code ramsesExec} is left pointing at the
-     * bundled engine, so a failed compile never leaves the app unable to
-     * simulate.
+     * runs on the EDT (see {@link ModelCompiler.Listener#onFinished}'s callers,
+     * both wrapped in {@code invokeLater}). On any failure {@code ramsesExec} is
+     * restored to the bundled engine, so a failed compile never leaves the app
+     * unable to simulate.
      */
     private void reportCompileOutcome(int exitCode, File dynsim, String problem) {
+        compileInProgress = false;
         Compile.setEnabled(true);
         if (problem != null || dynsim == null) {
+            File bundled = toolchain.ramses();
+            if (bundled != null) {
+                ramsesExec = bundled;
+            }
             codegenPane.append("\n" + (problem == null ? "Compilation failed." : problem) + "\n");
             JOptionPane.showMessageDialog(this,
                     "<html>" + (problem == null ? "Compilation failed." : escapeHtml(problem))
@@ -4610,7 +4688,9 @@ public class RamsesUI extends javax.swing.JFrame {
         fileChooser.setSelectedFile(new File(source.getName()));
         fileChooser.setDialogTitle("Save Compiled Simulator");
         fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-        if (fileChooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+        int returnVal = fileChooser.showSaveDialog(this);
+        fileChooser.resetChoosableFileFilters();
+        if (returnVal != JFileChooser.APPROVE_OPTION) {
             return;
         }
         File dest = fileChooser.getSelectedFile();
@@ -4681,6 +4761,14 @@ public class RamsesUI extends javax.swing.JFrame {
     private File gnuplotExec = null;
     private File codegenExec = null;
     private ModelCompiler modelCompiler = null;
+    // EDT-only: set at the top of CompileActionPerformed, cleared in every
+    // path out of the background compile thread (prepare-failure,
+    // build-start-failure, and both branches of reportCompileOutcome).
+    // Guards against Compile -> Run Codegen -> Compile starting a second
+    // ModelCompiler whose prepare() would delete the kit out from under the
+    // running make, and against the Codegen completion handler re-enabling
+    // Compile mid-build.
+    private boolean compileInProgress = false;
     // initRamses() re-runs on every working-directory change, but the
     // "gnuplot not found" warning only needs to be told once per session.
     private boolean gnuplotMissingWarned = false;
