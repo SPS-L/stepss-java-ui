@@ -34,6 +34,10 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
+import my.ramses.platform.Platform;
+import my.ramses.platform.PlatformLauncher;
+import my.ramses.platform.Toolchain;
+import my.ramses.platform.UnsupportedPlatformException;
 import org.apache.commons.exec.*;
 import org.apache.commons.exec.environment.EnvironmentUtils;
 import org.apache.commons.io.FileUtils;
@@ -2626,7 +2630,7 @@ public class RamsesUI extends javax.swing.JFrame {
         if (confirmed == JOptionPane.YES_OPTION) {
             if (myTempDir == null) {
             } else {
-                fileOps.deleteDirectory(myTempDir);
+                fileOps.deleteDirectory(toolDir);
             }
             System.exit(0);
         } else if (confirmed == JOptionPane.NO_OPTION) {
@@ -2634,7 +2638,7 @@ public class RamsesUI extends javax.swing.JFrame {
             } else {
                 clearGnuplotButtonActionPerformed(null);
                 stopSimulationButtonActionPerformed(null);
-                fileOps.deleteDirectory(myTempDir);
+                fileOps.deleteDirectory(toolDir);
             }
             System.exit(0);
         }
@@ -3067,7 +3071,7 @@ public class RamsesUI extends javax.swing.JFrame {
     private void showGnupCopyrightButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showGnupCopyrightButtonActionPerformed
         try {
             if (nppExec == null) {
-                nppExec = fileOps.extractNpp(myTempDir);
+                nppExec = toolchain.npp();
             }
             InputStream in;
             in = RamsesUI.class.getResourceAsStream("gnuplotLicense.txt");
@@ -3107,7 +3111,7 @@ public class RamsesUI extends javax.swing.JFrame {
     private void showApacheLicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showApacheLicenseButtonActionPerformed
         try {
             if (nppExec == null) {
-                nppExec = fileOps.extractNpp(myTempDir);
+                nppExec = toolchain.npp();
             }
             InputStream in;
             in = RamsesUI.class.getResourceAsStream("apacheLicense.txt");
@@ -3142,7 +3146,7 @@ public class RamsesUI extends javax.swing.JFrame {
         try {
             if (nppExec == null) {
 
-                nppExec = fileOps.extractNpp(myTempDir);
+                nppExec = toolchain.npp();
 
             }
             InputStream in;
@@ -3182,7 +3186,7 @@ public class RamsesUI extends javax.swing.JFrame {
         try {
             if (nppExec == null) {
 
-                nppExec = fileOps.extractNpp(myTempDir);
+                nppExec = toolchain.npp();
 
             }
             InputStream in;
@@ -4410,14 +4414,9 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_displayCGfilesActionPerformed
 
     private void execCodegenActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_execCodegenActionPerformed
-        
-    try{
-        if (codegenExec == null) {
-            codegenExec = fileOps.extractCodegen(myTempDir);
-        }
 
-    } catch (IOException ex) {
-        Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
+    if (codegenExec == null) {
+        codegenExec = toolchain.codegen();
     }
 
     if (!createCGCommandFile()) {
@@ -4622,7 +4621,7 @@ public class RamsesUI extends javax.swing.JFrame {
 //
             
             
-            File vswhereExec = fileOps.extractVswhere(myTempDir);
+            File vswhereExec = toolchain.vswhere();
 
             ProcessBuilder builder = new ProcessBuilder();
             builder.command(vswhereExec.getAbsolutePath(), "-latest", "-property", "productPath");
@@ -4680,7 +4679,7 @@ public class RamsesUI extends javax.swing.JFrame {
         try {
             if (nppExec == null) {
 
-                nppExec = fileOps.extractNpp(myTempDir);
+                nppExec = toolchain.npp();
 
             }
             InputStream in;
@@ -4717,7 +4716,7 @@ public class RamsesUI extends javax.swing.JFrame {
         try {
             if (nppExec == null) {
 
-                nppExec = fileOps.extractNpp(myTempDir);
+                nppExec = toolchain.npp();
 
             }
             InputStream in;
@@ -4753,7 +4752,7 @@ public class RamsesUI extends javax.swing.JFrame {
         try {
             if (nppExec == null) {
 
-                nppExec = fileOps.extractNpp(myTempDir);
+                nppExec = toolchain.npp();
 
             }
             InputStream in;
@@ -4856,6 +4855,9 @@ public class RamsesUI extends javax.swing.JFrame {
         });
     }
     private Boolean savedOutputBool = false;
+    private Platform platform;
+    private Toolchain toolchain;
+    private File toolDir = null;
     private File myTempDir = null;
     private File selWorkDir = null;
     private File ramsesExec = null;
@@ -5126,51 +5128,46 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private boolean initRamses() {
         try {
-            if (!(myTempDir == null)) {
-                fileOps.deleteDirectory(myTempDir);
+            platform = Platform.current();
+        } catch (UnsupportedPlatformException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(),
+                    "Unsupported platform", JOptionPane.ERROR_MESSAGE);
+            System.exit(1);
+        }
+        try {
+            if (toolDir == null) {
+                toolDir = File.createTempFile("stepssTools", "");
+                if (!toolDir.delete() || !toolDir.mkdir()) {
+                    throw new IOException("Could not create tool directory " + toolDir);
+                }
             }
-            if (selWorkDir == null) {
-                myTempDir = File.createTempFile("ramsesTempDir", "");
-                myTempDir.delete();
-                myTempDir.mkdir();
-            } else {
-//                myTempDir = File.createTempFile("ramsesTempDir", "", selWorkDir);
-                myTempDir = selWorkDir;
+            toolchain = new Toolchain(platform, toolDir);
+            toolchain.extractAll();
 
-            }
+            myTempDir = (selWorkDir != null) ? selWorkDir : toolDir;
+
             openExplButton.setEnabled(true);
             openTermButton.setEnabled(true);
-            ramsesExec = fileOps.extractRamses(myTempDir);
-            pfcExec = fileOps.extractPfc(myTempDir);
-            gnuplotExec = fileOps.extractGnuplot(myTempDir);
-            nppExec = fileOps.extractNpp(myTempDir);
-            dyngraphExec = fileOps.extractDyngraph(myTempDir);
-            userguide = fileOps.extractDoc(myTempDir);
-            if (OS.isFamilyWindows()) {
-                WinEnvironment = EnvironmentUtils.getProcEnvironment();
-                String path = (String) WinEnvironment.get("PATH");
-                path = myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "gnuplot"
-                        + System.getProperty("file.separator") + "bin;" + myTempDir.getAbsolutePath() 
-                        + System.getProperty("file.separator") + "dynsim;" + path;
-                System.out.print("The new path is: " + path);
-                EnvironmentUtils.addVariableToEnvironment(WinEnvironment, "PATH=" + path);
-//                path = (String) WinEnvironment.get("PATH");
-//                System.out.println(path);
-            }
 
-            if (gnuplotExec.exists()) {
-                CommandLine command = new CommandLine(gnuplotExec.getAbsolutePath());
-                DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-                ExecuteWatchdog watchdog = new ExecuteWatchdog(3000);
-                DefaultExecutor executor = new DefaultExecutor();
-                ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-                executor.setProcessDestroyer(processDestroyer);
-                executor.setWatchdog(watchdog);
-                executor.execute(command, resultHandler);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>gnuplot</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
+            ramsesExec = toolchain.ramses();
+            pfcExec = toolchain.pfc();
+            dyngraphExec = toolchain.dyngraph();
+            codegenExec = toolchain.codegen();
+            nppExec = toolchain.npp();
+            userguide = toolchain.userGuide();
+            gnuplotExec = toolchain.gnuplot();
+            WinEnvironment = PlatformLauncher.execEnvironment(platform, toolDir);
+
+            if (gnuplotExec == null || !gnuplotExec.exists()) {
+                JOptionPane.showMessageDialog(this,
+                        "<html>gnuplot was not found, so real-time plotting is disabled."
+                        + "<br>Install it and restart to enable it.</html>",
+                        "gnuplot not found", JOptionPane.WARNING_MESSAGE);
             }
         } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Could not prepare the simulation toolchain.\n\n" + ex.getMessage(),
+                    "Toolchain error", JOptionPane.ERROR_MESSAGE);
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
             return false;
         }
