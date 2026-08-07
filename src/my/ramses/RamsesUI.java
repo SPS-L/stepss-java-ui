@@ -26,7 +26,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
-import java.util.zip.ZipInputStream;
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.text.BadLocationException;
@@ -4193,13 +4192,10 @@ public class RamsesUI extends javax.swing.JFrame {
     simulExecutor.setProcessDestroyer(processDestroyer);
     try {
         simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
-        InputStream in = RamsesUI.class.getResourceAsStream("URAMSES.zip");
-        fileOps.extractToFolder(new ZipInputStream(in), myTempDir);
     } catch (IOException ex) {
         Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
     }
     saveCGFiles.setEnabled(true);
-    Compile.setEnabled(true);
     }//GEN-LAST:event_execCodegenActionPerformed
 
     private void saveCGFilesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveCGFilesActionPerformed
@@ -4238,182 +4234,11 @@ public class RamsesUI extends javax.swing.JFrame {
     
     
     private void CompileActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_CompileActionPerformed
-        if (platform != Platform.WINDOWS_X86_64) {
-            JOptionPane.showMessageDialog(this,
-                    "<html>Compiling custom models requires the Intel Fortran and "
-                    + "Visual Studio toolchain, which is available on Windows only."
-                    + "<br>Model generation works on this platform; compilation does not.</html>",
-                    "Not available on this platform", JOptionPane.INFORMATION_MESSAGE);
-            return;
-        }
-        try {
-            codegenPane.setText("Starting compilation...\n");
-            String vfproj = "";
-            for (File temp : codeGenFiles) {
-                String flname = temp.getName().replaceFirst("[.][^.]+$", "");
-                File srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + flname +".f90");
-                File destFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                                + System.getProperty("file.separator") + "my_models" 
-                                + System.getProperty("file.separator") + flname + ".f90");
-                vfproj = vfproj + "<File RelativePath=\".\\my_models\\"+flname+".f90\"/>\n";
-                if (!srcFile.exists()) {
-                    JOptionPane.showMessageDialog(this, "<html>f90 file not found. Sorry. Report this.</html>", "Error", JOptionPane.ERROR_MESSAGE);
-                } else {
-                    fileOps.copyFiletoFile(srcFile, destFile);
-                }
-            }  
-            Path vfproj1 = Path.of(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                                + System.getProperty("file.separator") +"exeramses.vfproj.1");
-            String vfproj1str1 = Files.readString(vfproj1);
-            Path vfproj2 = Path.of(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                                + System.getProperty("file.separator") +"exeramses.vfproj.2");
-            String vfproj1str2 = Files.readString(vfproj2);
-            FileWriter myWriter = new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                                + System.getProperty("file.separator") + "exeramses.vfproj");
-            myWriter.write(vfproj1str1+vfproj+vfproj1str2);
-            myWriter.close();
-            
-            vfproj1 = Path.of(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_inj_models.f90.1");
-            vfproj1str1 = Files.readString(vfproj1);
-            vfproj2 = Path.of(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_inj_models.f90.2");
-            vfproj1str2 = Files.readString(vfproj2);
-            vfproj = "";
-            String vfproj3 = "";
-            for (File temp : codeGenFiles) {
-                String flname = temp.getName().replaceFirst("[.][^.]+$", "");
-                if (flname.substring(0,3).equals("inj") ){
-                    String modelname = flname.replace("inj_", "");
-                    vfproj = vfproj + "external "+flname+"\n";
-                    vfproj3 = vfproj3 + "case('"+modelname+"')\n inj_ptr => "+flname+"\n\n";
-                }
-            }  
-            myWriter = new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_inj_models.f90");
-            myWriter.write(vfproj1str1+vfproj+"select case (modelname)\n\n"+vfproj3+vfproj1str2);
-            myWriter.close();
-            
-            vfproj1 = Path.of(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_exc_models.f90.1");
-            vfproj1str1 = Files.readString(vfproj1);
-            vfproj2 = Path.of(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_exc_models.f90.2");
-            vfproj1str2 = Files.readString(vfproj2);
-            vfproj = "";
-            vfproj3 = "";
-            for (File temp : codeGenFiles) {
-                String flname = temp.getName().replaceFirst("[.][^.]+$", "");
-                if (flname.substring(0,3).equals("exc") ){
-                    String modelname = flname.replace("exc_", "");
-                    vfproj = vfproj + "external "+flname+"\n";
-                    vfproj3 = vfproj3 + "case('"+modelname+"')\n exc_ptr => "+flname+"\n\n";
-                }
-            }  
-            myWriter = new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_exc_models.f90");
-            myWriter.write(vfproj1str1+vfproj+"select case (modelname)\n\n"+vfproj3+vfproj1str2);
-            myWriter.close();
-            
-            vfproj1 = Path.of(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_tor_models.f90.1");
-            vfproj1str1 = Files.readString(vfproj1);
-            vfproj2 = Path.of(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_tor_models.f90.2");
-            vfproj1str2 = Files.readString(vfproj2);
-            vfproj = "";
-            vfproj3 = "";
-            for (File temp : codeGenFiles) {
-                String flname = temp.getName().replaceFirst("[.][^.]+$", "");
-                if (flname.substring(0,3).equals("tor") ){
-                    String modelname = flname.replace("tor_", "");
-                    vfproj = vfproj + "external "+flname+"\n";
-                    vfproj3 = vfproj3 + "case('"+modelname+"')\n tor_ptr => "+flname+"\n\n";
-                }
-            }  
-            myWriter = new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_tor_models.f90");
-            myWriter.write(vfproj1str1+vfproj+"select case (modelname)\n\n"+vfproj3+vfproj1str2);
-            myWriter.close();
-            
-            vfproj1 = Path.of(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_twop_models.f90.1");
-            vfproj1str1 = Files.readString(vfproj1);
-            vfproj2 = Path.of(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_twop_models.f90.2");
-            vfproj1str2 = Files.readString(vfproj2);
-            vfproj = "";
-            vfproj3 = "";
-            for (File temp : codeGenFiles) {
-                String flname = temp.getName().replaceFirst("[.][^.]+$", "");
-                if (flname.substring(0,4).equals("twop") ){
-                    String modelname = flname.replace("twop_", "");
-                    vfproj = vfproj + "external "+flname+"\n";
-                    vfproj3 = vfproj3 + "case('"+modelname+"')\n twop_ptr => "+flname+"\n\n";
-                }
-            }  
-            myWriter = new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") +"URAMSES" 
-                            + System.getProperty("file.separator") +"src"+System.getProperty("file.separator") 
-                            +"usr_twop_models.f90");
-            myWriter.write(vfproj1str1+vfproj+"select case (modelname)\n\n"+vfproj3+vfproj1str2);
-            myWriter.close();
-            
-//
-            
-            
-            File vswhereExec = toolchain.vswhere();
-
-            ProcessBuilder builder = new ProcessBuilder();
-            builder.command(vswhereExec.getAbsolutePath(), "-latest", "-property", "productPath");
-            builder.directory(myTempDir);
-            Process process = builder.start();
-            int exitCode = process.waitFor();
-            assert exitCode == 0;
-            String result = new String(process.getInputStream().readAllBytes());
-            System.out.println(result);
-            codegenPane.append("Detected Visual Studio installation: "+result+"\n\n");
-            
-            File devenvExec = new File(result.strip());
-        
-            builder = new ProcessBuilder();
-            File logFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator")+"log.txt");
-            logFile.createNewFile();
-            builder.command(devenvExec.getAbsolutePath(), myTempDir.getAbsolutePath()+System.getProperty("file.separator")+"URAMSES"+System.getProperty("file.separator")+"URAMSES.sln", "/Out", logFile.getAbsolutePath(), "/rebuild");
-            process = builder.start();
-            exitCode = process.waitFor();
-            assert exitCode == 0;
-            
-            BufferedReader traceFileBufReader = new BufferedReader(new FileReader(logFile));
-            String line;
-            while ((line = traceFileBufReader.readLine()) != null) {
-                codegenPane.append(line);
-                codegenPane.append("\n");
-            }
-            traceFileBufReader.close();
-            
-            
-            ramsesExec = new File(myTempDir.getAbsolutePath()+System.getProperty("file.separator")+"URAMSES"+System.getProperty("file.separator")+"Release_intel_w64"+System.getProperty("file.separator")+"dynsim.exe");
-            ramsesExec.setExecutable(true);
-            
-            
-        } catch (IOException ex) {
-            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (InterruptedException ex) {
-            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        savedynsim.setEnabled(true);
-
+        JOptionPane.showMessageDialog(this,
+                "<html>Compiling custom models is not available in this release."
+                + "<br>Model generation works as usual; compilation returns in a"
+                + " later release built on gfortran.</html>",
+                "Not available", JOptionPane.INFORMATION_MESSAGE);
     }//GEN-LAST:event_CompileActionPerformed
 
     private void clearPFCOutputActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearPFCOutputActionPerformed
@@ -4473,35 +4298,11 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_showCODEGENLicenseButtonActionPerformed
 
     private void savedynsimActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_savedynsimActionPerformed
-        fileChooser.setSelectedFile(new File(""));
-        fileChooser.setDialogTitle("Choose File Location");
-        fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        int returnVal = fileChooser.showSaveDialog(this);
-        codegenPane.setText("");
-        if (returnVal == JFileChooser.APPROVE_OPTION) {
-            try {
-
-                File destFile = new File(fileChooser.getSelectedFile() + System.getProperty("file.separator") + "dynsim.exe");
-                codegenPane.append("Copying executable to "+destFile.toString()+ " ... ");
-                if (destFile.exists()) {
-                    int response = JOptionPane.showConfirmDialog(null, "Overwrite existing file?", "Confirm Overwrite", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-                    if (response == JOptionPane.CANCEL_OPTION) {
-                        return;
-                    }
-                }
-                if (!ramsesExec.exists()) {
-                    JOptionPane.showMessageDialog(this, "<html>The executable doesn't exist. Sorry. Report this.</html>", "Error", JOptionPane.ERROR_MESSAGE);
-                } else {
-                    fileOps.copyFiletoFile(ramsesExec, destFile);
-                    codegenPane.append("Complete.\n");
-                }
-                
-            } catch (IOException ex) {
-                Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
-        }
-
+        JOptionPane.showMessageDialog(this,
+                "<html>Saving a compiled executable is not available in this release."
+                + "<br>Model generation works as usual; compilation returns in a"
+                + " later release built on gfortran.</html>",
+                "Not available", JOptionPane.INFORMATION_MESSAGE);
     }//GEN-LAST:event_savedynsimActionPerformed
     /**
      * @param args the command line arguments

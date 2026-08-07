@@ -14,8 +14,6 @@ public final class Toolchain {
     public static final String DYNGRAPH = "dyngraph";
     public static final String CODEGEN = "codegen";
     public static final String GNUPLOT = "gnuplot";
-    public static final String VSWHERE = "vswhere";
-    public static final String URAMSES = "uramses";
 
     public static final List<ToolSpec> SPECS = buildSpecs();
 
@@ -63,14 +61,6 @@ public final class Toolchain {
         s.add(new ToolSpec(GNUPLOT)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
                 "gpwin.zip", ToolSpec.Kind.ZIP, null, "gnuplot/bin/pgnuplot.exe", false)));
-
-        s.add(new ToolSpec(VSWHERE)
-            .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "vswhere.exe", ToolSpec.Kind.RAW, null, "vswhere.exe", true)));
-
-        s.add(new ToolSpec(URAMSES)
-            .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "URAMSES.zip", ToolSpec.Kind.ZIP, null, "URAMSES", false)));
 
         return s;
     }
@@ -120,7 +110,6 @@ public final class Toolchain {
     public File pfc()       { return get(PFC); }
     public File dyngraph()  { return get(DYNGRAPH); }
     public File codegen()   { return get(CODEGEN); }
-    public File vswhere()   { return get(VSWHERE); }
 
     /**
      * Windows bundles gnuplot; elsewhere it is resolved from PATH.
