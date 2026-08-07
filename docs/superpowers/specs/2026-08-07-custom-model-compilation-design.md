@@ -85,6 +85,27 @@ registered:
 They are inert comments: `make` from a plain checkout behaves exactly as it does
 today, and a user hand-editing a router is unaffected.
 
+The same patch normalises the five routers, so the GUI writes into a consistent
+shape rather than working around historical drift:
+
+- **`case default` is removed from all of them.** It appears only in
+  `usr_exc_models.f90` and `usr_dctl_models.f90`, and in both the body is empty.
+  An unmatched `select case` with no default already does nothing, so this is a
+  pure consistency change with no behavioural effect — the caller's contract is
+  unchanged, and an unresolved name still leaves the pointer untouched.
+- **Commented-out entries are deleted.** There are four such lines, and they are
+  not the same kind of thing:
+  - `usr_tor_models.f90` carries a commented `tor_sultan` case. No `tor_sultan`
+    symbol exists in `libramses.a` and it is not declared `external`, so this is
+    dead text.
+  - `usr_twop_models.f90` carries a commented `twop_HVDC_VSC` case. That one *is*
+    declared `external` and *is* defined in `libramses.a` — the model ships, but
+    with its case commented out it cannot be reached by name from a `.dat` file.
+    Deleting the comment is what this spec does, because the comment is not what
+    makes the model unreachable. It does remove the only surviving hint that it
+    was once dispatchable, so whether `twop_HVDC_VSC` should be restored to the
+    select-case is recorded below as an open upstream question, separate from P2.
+
 ## Payload
 
 `versions.properties` gains a `uramses` block:
@@ -322,3 +343,9 @@ in P1 and do not return.
 - **Statically linked macOS builds** of ramses, dyngraph and codegen, carried over
   from P1 and tracked upstream. Unrelated to compilation, which needs Homebrew
   gcc on macOS regardless.
+- **`twop_HVDC_VSC`'s dispatch entry**, upstream. The model is compiled into
+  `libramses.a` and declared `external` in `usr_twop_models.f90`, but its
+  select-case entry is commented out, so no `.dat` file can name it. P2's marker
+  patch deletes the comment without restoring the case, because restoring
+  dispatch for a model would be a behavioural change to RAMSES that nothing in
+  this spec calls for. It belongs in stepss-uramses as its own decision.
