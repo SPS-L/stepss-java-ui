@@ -294,8 +294,24 @@ are removed.
 
 ## Deferred to P2
 
-Migrating the Codegen compile step from Intel/Visual Studio to gfortran on all three
-platforms: bundling `modules_l`/`modules_m`/`modules_wg`, driving
-`Makefile.{linux,macos,windows}`, probing for gfortran and make, and retiring
-`vswhere.exe`, the Intel `URAMSES.zip` and the `devenv` logic. P2 changes a
-prerequisite for existing Windows users, so it gets its own design discussion.
+**Reinstating custom-model compilation, on gfortran.** P1 removed it outright: the
+Intel/Visual-Studio path lost its runtime when `dynsim.zip` was dropped, so
+`vswhere.exe`, the Intel `URAMSES.zip` and the `devenv` logic are already gone, and
+the Compile button shows an unavailable message on every platform. Model *generation*
+via CODEGEN still works everywhere.
+
+P2 brings compilation back by bundling the `modules_l`/`modules_m`/`modules_wg` kits
+from a pinned `stepss-uramses` tag, driving `Makefile.{linux,macos,windows}`, and
+probing for gfortran and make on the user's machine. That changes the prerequisite for
+Windows users from Visual Studio + Intel Fortran to MinGW gfortran, so it needs its own
+design discussion.
+
+**Also open, tracked outside this repo:**
+
+- helios reports transformer tap and max-tap integers one lower than PFC on every
+  transformer — a 1-based versus 0-based convention difference, not a numerical error.
+  Deliberately not compensated in the GUI; it belongs in the engines.
+- Statically linked macOS builds of ramses, dyngraph and codegen. Until they ship,
+  macOS users need `brew install gcc openblas`.
+- The release workflow that builds the jar on tag and attaches it to the release,
+  authenticating to the private component repos with this repository's `STEPSS_TOKEN`.
