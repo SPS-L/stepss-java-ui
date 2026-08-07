@@ -3,6 +3,7 @@ package my.ramses.platform;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 public enum Platform {
     WINDOWS_X86_64("windows"),
@@ -56,16 +57,16 @@ public enum Platform {
                     + "Intel Macs are not supported by the bundled simulation engine.");
         }
         if (os.contains("win")) {
-            if (!arch.contains("64")) {
+            if (!arch.equals("amd64") && !arch.equals("x86_64")) {
                 throw new UnsupportedPlatformException(
-                        "STEPSS requires 64-bit Windows.\nDetected: " + describe());
+                        "STEPSS requires x86_64 Windows.\nDetected: " + describe());
             }
             return WINDOWS_X86_64;
         }
         if (os.contains("linux")) {
-            if (!arch.contains("64")) {
+            if (!arch.equals("amd64") && !arch.equals("x86_64")) {
                 throw new UnsupportedPlatformException(
-                        "STEPSS requires 64-bit Linux.\nDetected: " + describe());
+                        "STEPSS requires x86_64 Linux.\nDetected: " + describe());
             }
             return LINUX_X86_64;
         }
@@ -80,12 +81,20 @@ public enum Platform {
      */
     private static boolean isRosettaTranslated() {
         BufferedReader reader = null;
+        Process p = null;
         try {
-            Process p = new ProcessBuilder("sysctl", "-n", "sysctl.proc_translated")
+            p = new ProcessBuilder("sysctl", "-n", "sysctl.proc_translated")
                     .redirectErrorStream(true).start();
+
+            // Wait for process with timeout
+            if (!p.waitFor(2, TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                return false;  // Timeout - treat as not translated
+            }
+
+            // Process has exited, now read output
             reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line = reader.readLine();
-            p.waitFor();
             return line != null && line.trim().equals("1");
         } catch (Exception ex) {
             return false;
@@ -93,6 +102,14 @@ public enum Platform {
             if (reader != null) {
                 try {
                     reader.close();
+                } catch (Exception ignore) {
+                }
+            }
+            if (p != null) {
+                try {
+                    p.getInputStream().close();
+                    p.getOutputStream().close();
+                    p.getErrorStream().close();
                 } catch (Exception ignore) {
                 }
             }
