@@ -145,4 +145,20 @@
   <fetch-asset repo="${codegen.repo}" tag="${codegen.tag}"
                asset="${codegen.macos.asset}" sha256="${codegen.macos.sha256}"/>
  </target>
+
+ <target name="stage-payloads" depends="fetch-payloads"
+         description="Copy verified payloads into the source tree for packaging">
+  <mkdir dir="src/my/ramses/payload"/>
+  <copy todir="src/my/ramses/payload" flatten="true">
+   <fileset dir="${payload.cache}">
+    <include name="ramses-*"/>
+    <include name="stepss-helios-*"/>
+    <include name="dyngraph-linux-*"/>
+    <include name="dyngraph-macos-*"/>
+    <include name="codegen-*"/>
+   </fileset>
+  </copy>
+ </target>
+
+ <target name="-pre-compile" depends="stage-payloads"/>
 </project>

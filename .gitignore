@@ -9,3 +9,6 @@
 
 # Fetched release payloads (see versions.properties)
 /payload-cache/
+
+# Staged build inputs copied from payload-cache/ (see build.xml stage-payloads)
+/src/my/ramses/payload/

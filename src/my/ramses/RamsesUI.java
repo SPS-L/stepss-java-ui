@@ -215,7 +215,6 @@ public class RamsesUI extends javax.swing.JFrame {
         webpageLabel = new javax.swing.JLabel();
         showGnupCopyrightButton = new javax.swing.JButton();
         showApacheLicenseButton = new javax.swing.JButton();
-        showNppLicenseButton = new javax.swing.JButton();
         showKLULicenseButton = new javax.swing.JButton();
         versionLabel1 = new javax.swing.JLabel();
         showRAMSESLicenseButton = new javax.swing.JButton();
@@ -430,14 +429,6 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        showNppLicenseButton.setText("Notepad++");
-        showNppLicenseButton.setName("showNppLicenseButton"); // NOI18N
-        showNppLicenseButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                showNppLicenseButtonActionPerformed(evt);
-            }
-        });
-
         showKLULicenseButton.setText("KLU solver");
         showKLULicenseButton.setName("showKLULicenseButton"); // NOI18N
         showKLULicenseButton.addActionListener(new java.awt.event.ActionListener() {
@@ -499,10 +490,7 @@ public class RamsesUI extends javax.swing.JFrame {
                         .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(aboutBoxLayout.createSequentialGroup()
                                 .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addGroup(aboutBoxLayout.createSequentialGroup()
-                                        .addComponent(showKLULicenseButton)
-                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                        .addComponent(showNppLicenseButton))
+                                    .addComponent(showKLULicenseButton)
                                     .addComponent(versionLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 121, javax.swing.GroupLayout.PREFERRED_SIZE))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(showApacheLicenseButton)
@@ -550,7 +538,6 @@ public class RamsesUI extends javax.swing.JFrame {
                 .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(showGnupCopyrightButton)
                     .addComponent(showApacheLicenseButton)
-                    .addComponent(showNppLicenseButton)
                     .addComponent(showKLULicenseButton))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
@@ -2962,9 +2949,6 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void showGnupCopyrightButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showGnupCopyrightButtonActionPerformed
         try {
-            if (nppExec == null) {
-                nppExec = toolchain.npp();
-            }
             InputStream in;
             in = RamsesUI.class.getResourceAsStream("gnuplotLicense.txt");
             File gnupCopyrightFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "gnuplotLicense.txt");
@@ -2986,9 +2970,6 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void showApacheLicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showApacheLicenseButtonActionPerformed
         try {
-            if (nppExec == null) {
-                nppExec = toolchain.npp();
-            }
             InputStream in;
             in = RamsesUI.class.getResourceAsStream("apacheLicense.txt");
             File gnupCopyrightFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "apacheLicense.txt");
@@ -3002,37 +2983,12 @@ public class RamsesUI extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_showApacheLicenseButtonActionPerformed
 
-    private void showNppLicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showNppLicenseButtonActionPerformed
-        try {
-            if (nppExec == null) {
-
-                nppExec = toolchain.npp();
-
-            }
-            InputStream in;
-            in = RamsesUI.class.getResourceAsStream("nppLicense.txt");
-            File gnupCopyrightFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "nppLicense.txt");
-            OutputStream streamOut = FileUtils.openOutputStream(gnupCopyrightFile);
-            IOUtils.copy(in, streamOut);
-            in.close();
-            streamOut.close();
-            PlatformLauncher.openInEditor(gnupCopyrightFile);
-        } catch (IOException ex) {
-            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }//GEN-LAST:event_showNppLicenseButtonActionPerformed
-
     private void killAllGnupMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_killAllGnupMenuItemActionPerformed
         clearGnuplotButtonActionPerformed(evt);
     }//GEN-LAST:event_killAllGnupMenuItemActionPerformed
 
     private void showKLULicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showKLULicenseButtonActionPerformed
         try {
-            if (nppExec == null) {
-
-                nppExec = toolchain.npp();
-
-            }
             InputStream in;
             in = RamsesUI.class.getResourceAsStream("KLULicense.txt");
             File kluCopyrightFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "KLULicense.txt");
@@ -4472,11 +4428,6 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void showRAMSESLicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showRAMSESLicenseButtonActionPerformed
         try {
-            if (nppExec == null) {
-
-                nppExec = toolchain.npp();
-
-            }
             InputStream in;
             in = RamsesUI.class.getResourceAsStream("ramsesLicense.txt");
             File kluCopyrightFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "ramsesLicense.txt");
@@ -4493,11 +4444,6 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void showPFCLicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showPFCLicenseButtonActionPerformed
         try {
-            if (nppExec == null) {
-
-                nppExec = toolchain.npp();
-
-            }
             InputStream in;
             in = RamsesUI.class.getResourceAsStream("pfcLicense.txt");
             File kluCopyrightFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "pfcLicense.txt");
@@ -4513,11 +4459,6 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void showCODEGENLicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showCODEGENLicenseButtonActionPerformed
         try {
-            if (nppExec == null) {
-
-                nppExec = toolchain.npp();
-
-            }
             InputStream in;
             in = RamsesUI.class.getResourceAsStream("codegenLicense.txt");
             File kluCopyrightFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "codegenLicense.txt");
@@ -4611,7 +4552,6 @@ public class RamsesUI extends javax.swing.JFrame {
     private File pfcExec = null;
     private File dyngraphExec = null;
     private File gnuplotExec = null;
-    private File nppExec = null;
     private File codegenExec = null;
     private double this_version = 0.0;
     private boolean ssa = false;
@@ -4782,7 +4722,6 @@ public class RamsesUI extends javax.swing.JFrame {
     private javax.swing.JMenuItem showChangeLogButton;
     private javax.swing.JButton showGnupCopyrightButton;
     private javax.swing.JButton showKLULicenseButton;
-    private javax.swing.JButton showNppLicenseButton;
     private javax.swing.JButton showPFCLicenseButton;
     private javax.swing.JButton showRAMSESLicenseButton;
     private javax.swing.JMenuItem showUserGuideButton;
@@ -4899,7 +4838,6 @@ public class RamsesUI extends javax.swing.JFrame {
             pfcExec = toolchain.pfc();
             dyngraphExec = toolchain.dyngraph();
             codegenExec = toolchain.codegen();
-            nppExec = toolchain.npp();
             gnuplotExec = toolchain.gnuplot();
             WinEnvironment = PlatformLauncher.execEnvironment(platform, toolDir);
 

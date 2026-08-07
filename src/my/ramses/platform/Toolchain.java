@@ -16,7 +16,6 @@ public final class Toolchain {
     public static final String GNUPLOT = "gnuplot";
     public static final String VSWHERE = "vswhere";
     public static final String URAMSES = "uramses";
-    public static final String NPP = "npp";
 
     public static final List<ToolSpec> SPECS = buildSpecs();
 
@@ -25,9 +24,14 @@ public final class Toolchain {
 
         s.add(new ToolSpec(RAMSES)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "dynsim.zip", ToolSpec.Kind.ZIP, null, "dynsim/dynsim.exe", true))
+                "payload/ramses-windows-x86_64-v3.55.zip", ToolSpec.Kind.ZIP,
+                "ramses.exe", "dynsim.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "dynsim.zip", ToolSpec.Kind.ZIP, null, "dynsim/dynsim", true)));
+                "payload/ramses-linux-x86_64-v3.55.tar.gz", ToolSpec.Kind.TGZ,
+                "ramses", "dynsim", true))
+            .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
+                "payload/ramses-macos-arm64-v3.55.tar.gz", ToolSpec.Kind.TGZ,
+                "ramses", "dynsim", true)));
 
         s.add(new ToolSpec(PFC)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
@@ -39,13 +43,22 @@ public final class Toolchain {
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
                 "dyngraph.exe", ToolSpec.Kind.RAW, null, "dyngraph.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "dyngraph", ToolSpec.Kind.RAW, null, "dyngraph", true)));
+                "payload/dyngraph-linux-x86_64-v1.1.0.tar.gz", ToolSpec.Kind.TGZ,
+                "dyngraph", "dyngraph", true))
+            .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
+                "payload/dyngraph-macos-arm64-v1.1.0.tar.gz", ToolSpec.Kind.TGZ,
+                "dyngraph", "dyngraph", true)));
 
         s.add(new ToolSpec(CODEGEN)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "codegen.exe", ToolSpec.Kind.RAW, null, "codegen.exe", true))
+                "payload/codegen-windows-x86_64-v5.1.0.zip", ToolSpec.Kind.ZIP,
+                "CODEGEN.exe", "CODEGEN.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "CODEGEN", ToolSpec.Kind.RAW, null, "CODEGEN", true)));
+                "payload/codegen-linux-x86_64-v5.1.0.tar.gz", ToolSpec.Kind.TGZ,
+                "CODEGEN", "CODEGEN", true))
+            .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
+                "payload/codegen-macos-arm64-v5.1.0.tar.gz", ToolSpec.Kind.TGZ,
+                "CODEGEN", "CODEGEN", true)));
 
         s.add(new ToolSpec(GNUPLOT)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
@@ -54,12 +67,6 @@ public final class Toolchain {
         s.add(new ToolSpec(VSWHERE)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
                 "vswhere.exe", ToolSpec.Kind.RAW, null, "vswhere.exe", true)));
-
-        s.add(new ToolSpec(NPP)
-            .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "npp.zip", ToolSpec.Kind.ZIP, null, "notepad++.exe", true))
-            .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "npp.zip", ToolSpec.Kind.ZIP, null, "notepad++.exe", true)));
 
         s.add(new ToolSpec(URAMSES)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
@@ -114,7 +121,6 @@ public final class Toolchain {
     public File dyngraph()  { return get(DYNGRAPH); }
     public File codegen()   { return get(CODEGEN); }
     public File vswhere()   { return get(VSWHERE); }
-    public File npp()       { return get(NPP); }
 
     /**
      * Windows bundles gnuplot; elsewhere it is resolved from PATH.
