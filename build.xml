@@ -7,7 +7,7 @@
 <!-- the Compile on Save feature is turned off for the project. -->
 <!-- You can turn off the Compile on Save (or Deploy on Save) setting -->
 <!-- in the project's Project Properties dialog box.-->
-<project name="ramses" default="default" basedir=".">
+<project name="ramses" default="default" basedir="." xmlns:unless="ant:unless">
     <description>Builds, tests, and runs the project ramses.</description>
     <import file="nbproject/build-impl.xml"/>
     <!--
@@ -89,6 +89,14 @@
   <attribute name="sha256"/>
   <sequential>
    <mkdir dir="${payload.cache}"/>
+   <!-- Skip the network call entirely when the asset is already sitting in
+        the cache: `gh release download` still resolves the release against
+        api.github.com before deciding whether the "skip existing" flag
+        applies, so calling it unconditionally would mean every build needs
+        network and `gh` auth, not just the first one. The digest check
+        below still runs on both paths, so a corrupt or tampered cached file
+        fails the build exactly as it would after a fresh download. -->
+   <available file="${payload.cache}/@{asset}" property="@{asset}.cached"/>
    <!-- SPS-L/@{repo} release assets live in a private repo: the plain
         https://github.com/OWNER/REPO/releases/download/... URL only serves
         browser sessions and returns 404 to anonymous or bearer-token requests
@@ -98,7 +106,8 @@
         lookup and the authenticated download in one step, reusing the
         caller's existing `gh auth login` session. Requires: gh CLI installed
         and authenticated with access to the SPS-L org. -->
-   <exec executable="gh" failonerror="true" failifexecutionfails="true">
+   <exec executable="gh" failonerror="true" failifexecutionfails="true"
+         unless:set="@{asset}.cached">
     <arg value="release"/>
     <arg value="download"/>
     <arg value="@{tag}"/>
@@ -148,6 +157,14 @@
 
  <target name="stage-payloads" depends="fetch-payloads"
          description="Copy verified payloads into the source tree for packaging">
+  <!-- Nothing else prunes this directory, so a stale payload left over from
+       a previous version pin (e.g. after bumping versions.properties) would
+       otherwise survive indefinitely and ship in the jar alongside the
+       current one. Clearing it here means it always reflects exactly the
+       pinned set in payload-cache/, never a superset. This only touches the
+       staged copies under src/my/ramses/payload/ - payload-cache/ itself
+       (the download cache Finding 1 relies on) is left untouched. -->
+  <delete dir="src/my/ramses/payload" quiet="true"/>
   <mkdir dir="src/my/ramses/payload"/>
   <copy todir="src/my/ramses/payload" flatten="true">
    <fileset dir="${payload.cache}">
@@ -161,4 +178,8 @@
  </target>
 
  <target name="-pre-compile" depends="stage-payloads"/>
+
+ <target name="-post-clean" description="Remove staged payload copies so ant clean leaves no residue">
+  <delete dir="src/my/ramses/payload" quiet="true"/>
+ </target>
 </project>
