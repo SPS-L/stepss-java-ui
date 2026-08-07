@@ -448,14 +448,18 @@ The pinned kit carries no markers, so *Compile* fails at `prepare()` for every u
 (5d), but `RouterSplicer`'s wording is developer-facing and reads like a bug rather than a known
 state.
 
-*Disclosed to users in fix round 1:* `README.md` now carries a one-paragraph **Known limitation in
-this release** notice, placed immediately after the Fortran-toolchain prerequisite in
-*Installation* — the point at which a reader is installing tools in order to compile, so they meet
-it before acting rather than after. It names the missing marker comments, names v3.55 as
-predating them, and says plainly that no compiler will change the outcome. The rest of the README
-still describes the feature as the plan's Step 7 specifies; that text becomes correct the moment
-an upstream release carries the markers, at which point the notice is a single clean paragraph
-deletion. Nothing else in the README references it, deliberately.
+*Disclosed to users in fix rounds 1 and 2:* `README.md` now carries a one-paragraph **Known
+limitation in this release** notice as the second paragraph of *Installation* — directly under
+**Requirements:** and **above** the fork between "download the prebuilt jar" and
+"### Build from source", so both kinds of reader pass through it on the only route the README
+offers to either. (Fix round 1 placed it beside the Fortran-toolchain prerequisite, which sits
+inside *Build from source*; the release-jar downloader, who is the primary audience and has no
+reason to open that section, missed it entirely. Fix round 2 moved it above the fork.) It names
+the missing marker comments, names v3.55 as predating them, says plainly that no compiler will
+change the outcome, and states that it applies to the prebuilt jar and a source build alike. The
+rest of the README still describes the feature as the plan's Step 7 specifies; that text becomes
+correct the moment an upstream release carries the markers, at which point the notice is a single
+clean paragraph deletion. Nothing else in the README references it, deliberately.
 
 **The release-sequencing decision is still the project owner's**: tag `8e7b1de` upstream and
 re-pin, or ship with the notice standing.
