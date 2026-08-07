@@ -14,7 +14,7 @@ Current release: **3.55**.
 - **Real-time plotting**: live curves during simulation via gnuplot (bus voltages, machine speeds, branch flows, wall time, and more)
 - **Result extraction**: "Extract Curves" launches the bundled DYNGRAPH viewer on saved output trajectories
 - **Analysis tools**: Jacobian matrix extraction and small-signal stability analysis
-- **User models**: the Codegen tab generates user-written model source with CODEGEN; compiling it into a custom simulator executable returns in a later release built on gfortran
+- **User models**: the Codegen tab generates user-written model source with CODEGEN and compiles it into a custom simulator with gfortran
 - **Observable wizard**: dialog for selecting buses, machines, shunts, branches, and injectors to record
 - **Integrated editing**: opens data and disturbance files in the operating system's default editor
 - **Built-in help**: online user guide, changelog viewer, and update checker
@@ -40,6 +40,8 @@ Building fetches the pinned RAMSES, Helios, DYNGRAPH, and CODEGEN binaries for a
 
 On macOS, the current RAMSES, DYNGRAPH, and CODEGEN builds are dynamically linked against gfortran and OpenBLAS; install them first with `brew install gcc openblas`. Statically linked builds that drop this requirement are expected from those projects.
 
+Compiling custom models is optional and needs a Fortran toolchain on your machine: `gfortran`, GNU `make`, and OpenBLAS. On Debian/Ubuntu that is `sudo apt install gfortran make libopenblas-dev`; on macOS `brew install gcc openblas`; on Windows install [MSYS2](https://www.msys2.org/) and run `pacman -S mingw-w64-x86_64-gcc-fortran mingw-w64-x86_64-openblas make` (STEPSS looks in `C:\msys64`, or wherever `MSYS2_ROOT` points). The bundled module kits are gfortran-ABI-specific and each platform's default compiler matches its own kit; if yours does not, STEPSS reports the exact compiler version to install. Everything else in STEPSS works without any of this.
+
 ## Quick Start
 
 ```bash
@@ -64,7 +66,7 @@ The jar embeds the toolchain executables for the platform it runs on and extract
 | Helios | Power flow | yes | yes | yes |
 | DYNGRAPH | Curve viewer | yes (dialog build) | yes (console) | yes (console) |
 | CODEGEN | Model generation | yes | yes | yes |
-| Model compilation | Custom models | not available this release | not available this release | not available this release |
+| Model compilation | Custom models | yes (MSYS2/MinGW) | yes (gfortran) | yes (Homebrew gcc) |
 | gnuplot | Real-time plotting | bundled | resolved from `PATH` | resolved from `PATH` |
 | Data file editing | OS default editor | yes | yes | yes |
 
