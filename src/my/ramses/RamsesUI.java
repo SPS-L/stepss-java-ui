@@ -124,11 +124,9 @@ public class RamsesUI extends javax.swing.JFrame {
 
         if (initRamses()) {
         } else {
-            JOptionPane.showMessageDialog(this,
-                    "Failed to create temporary directory and initialize solver.\n"
-                    + "Exiting.",
-                    "Warning",
-                    JOptionPane.WARNING_MESSAGE);
+            // initRamses() already showed a dialog naming the specific tool
+            // and path that failed; a second, generic dialog here would just
+            // repeat the failure without adding information.
             System.exit(1);
         }
     }
@@ -2628,13 +2626,13 @@ public class RamsesUI extends javax.swing.JFrame {
             "Cancel"};
         int confirmed = JOptionPane.showOptionDialog(this, "Are you sure you want to exit? All simulation data will be lost!", "Exit Confirmation", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[2]);
         if (confirmed == JOptionPane.YES_OPTION) {
-            if (myTempDir == null) {
+            if (toolDir == null) {
             } else {
                 fileOps.deleteDirectory(toolDir);
             }
             System.exit(0);
         } else if (confirmed == JOptionPane.NO_OPTION) {
-            if (myTempDir == null) {
+            if (toolDir == null) {
             } else {
                 clearGnuplotButtonActionPerformed(null);
                 stopSimulationButtonActionPerformed(null);
@@ -3030,11 +3028,9 @@ public class RamsesUI extends javax.swing.JFrame {
             }
             if (initRamses()) {
             } else {
-                JOptionPane.showMessageDialog(this,
-                        "Failed to create temporary directory and initialize solver.\n"
-                        + "Exiting.",
-                        "Warning",
-                        JOptionPane.WARNING_MESSAGE);
+                // initRamses() already showed a dialog naming the specific
+                // tool and path that failed; a second, generic dialog here
+                // would just repeat the failure without adding information.
                 System.exit(1);
             }
         }
@@ -3438,7 +3434,7 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void viewCurvesButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_viewCurvesButtonActionPerformed
         try {
-            if (gnuplotExec.exists()) {
+            if (gnuplotExec != null && gnuplotExec.exists()) {
                 //                String command = gnuplotExec.getAbsolutePath() + " -persist " + myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut.plt";
                 //                Runtime rt = Runtime.getRuntime();
                 //                rt.exec(command);
@@ -5133,6 +5129,7 @@ public class RamsesUI extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(this, ex.getMessage(),
                     "Unsupported platform", JOptionPane.ERROR_MESSAGE);
             System.exit(1);
+            return false;
         }
         try {
             if (toolDir == null) {

@@ -231,6 +231,12 @@ public final class PlatformLauncher {
 
     /**
      * Windows needs gnuplot's bin directory on PATH for the exec'd children.
+     * It also needs the {@code dynsim} directory on PATH: that is how a
+     * Codegen-built {@code Release_intel_w64/dynsim.exe} locates the Intel
+     * Fortran runtime DLLs shipped alongside it in {@code dynsim.zip} (they
+     * are not on the system PATH and are not next to the custom-model
+     * executable itself). Do not drop this entry without understanding that
+     * it serves the Codegen-built executable, not the bundled one.
      * Other platforms inherit the ambient environment, signalled by null.
      */
     public static Map execEnvironment(Platform p, File toolDir) throws IOException {
@@ -240,8 +246,9 @@ public final class PlatformLauncher {
         Map env = EnvironmentUtils.getProcEnvironment();
         String path = (String) env.get("PATH");
         String gnuplotBin = new File(new File(toolDir, "gnuplot"), "bin").getAbsolutePath();
+        String dynsimDir = new File(toolDir, "dynsim").getAbsolutePath();
         EnvironmentUtils.addVariableToEnvironment(env, "PATH=" + gnuplotBin
-                + File.pathSeparator + path);
+                + File.pathSeparator + dynsimDir + File.pathSeparator + path);
         return env;
     }
 
