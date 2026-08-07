@@ -4402,6 +4402,9 @@ public class RamsesUI extends javax.swing.JFrame {
     // runs on Commons Exec's own watchdog thread, so the enable is
     // marshalled through invokeLater, and it defers to a build already in
     // progress rather than re-enabling Compile out from under it.
+    // onProcessFailed mirrors that on the failure side, so a CODEGEN run
+    // that genuinely fails leaves Compile disabled and says why, instead
+    // of failing silently.
     simulExecutorResultHandler = new DefaultExecuteResultHandler() {
         @Override
         public void onProcessComplete(int exitValue) {
@@ -4414,9 +4417,29 @@ public class RamsesUI extends javax.swing.JFrame {
                 }
             });
         }
+
+        @Override
+        public void onProcessFailed(final ExecuteException ex) {
+            super.onProcessFailed(ex);
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    codegenPane.append("\nCODEGEN failed (exit " + ex.getExitValue() + ").\n");
+                    if (!compileInProgress) {
+                        Compile.setEnabled(false);
+                    }
+                }
+            });
+        }
     };
     simulExecutor = new DefaultExecutor();
-    simulExecutor.setExitValue(1);
+    // CODEGEN's success exit code is 0, like every other tool this class
+    // drives; this was the same inverted-exit-value mistake already fixed
+    // for the helios power-flow run (see runPFActionPerformed), just
+    // missed here. With setExitValue(1) a genuinely successful CODEGEN run
+    // (exit 0) dispatched to onProcessFailed instead of onProcessComplete,
+    // so Compile could never be enabled by any reachable call site - the
+    // whole feature was unreachable from a fresh launch.
+    simulExecutor.setExitValue(0);
     ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
     PumpStreamHandler streamHandler = new PumpStreamHandler(outputstreamCG, outputstreamCG);
     simulExecutor.setStreamHandler(streamHandler);
@@ -4501,16 +4524,23 @@ public class RamsesUI extends javax.swing.JFrame {
         // A stale success from an earlier compile must not look current
         // while this one is running, and must not survive if this one fails.
         savedynsim.setEnabled(false);
-        // prepare() is about to delete and rebuild the kit that a previous
-        // custom dynsim lives inside; point back at the bundled engine
-        // before that starts, so a simulation launched mid-build can never
-        // target a half-rebuilt or already-deleted tree. reportCompileOutcome
-        // restores this again on failure, independently, as the binding
-        // guarantee: a failed build must never leave the app unable to
-        // simulate at all.
-        File bundled = toolchain.ramses();
-        if (bundled != null) {
-            ramsesExec = bundled;
+        // Remembered so every failure path below can restore the user's own
+        // choice (e.g. one picked via Load External Simulator) instead of
+        // discarding it. restoreExecOnFailure falls back to the bundled
+        // engine only when previousExec itself was a previous compile's own
+        // output inside the kit directory - a file prepare() is about to
+        // delete regardless of whether this run succeeds.
+        final File previousExec = ramsesExec;
+        if (isInsideKitDirectory(previousExec)) {
+            // prepare() is about to delete and rebuild the kit that
+            // previousExec lives inside; point back at the bundled engine
+            // right away, so a simulation launched mid-build (before this
+            // compile has even succeeded or failed) can never target a
+            // half-rebuilt or already-deleted tree.
+            File bundled = toolchain.ramses();
+            if (bundled != null) {
+                ramsesExec = bundled;
+            }
         }
 
         final ModelCompiler compiler = new ModelCompiler(toolchain.platform(), toolchain);
@@ -4523,6 +4553,16 @@ public class RamsesUI extends javax.swing.JFrame {
         // repaint (the "Preparing..." text above would never even appear).
         // The whole sequence therefore runs on a background thread, and
         // every Swing touch is marshalled back through invokeLater.
+        //
+        // prepare() and build() only throw the checked IOException, but an
+        // unchecked RuntimeException escaping either would otherwise die on
+        // this thread silently (no uncaught-exception handler is installed
+        // here) with compileInProgress stuck true, wedging Compile behind
+        // the "build is already running" guard for the rest of the session.
+        // Both calls below are therefore also guarded by a RuntimeException
+        // catch that clears the flag and reports the failure instead of
+        // swallowing it, even though nothing in the current call graph is
+        // known to throw one.
         new Thread("stepss-compile") {
             @Override
             public void run() {
@@ -4533,10 +4573,26 @@ public class RamsesUI extends javax.swing.JFrame {
                         public void run() {
                             compileInProgress = false;
                             Compile.setEnabled(true);
+                            ramsesExec = restoreExecOnFailure(previousExec);
                             codegenPane.append(ex.getMessage() + "\n");
                             JOptionPane.showMessageDialog(RamsesUI.this,
                                     "<html>Could not prepare the build:<br>"
                                     + escapeHtml(ex.getMessage()) + "</html>",
+                                    "Compilation failed", JOptionPane.ERROR_MESSAGE);
+                        }
+                    });
+                    return;
+                } catch (final RuntimeException ex) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            compileInProgress = false;
+                            Compile.setEnabled(true);
+                            ramsesExec = restoreExecOnFailure(previousExec);
+                            String detail = describe(ex);
+                            codegenPane.append("Unexpected error: " + detail + "\n");
+                            JOptionPane.showMessageDialog(RamsesUI.this,
+                                    "<html>An unexpected error interrupted the build:<br>"
+                                    + escapeHtml(detail) + "</html>",
                                     "Compilation failed", JOptionPane.ERROR_MESSAGE);
                         }
                     });
@@ -4563,7 +4619,7 @@ public class RamsesUI extends javax.swing.JFrame {
                                 final String problem) {
                             SwingUtilities.invokeLater(new Runnable() {
                                 public void run() {
-                                    reportCompileOutcome(exitCode, dynsim, problem);
+                                    reportCompileOutcome(exitCode, dynsim, problem, previousExec);
                                 }
                             });
                         }
@@ -4573,9 +4629,24 @@ public class RamsesUI extends javax.swing.JFrame {
                         public void run() {
                             compileInProgress = false;
                             Compile.setEnabled(true);
+                            ramsesExec = restoreExecOnFailure(previousExec);
                             JOptionPane.showMessageDialog(RamsesUI.this,
                                     "<html>Could not start the build:<br>"
                                     + escapeHtml(ex.getMessage()) + "</html>",
+                                    "Compilation failed", JOptionPane.ERROR_MESSAGE);
+                        }
+                    });
+                } catch (final RuntimeException ex) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            compileInProgress = false;
+                            Compile.setEnabled(true);
+                            ramsesExec = restoreExecOnFailure(previousExec);
+                            String detail = describe(ex);
+                            codegenPane.append("Unexpected error: " + detail + "\n");
+                            JOptionPane.showMessageDialog(RamsesUI.this,
+                                    "<html>An unexpected error interrupted the build:<br>"
+                                    + escapeHtml(detail) + "</html>",
                                     "Compilation failed", JOptionPane.ERROR_MESSAGE);
                         }
                     });
@@ -4588,17 +4659,18 @@ public class RamsesUI extends javax.swing.JFrame {
      * Adopts a freshly built simulator, or reports why there is not one. Always
      * runs on the EDT (see {@link ModelCompiler.Listener#onFinished}'s callers,
      * both wrapped in {@code invokeLater}). On any failure {@code ramsesExec} is
-     * restored to the bundled engine, so a failed compile never leaves the app
-     * unable to simulate.
+     * restored via {@link #restoreExecOnFailure}, so a failed compile never
+     * leaves the app unable to simulate, and never silently discards a
+     * simulator the user loaded themselves.
+     *
+     * @param previousExec what {@code ramsesExec} held before this compile
+     *        started, as captured by {@link #CompileActionPerformed}
      */
-    private void reportCompileOutcome(int exitCode, File dynsim, String problem) {
+    private void reportCompileOutcome(int exitCode, File dynsim, String problem, File previousExec) {
         compileInProgress = false;
         Compile.setEnabled(true);
         if (problem != null || dynsim == null) {
-            File bundled = toolchain.ramses();
-            if (bundled != null) {
-                ramsesExec = bundled;
-            }
+            ramsesExec = restoreExecOnFailure(previousExec);
             codegenPane.append("\n" + (problem == null ? "Compilation failed." : problem) + "\n");
             JOptionPane.showMessageDialog(this,
                     "<html>" + (problem == null ? "Compilation failed." : escapeHtml(problem))
@@ -4613,6 +4685,45 @@ public class RamsesUI extends javax.swing.JFrame {
                 "<html>Custom simulator built.<br>Simulations will now run on it"
                 + " instead of the bundled engine.</html>",
                 "Compilation complete", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    /**
+     * True when {@code file} lives inside the uramses kit directory that
+     * {@link ModelCompiler#prepare} deletes and re-extracts on every
+     * compile, so a value that can only ever have been a previous compile's
+     * own output is never mistaken for something still on disk once that
+     * step has run.
+     */
+    private boolean isInsideKitDirectory(File file) {
+        if (file == null || toolchain == null) {
+            return false;
+        }
+        File kitDir = new File(toolchain.directory(), "uramses");
+        return file.getAbsolutePath().startsWith(kitDir.getAbsolutePath() + File.separator);
+    }
+
+    /**
+     * The value to restore {@code ramsesExec} to when a compile fails: what
+     * it held before this compile touched anything, unless that was itself
+     * inside the kit directory {@code prepare()} has just deleted (a
+     * previous compile's own output) - in which case the bundled engine is
+     * the only thing guaranteed to still exist. Never returns null when
+     * {@code toolchain.ramses()} does not either, so every failure path
+     * that assigns its result upholds the binding constraint: a failed
+     * build must never leave {@code ramsesExec} pointing at a file that no
+     * longer exists.
+     */
+    private File restoreExecOnFailure(File previousExec) {
+        if (previousExec == null || isInsideKitDirectory(previousExec)) {
+            return toolchain.ramses();
+        }
+        return previousExec;
+    }
+
+    /** A throwable's message, falling back to its class name when the message is null. */
+    private static String describe(Throwable t) {
+        String message = t.getMessage();
+        return message != null ? message : t.toString();
     }
 
     /** Renders a multi-line plain-text message safely inside an HTML dialog. */
