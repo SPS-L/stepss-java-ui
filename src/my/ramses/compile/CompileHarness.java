@@ -21,6 +21,7 @@ public final class CompileHarness {
         checkSpliceIsDeterministic();
         checkSpliceOnAlreadySplicedOutputDuplicatesCase();
         checkMissingMarkerFails();
+        checkAbiParsing();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -111,6 +112,15 @@ public final class CompileHarness {
         } catch (Exception ex) {
             fail("wrong exception for missing marker: " + ex);
         }
+    }
+
+    private static void checkAbiParsing() {
+        expect("abi 15", 15, FortranToolchain.parseAbi(
+                "GFORTRAN module version '15' created from probe.f90"));
+        expect("abi 16", 16, FortranToolchain.parseAbi(
+                "GFORTRAN module version '16' created from probe.f90"));
+        expect("abi absent", -1, FortranToolchain.parseAbi("not a module banner"));
+        expect("abi unterminated", -1, FortranToolchain.parseAbi("module version '15"));
     }
 
     /** A minimal stand-in with the same shape as the real router. */
