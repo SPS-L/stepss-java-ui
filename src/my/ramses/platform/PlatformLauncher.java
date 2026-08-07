@@ -3,11 +3,13 @@ package my.ramses.platform;
 import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
+import org.apache.commons.exec.ExecuteException;
+import org.apache.commons.exec.ExecuteResultHandler;
 import org.apache.commons.exec.ShutdownHookProcessDestroyer;
 import org.apache.commons.exec.environment.EnvironmentUtils;
 
@@ -53,7 +55,7 @@ public final class PlatformLauncher {
             cmd = new CommandLine("xdg-open");
         }
         cmd.addArgument(file.getAbsolutePath(), false);
-        run(cmd, file.getParentFile());
+        run(cmd, file.getParentFile(), "open an editor for " + file.getName());
     }
 
     /**
@@ -108,7 +110,7 @@ public final class PlatformLauncher {
         } else {
             cmd = terminalOnLinux();
         }
-        run(cmd, dir);
+        run(cmd, dir, "open a terminal");
     }
 
     public static void openFileManager(File dir) throws IOException {
@@ -124,7 +126,7 @@ public final class PlatformLauncher {
             cmd = new CommandLine("xdg-open");
             cmd.addArgument(dir.getAbsolutePath(), false);
         }
-        run(cmd, dir);
+        run(cmd, dir, "open a file manager");
     }
 
     /** Runs an interactive console program inside a terminal window. */
@@ -147,7 +149,7 @@ public final class PlatformLauncher {
                 cmd.addArgument(a, false);
             }
         }
-        run(cmd, dir);
+        run(cmd, dir, "run " + argv.get(0) + " in a terminal");
     }
 
     /**
@@ -260,12 +262,58 @@ public final class PlatformLauncher {
         }
     }
 
-    private static void run(CommandLine cmd, File workingDir) throws IOException {
+    /**
+     * Notified when a launch started via {@link #run} fails after the async
+     * {@code execute} call has already returned normally — e.g. the target
+     * program (xdg-open, a terminal emulator, ...) does not exist. Commons
+     * Exec's async {@code execute(CommandLine, ExecuteResultHandler)}
+     * overload runs the whole launch, including the {@code IOException} that
+     * a missing executable throws from {@code ProcessBuilder}, on a worker
+     * thread and hands it to the result handler instead of the caller; a
+     * bare {@code DefaultExecuteResultHandler} just records it and returns,
+     * so without this hook the failure is never seen by anyone. Set once by
+     * the UI at startup ({@link #setLaunchFailureListener}); a null listener
+     * means failures are only logged to stderr, which still beats silence.
+     */
+    private static volatile BiConsumer<String, Throwable> launchFailureListener;
+
+    /**
+     * Registers the callback used to surface an async launch failure to the
+     * user. Called back on whatever thread Commons Exec's worker thread is
+     * running on, not the EDT — implementations that touch Swing must hop
+     * back with {@code SwingUtilities.invokeLater} themselves.
+     */
+    public static void setLaunchFailureListener(BiConsumer<String, Throwable> listener) {
+        launchFailureListener = listener;
+    }
+
+    /**
+     * Launches {@code cmd} without blocking the caller. {@code description}
+     * is a short present-tense fragment ("open a terminal") used only if the
+     * launch fails, to name what was being attempted.
+     */
+    private static void run(CommandLine cmd, File workingDir, String description) throws IOException {
         DefaultExecutor executor = new DefaultExecutor();
         executor.setProcessDestroyer(new ShutdownHookProcessDestroyer());
         if (workingDir != null && workingDir.isDirectory()) {
             executor.setWorkingDirectory(workingDir);
         }
-        executor.execute(cmd, new org.apache.commons.exec.DefaultExecuteResultHandler());
+        executor.execute(cmd, new ExecuteResultHandler() {
+            @Override
+            public void onProcessComplete(int exitValue) {
+                // Fire-and-forget launch; nothing to do on success.
+            }
+
+            @Override
+            public void onProcessFailed(ExecuteException e) {
+                BiConsumer<String, Throwable> listener = launchFailureListener;
+                if (listener != null) {
+                    listener.accept(description, e);
+                } else {
+                    System.err.println("PlatformLauncher: could not " + description
+                            + ": " + e.getMessage());
+                }
+            }
+        });
     }
 }

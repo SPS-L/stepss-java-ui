@@ -13,7 +13,6 @@ package my.ramses;
 import java.awt.Component;
 import java.awt.HeadlessException;
 import java.awt.Rectangle;
-import java.awt.geom.AffineTransform;
 import java.io.*;
 import java.net.URL;
 import java.nio.file.Files;
@@ -37,7 +36,6 @@ import my.ramses.platform.PlatformLauncher;
 import my.ramses.platform.Toolchain;
 import my.ramses.platform.UnsupportedPlatformException;
 import org.apache.commons.exec.*;
-import org.apache.commons.exec.environment.EnvironmentUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
@@ -54,6 +52,17 @@ public class RamsesUI extends javax.swing.JFrame {
      */
     public RamsesUI() {
         initComponents();
+        // PlatformLauncher's launches (editor/terminal/file manager) run via
+        // Commons Exec's async execute(), which hands a launch failure (e.g.
+        // a missing xdg-open or terminal emulator) to this listener instead
+        // of throwing it back to the caller. Without a listener registered,
+        // such a failure is silent. Registered once, here, for the process
+        // lifetime; called back off the EDT, so it hops back with invokeLater.
+        PlatformLauncher.setLaunchFailureListener((description, cause) -> {
+            SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this,
+                    "Could not " + description + ".\n\n" + cause.getMessage(),
+                    "Launch failed", JOptionPane.ERROR_MESSAGE));
+        });
         this_version = Double.parseDouble(getVersion());
         String fullLimited = getRamsesType();
         versionLabel.setText("<html><B><U>Version</U>:</B> " + this_version + " (" + fullLimited + " Version)</html>");
@@ -3241,7 +3250,7 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void runDyngraphButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runDyngraphButtonActionPerformed
         try {
-            if (!dyngraphExec.exists()) {
+            if (dyngraphExec == null || !dyngraphExec.exists()) {
                 JOptionPane.showMessageDialog(this, "<html>The file <B>dyngraph</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -3483,7 +3492,7 @@ public class RamsesUI extends javax.swing.JFrame {
         loadOutputActionPerformed(evt);
         savedOutputBool = false;
 
-        if (!ramsesExec.exists()) {
+        if (ramsesExec == null || !ramsesExec.exists()) {
             JOptionPane.showMessageDialog(this, "<html>The file <B>dynsim</B> does not exist. .</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
             return;
         } else {
@@ -3961,6 +3970,33 @@ public class RamsesUI extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_loadData1ActionPerformed
 
+    /**
+     * Deletes every file a previous power-flow run may have left in
+     * {@code myTempDir}: the four legacy-named .res exports, the in_svc.res
+     * export added for helios' per-table export mechanism, and the
+     * in_volt_trfo.dat file whose appearance signals a completed run (see
+     * the completion thread in {@link #runPFActionPerformed}). Called at the
+     * start of a run so a run that helios aborts partway through cannot
+     * leave any of the previous run's results looking like they belong to
+     * the run just made.
+     */
+    private void deletePFCResultFiles() {
+        String[] resultFiles = {
+            "in_net.res", "in_trfo.res", "in_gen.res", "in_bal.res",
+            "in_svc.res", "in_volt_trfo.dat"
+        };
+        for (String name : resultFiles) {
+            Path p = Paths.get(myTempDir.getAbsolutePath(), name);
+            if (Files.exists(p)) {
+                try {
+                    Files.delete(p);
+                } catch (IOException ex) {
+                    Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+    }
+
     private void runPFActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runPFActionPerformed
         if (!createPFCCommandFile()) {
             JOptionPane.showMessageDialog(this, "<html>Command File for Helios not created.</html>", "Command File Error!", JOptionPane.ERROR_MESSAGE);
@@ -3972,14 +4008,18 @@ public class RamsesUI extends javax.swing.JFrame {
         fileData10.setText("");
         loadOutputActionPerformed(evt);
         savedOutputBool = false;
-        Path fileToDeletePath = Paths.get(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "in_volt_trfo.dat");
-        if (Files.exists(fileToDeletePath)) {
-            try{
-                Files.delete(fileToDeletePath);
-            } catch (IOException ex) {
-                Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
+
+        // helios exits 0 even when it fails to converge, and can abort before
+        // its final VT export; without this, a leftover .res/.dat file from
+        // the previous run would still be sitting there for the load buttons
+        // to display as if it belonged to the run just made. Clearing the
+        // pane and disabling every result-loading button up front (reusing
+        // the same reset the "Clear All" button performs) and deleting every
+        // prior result file means nothing stale can survive into this run;
+        // the completion thread below re-enables the buttons once helios'
+        // own export produces fresh files.
+        clearPFCOutputActionPerformed(evt);
+        deletePFCResultFiles();
 
         if (heliosExec == null || !heliosExec.exists()) {
             JOptionPane.showMessageDialog(this, "<html>The file <B>helios</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
@@ -4372,6 +4412,9 @@ public class RamsesUI extends javax.swing.JFrame {
     private File dyngraphExec = null;
     private File gnuplotExec = null;
     private File codegenExec = null;
+    // initRamses() re-runs on every working-directory change, but the
+    // "gnuplot not found" warning only needs to be told once per session.
+    private boolean gnuplotMissingWarned = false;
     private double this_version = 0.0;
     private boolean ssa = false;
     private ProcessBuilder matlabProcessBuilder;
@@ -4629,6 +4672,17 @@ public class RamsesUI extends javax.swing.JFrame {
         }
     }
 
+    /** @return the platform-appropriate command to install gnuplot from a package manager. */
+    private String gnuplotInstallHint() {
+        if (platform == Platform.MACOS_ARM64) {
+            return "brew install gnuplot";
+        }
+        if (platform == Platform.WINDOWS_X86_64) {
+            return "reinstall STEPSS; gnuplot ships bundled on Windows";
+        }
+        return "apt install gnuplot";
+    }
+
     private boolean initRamses() {
         try {
             platform = Platform.current();
@@ -4660,10 +4714,12 @@ public class RamsesUI extends javax.swing.JFrame {
             gnuplotExec = toolchain.gnuplot();
             WinEnvironment = PlatformLauncher.execEnvironment(platform, toolDir);
 
-            if (gnuplotExec == null || !gnuplotExec.exists()) {
+            if ((gnuplotExec == null || !gnuplotExec.exists()) && !gnuplotMissingWarned) {
+                gnuplotMissingWarned = true;
                 JOptionPane.showMessageDialog(this,
                         "<html>gnuplot was not found, so real-time plotting is disabled."
-                        + "<br>Install it and restart to enable it.</html>",
+                        + "<br>Install it and restart to enable it: <b>" + gnuplotInstallHint()
+                        + "</b></html>",
                         "gnuplot not found", JOptionPane.WARNING_MESSAGE);
             }
         } catch (IOException ex) {

@@ -71,13 +71,32 @@
     nbproject/build-impl.xml file. 
 
     -->
- <target name="-post-jar">  
-  <jar jarfile="dist/stepss.jar" update="true">  
-	<zipfileset src="${dist.jar}" excludes="META-INF/*" />  
+ <target name="-post-jar">
+  <jar jarfile="dist/stepss.jar" update="true">
+	<zipfileset src="${dist.jar}" excludes="META-INF/*" />
 	<zipfileset src="dist/lib/commons-exec-1.3.jar" excludes="META-INF/*" />
 	<zipfileset src="dist/lib/commons-io-2.11.0.jar" excludes="META-INF/*" />
-  </jar>  
- </target>  
+  </jar>
+ </target>
+
+ <!-- Runs after javac, once my.ramses.platform.Toolchain and friends are
+      compiled, and after stage-payloads (a -pre-compile dependency, so it
+      has already run by the time -post-compile does) has populated
+      src/my/ramses/payload/. Catches the case versions.properties' own
+      header used to invite: bumping a component's version there fetches
+      and stages the new asset under its new name and leaves the build
+      green, but Toolchain.java's hardcoded, version-suffixed resource
+      names still point at the old one, so every launch would fail with
+      "Missing bundled resource" once the jar shipped. See
+      PayloadManifestCheck's class comment for the full rationale. -->
+ <target name="-post-compile"
+         description="Fail the build if Toolchain.java's payload manifest and the staged payload directory disagree">
+  <java classname="my.ramses.platform.PayloadManifestCheck"
+        classpath="${build.classes.dir}"
+        fork="true" failonerror="true">
+   <arg value="src/my/ramses/payload"/>
+  </java>
+ </target>
 
  <property file="versions.properties"/>
  <property name="payload.cache" location="payload-cache"/>

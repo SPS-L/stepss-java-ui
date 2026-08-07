@@ -16,23 +16,6 @@ import org.apache.commons.io.IOUtils;
  */
 public class fileOps {
 
-    public static void deleteFiles(String[] args) {
-        for (int i = 0; i < args.length; i++) {
-            String fileName = args[i];
-            // A File object to represent the filename
-            File f = new File(fileName);
-
-            // Make sure the file or directory exists and isn't write protected
-            if (f.exists() && f.canWrite() && !f.isDirectory()) {
-                boolean success = f.delete();
-                if (!success) {
-                    System.out.println("File " + f.getAbsolutePath() + " not deleted");
-                }
-            }
-
-        }
-    }
-
     public static boolean deleteDirectory(File directory) {
 
         // System.out.println("removeDirectory " + directory);
