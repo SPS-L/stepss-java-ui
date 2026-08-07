@@ -1,10 +1,8 @@
 package my.ramses.compile;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -82,31 +80,84 @@ public final class FortranToolchain {
         return null;
     }
 
+    /** One gfortran found on PATH, carrying enough to let {@link #choose} pick among them. */
+    static final class Candidate {
+        final String label;
+        final boolean plain;
+        final int abi;
+
+        Candidate(String label, boolean plain, int abi) {
+            this.label = label;
+            this.plain = plain;
+            this.abi = abi;
+        }
+    }
+
     /**
      * Returns the compiler to use, preferring plain {@code gfortran} when its
-     * module ABI matches the kit, then scanning versioned binaries. Returns the
-     * plain name when no ABI could be read from either side, matching
-     * check_kit.sh's lenient behaviour - the definitive gate is check-deps.
+     * module ABI matches the kit, then scanning versioned binaries. Scanning
+     * (PATH lookups and spawning each candidate to read its ABI) lives here;
+     * the leniency contract itself is {@link #choose}, kept pure and separate
+     * so it is testable without depending on which compilers happen to be
+     * installed on the machine running the checks.
      */
     static String pickCompiler(File kitDir, Platform p) {
         int kitAbi = kitAbi(kitDir, p);
+        List<Candidate> found = new ArrayList<Candidate>();
+
         String plain = p.isWindows() ? "gfortran.exe" : "gfortran";
         File plainFile = PlatformLauncher.findOnPath(plain);
-
         if (plainFile != null) {
-            int abi = compilerAbi(plainFile.getAbsolutePath());
-            if (kitAbi < 0 || abi < 0 || abi == kitAbi) {
-                return "gfortran";
-            }
+            found.add(new Candidate("gfortran", true, compilerAbi(plainFile.getAbsolutePath())));
         }
         for (int i = 0; i < CANDIDATE_VERSIONS.length; i++) {
             String name = "gfortran-" + CANDIDATE_VERSIONS[i] + (p.isWindows() ? ".exe" : "");
             File candidate = PlatformLauncher.findOnPath(name);
-            if (candidate != null && compilerAbi(candidate.getAbsolutePath()) == kitAbi) {
-                return "gfortran-" + CANDIDATE_VERSIONS[i];
+            if (candidate != null) {
+                found.add(new Candidate("gfortran-" + CANDIDATE_VERSIONS[i], false,
+                        compilerAbi(candidate.getAbsolutePath())));
             }
         }
-        return plainFile != null ? "gfortran" : null;
+        return choose(kitAbi, found);
+    }
+
+    /**
+     * Pure selection: returns null only when {@code found} is empty - every
+     * other case must return some compiler that actually exists on PATH,
+     * matching check_kit.sh's lenient behaviour, since the definitive gate is
+     * upstream's {@code make check-deps}.
+     *
+     * <p>When the kit ABI cannot be read there is nothing to discriminate on,
+     * so the first candidate wins (plain first, since {@code found} is built
+     * plain-then-versioned-newest-first). When the kit ABI is known, plain is
+     * still preferred whenever its own ABI is unreadable or matches;
+     * otherwise the versioned candidates are scanned for an exact match; and
+     * if nothing matches at all, this still returns the first candidate
+     * found rather than null; a wrong {@code FC=} only wastes one
+     * {@code check-deps} round-trip, whose message is authoritative and
+     * surfaces the real remedy, whereas returning null here would misreport
+     * a working compiler as absent.
+     */
+    static String choose(int kitAbi, List<Candidate> found) {
+        if (found.isEmpty()) {
+            return null;
+        }
+        if (kitAbi < 0) {
+            return found.get(0).label;
+        }
+        for (int i = 0; i < found.size(); i++) {
+            Candidate c = found.get(i);
+            if (c.plain && (c.abi < 0 || c.abi == kitAbi)) {
+                return c.label;
+            }
+        }
+        for (int i = 0; i < found.size(); i++) {
+            Candidate c = found.get(i);
+            if (!c.plain && c.abi == kitAbi) {
+                return c.label;
+            }
+        }
+        return found.get(0).label;
     }
 
     /** The ABI of the kit, read from one of its own .mod files. */
@@ -145,9 +196,18 @@ public final class FortranToolchain {
         }
     }
 
-    /** Compiles a probe module and reads the ABI the compiler emits. */
+    /**
+     * Compiles a probe module and reads the ABI the compiler emits. The
+     * compiler's stdout/stderr are redirected to a file rather than piped, so
+     * nothing can fill a pipe buffer and block the compiler process while
+     * this thread is not reading it - that would leave {@code waitFor}'s
+     * 30-second bound unreachable on a hung or misbehaving compiler, which is
+     * exactly the unbounded wait this method exists to prevent (it runs on
+     * the Swing event thread).
+     */
     public static int compilerAbi(String fc) {
         File tmp = null;
+        Process proc = null;
         try {
             tmp = File.createTempFile("stepss-abi", "");
             if (!tmp.delete() || !tmp.mkdir()) {
@@ -155,11 +215,12 @@ public final class FortranToolchain {
             }
             File src = new File(tmp, "probe.f90");
             writeText(src, "module probe_mod\nend module probe_mod\n");
-            Process proc = new ProcessBuilder(fc, "-c", src.getAbsolutePath(),
+            proc = new ProcessBuilder(fc, "-c", src.getAbsolutePath(),
                     "-o", new File(tmp, "probe.o").getAbsolutePath(),
                     "-J" + tmp.getAbsolutePath())
-                    .redirectErrorStream(true).start();
-            drain(proc.getInputStream());
+                    .redirectErrorStream(true)
+                    .redirectOutput(new File(tmp, "probe.log"))
+                    .start();
             if (!proc.waitFor(30, TimeUnit.SECONDS)) {
                 proc.destroyForcibly();
                 return -1;
@@ -169,6 +230,9 @@ public final class FortranToolchain {
         } catch (IOException ex) {
             return -1;
         } catch (InterruptedException ex) {
+            if (proc != null) {
+                proc.destroyForcibly();
+            }
             Thread.currentThread().interrupt();
             return -1;
         } finally {
@@ -250,13 +314,6 @@ public final class FortranToolchain {
             out.write(text.getBytes("UTF-8"));
         } finally {
             out.close();
-        }
-    }
-
-    private static void drain(InputStream in) throws IOException {
-        BufferedReader r = new BufferedReader(new InputStreamReader(in, "UTF-8"));
-        while (r.readLine() != null) {
-            // Discard: only the emitted .mod matters.
         }
     }
 

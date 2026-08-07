@@ -2,6 +2,7 @@ package my.ramses.compile;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -22,6 +23,7 @@ public final class CompileHarness {
         checkSpliceOnAlreadySplicedOutputDuplicatesCase();
         checkMissingMarkerFails();
         checkAbiParsing();
+        checkCompilerSelection();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -121,6 +123,53 @@ public final class CompileHarness {
                 "GFORTRAN module version '16' created from probe.f90"));
         expect("abi absent", -1, FortranToolchain.parseAbi("not a module banner"));
         expect("abi unterminated", -1, FortranToolchain.parseAbi("module version '15"));
+    }
+
+    /**
+     * Exercises {@link FortranToolchain#choose} directly against synthetic
+     * candidate lists, rather than through {@code pickCompiler}, so these
+     * checks do not depend on which compilers (if any) happen to be
+     * installed on the machine running the harness. Covers the leniency
+     * contract end to end: a missing ABI on either side must never turn a
+     * compiler that exists into a reported "not found" - the one case this
+     * method was added to close was an unreadable kit ABI with no plain
+     * gfortran but a versioned one present, which used to fall through to
+     * null.
+     */
+    private static void checkCompilerSelection() {
+        expect("unknown kit abi, only a versioned compiler: picks it, not null",
+                "gfortran-13",
+                FortranToolchain.choose(-1, Arrays.asList(
+                        new FortranToolchain.Candidate("gfortran-13", false, 15))));
+
+        expect("unknown kit abi, plain and versioned both present: prefers plain",
+                "gfortran",
+                FortranToolchain.choose(-1, Arrays.asList(
+                        new FortranToolchain.Candidate("gfortran", true, -1),
+                        new FortranToolchain.Candidate("gfortran-13", false, 15))));
+
+        expect("known kit abi, plain's abi unreadable: accepted leniently",
+                "gfortran",
+                FortranToolchain.choose(15, Arrays.asList(
+                        new FortranToolchain.Candidate("gfortran", true, -1))));
+
+        expect("known kit abi, plain mismatches: falls through to matching versioned",
+                "gfortran-15",
+                FortranToolchain.choose(15, Arrays.asList(
+                        new FortranToolchain.Candidate("gfortran", true, 16),
+                        new FortranToolchain.Candidate("gfortran-15", false, 15))));
+
+        expect("known kit abi, nothing matches: still returns a real compiler, not null",
+                "gfortran-16",
+                FortranToolchain.choose(15, Arrays.asList(
+                        new FortranToolchain.Candidate("gfortran-16", false, 16))));
+
+        String none = FortranToolchain.choose(15, Collections.<FortranToolchain.Candidate>emptyList());
+        if (none == null) {
+            pass("no compiler on PATH at all: null");
+        } else {
+            fail("no compiler on PATH at all: wanted <null> got <" + none + ">");
+        }
     }
 
     /** A minimal stand-in with the same shape as the real router. */
