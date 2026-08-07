@@ -4432,13 +4432,20 @@ public class RamsesUI extends javax.swing.JFrame {
         }
     };
     simulExecutor = new DefaultExecutor();
-    // CODEGEN's success exit code is 0, like every other tool this class
-    // drives; this was the same inverted-exit-value mistake already fixed
-    // for the helios power-flow run (see runPFActionPerformed), just
+    // CODEGEN's success exit code is 0, so that is what this executor must
+    // treat as success; this was the same inverted-exit-value mistake already
+    // fixed for the helios power-flow run (see runPFActionPerformed), just
     // missed here. With setExitValue(1) a genuinely successful CODEGEN run
     // (exit 0) dispatched to onProcessFailed instead of onProcessComplete,
     // so Compile could never be enabled by any reachable call site - the
     // whole feature was unreachable from a fresh launch.
+    //
+    // Not every executor in this class is set to 0: runSimulationActionPerformed
+    // still uses setExitValue(1). That is pre-existing and deliberately left
+    // alone - the only thing done with that handler is waitFor(), so nothing
+    // there reads the complete/failed dispatch this value decides. Do not
+    // "correct" it on the strength of this comment; it would be a behaviour
+    // change to an unrelated path with no defect behind it.
     simulExecutor.setExitValue(0);
     ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
     PumpStreamHandler streamHandler = new PumpStreamHandler(outputstreamCG, outputstreamCG);
@@ -4693,12 +4700,16 @@ public class RamsesUI extends javax.swing.JFrame {
      * compile, so a value that can only ever have been a previous compile's
      * own output is never mistaken for something still on disk once that
      * step has run.
+     *
+     * <p>The kit path comes from {@link Toolchain#uramsesKitDirectory()},
+     * which {@link ModelCompiler#prepare} also uses, so this test and the
+     * directory actually deleted cannot drift apart.
      */
     private boolean isInsideKitDirectory(File file) {
         if (file == null || toolchain == null) {
             return false;
         }
-        File kitDir = new File(toolchain.directory(), "uramses");
+        File kitDir = toolchain.uramsesKitDirectory();
         return file.getAbsolutePath().startsWith(kitDir.getAbsolutePath() + File.separator);
     }
 
@@ -4817,8 +4828,8 @@ public class RamsesUI extends javax.swing.JFrame {
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
             JOptionPane.showMessageDialog(this,
-                    "<html>Could not save the simulator:<br>" + ex.getMessage() + "</html>",
-                    "Save failed", JOptionPane.ERROR_MESSAGE);
+                    "<html>Could not save the simulator:<br>" + escapeHtml(describe(ex))
+                    + "</html>", "Save failed", JOptionPane.ERROR_MESSAGE);
         }
     }//GEN-LAST:event_savedynsimActionPerformed
     /**
@@ -5151,6 +5162,33 @@ public class RamsesUI extends javax.swing.JFrame {
         return "apt install gnuplot";
     }
 
+    /**
+     * The simulator {@link #initRamses} should install: a custom one built by
+     * this session's last successful compile if it is still on disk, otherwise
+     * the bundled engine.
+     *
+     * <p>{@code initRamses()} runs again on every working-directory change, and
+     * unconditionally resetting {@code ramsesExec} to the bundled engine there
+     * silently un-adopted a compiled simulator while the Codegen pane still
+     * read "Simulations will now run on this custom simulator" and <i>Save
+     * executable</i> stayed enabled - so the user simulated on the bundled
+     * engine believing it was theirs. The kit lives under the tool directory,
+     * not the working directory, and {@code extractAll()} skips the lazy
+     * uramses kit, so the built executable genuinely survives the change; the
+     * {@code isFile()} test is what keeps this honest if it ever does not.
+     *
+     * <p>{@link ModelCompiler#builtExecutable()} is null until a build
+     * succeeds and is reset to null by every {@code prepare()}, so a failed or
+     * superseded compile cannot be re-adopted here.
+     */
+    private File adoptedSimulator() {
+        File custom = (modelCompiler == null) ? null : modelCompiler.builtExecutable();
+        if (custom != null && custom.isFile()) {
+            return custom;
+        }
+        return toolchain.ramses();
+    }
+
     private boolean initRamses() {
         try {
             platform = Platform.current();
@@ -5175,7 +5213,7 @@ public class RamsesUI extends javax.swing.JFrame {
             openExplButton.setEnabled(true);
             openTermButton.setEnabled(true);
 
-            ramsesExec = toolchain.ramses();
+            ramsesExec = adoptedSimulator();
             heliosExec = toolchain.helios();
             dyngraphExec = toolchain.dyngraph();
             codegenExec = toolchain.codegen();

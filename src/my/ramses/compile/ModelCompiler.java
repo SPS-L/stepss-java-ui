@@ -58,15 +58,28 @@ public final class ModelCompiler {
      * stale {@code Release_*} tree would let a previous build's objects survive
      * into this one. Re-unpacking ~12 MB takes well under a second and makes
      * every compile start from the same state.
+     *
+     * <p>The delete must therefore be verified, not attempted:
+     * {@code ToolExtractor.extract} re-unpacks only when the stamp is stale or the
+     * target is missing, and the stamp is still current here. So if even one
+     * file survives - on Windows the {@code dynsim.exe} a previous compile
+     * produced and the user is still simulating with, or a file an antivirus
+     * scanner or editor has locked - the directory still exists, extraction is
+     * skipped, and this method would splice against a tree whose {@code src/}
+     * it just deleted, silently and with no exception. Every later compile in
+     * the session would repeat it. Failing loudly here is the only outcome
+     * that leaves the user something to act on.
      */
     public void prepare(List<File> generated) throws IOException {
         if (generated == null || generated.isEmpty()) {
             throw new IOException("No generated model files to compile. Run Codegen first.");
         }
 
-        File dir = toolchain.directory();
-        File existing = new File(dir, "uramses");
+        File existing = toolchain.uramsesKitDirectory();
         deleteRecursively(existing);
+        if (existing.exists()) {
+            throw new IOException(resetFailedMessage(existing));
+        }
         // extractOnDemand caches the extracted File the first time it runs
         // and returns that cached reference on every later call without
         // touching disk again. Without forgetExtracted first, every compile
@@ -202,6 +215,49 @@ public final class ModelCompiler {
         }
         Files.copy(from.toPath(), to.toPath(),
                 java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    /**
+     * The user-facing explanation for a kit that could not be reset. Names the
+     * first file that survived the delete, because on Windows that file is
+     * usually the answer: a {@code dynsim.exe} from a previous compile that is
+     * still running cannot be deleted while it runs, and nothing else in the
+     * UI would ever tell the user that is what went wrong.
+     */
+    static String resetFailedMessage(File kit) {
+        File survivor = firstSurvivingFile(kit);
+        return "Could not reset the build kit at " + kit.getAbsolutePath() + ".\n"
+                + (survivor != null
+                        ? "This file could not be deleted: " + survivor.getAbsolutePath() + "\n"
+                        : "The directory itself could not be removed.\n")
+                + "The usual cause is that a simulator built by a previous compile is"
+                + " still running - stop the simulation and try again. A lock held by"
+                + " an antivirus scanner or an open editor does the same thing.\n"
+                + "Compiling now would build against a partly deleted kit, so the"
+                + " build was stopped.";
+    }
+
+    /**
+     * @return some file left behind under {@code dir}, or null if the only
+     *         thing that survived was a directory. Depth-first, so the deepest
+     *         surviving file is reported rather than the directory holding it.
+     */
+    private static File firstSurvivingFile(File dir) {
+        File[] kids = dir.listFiles();
+        if (kids == null) {
+            return null;
+        }
+        for (int i = 0; i < kids.length; i++) {
+            if (kids[i].isDirectory()) {
+                File deeper = firstSurvivingFile(kids[i]);
+                if (deeper != null) {
+                    return deeper;
+                }
+            } else {
+                return kids[i];
+            }
+        }
+        return null;
     }
 
     private static void deleteRecursively(File f) {

@@ -26,6 +26,8 @@ public final class CompileHarness {
         checkMissingMarkerFails();
         checkAbiParsing();
         checkCompilerSelection();
+        checkExtraDirectorySearch();
+        checkKitResetMessage();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -68,7 +70,7 @@ public final class CompileHarness {
      * cheap sanity check, not proof that splicing is safe to repeat - it
      * says nothing about what happens when the second call is fed the first
      * call's output instead of pristine source. See
-     * {@link #checkSpliceOnAlreadySplicedOutputDuplicatesCase()} for that.
+     * {@link #checkSpliceOnAlreadySplicedOutputIsIdempotent()} for that.
      */
     private static void checkSpliceIsDeterministic() {
         try {
@@ -223,6 +225,111 @@ public final class CompileHarness {
         }
     }
 
+    /**
+     * The lookup {@code pickCompiler} now uses must find a compiler that sits
+     * in a directory given to it explicitly and is <em>not</em> on PATH. That
+     * is the whole Windows/MSYS2 case, which cannot be run on Linux: MSYS2
+     * installs gfortran into {@code C:\msys64\mingw64\bin} and leaves it off
+     * the system PATH, so probing PATH alone reported "gfortran was not found"
+     * to users who had installed exactly what the dialog asked for. Here a
+     * stub with a deliberately unguessable name stands in for that compiler:
+     * absent from PATH, found once its directory is passed in.
+     */
+    private static void checkExtraDirectorySearch() {
+        java.io.File dir = null;
+        try {
+            dir = java.io.File.createTempFile("stepss-harness-path", "");
+            if (!dir.delete() || !dir.mkdir()) {
+                fail("extra-directory search: could not create a scratch directory");
+                return;
+            }
+            String stub = "stepss-harness-stub-fc";
+            java.io.File exe = new java.io.File(dir, stub);
+            java.io.OutputStream out = new java.io.FileOutputStream(exe);
+            try {
+                out.write("#!/bin/sh\nexit 0\n".getBytes("UTF-8"));
+            } finally {
+                out.close();
+            }
+            if (!exe.setExecutable(true)) {
+                fail("extra-directory search: could not mark the stub executable");
+                return;
+            }
+
+            expect("a stub compiler that is not on PATH is not found by the PATH-only lookup",
+                    null, my.ramses.platform.PlatformLauncher.findOnPath(stub));
+
+            java.io.File hit = my.ramses.platform.PlatformLauncher.findOnPath(stub,
+                    Collections.singletonList(dir.getAbsolutePath()));
+            expect("the same stub is found once its directory is passed as an extra entry",
+                    exe.getAbsolutePath(), hit == null ? null : hit.getAbsolutePath());
+
+            expect("a name in neither PATH nor the extra directories is still not found",
+                    null, my.ramses.platform.PlatformLauncher.findOnPath(
+                            "stepss-harness-absent-fc",
+                            Collections.singletonList(dir.getAbsolutePath())));
+        } catch (java.io.IOException ex) {
+            fail("extra-directory search threw: " + ex);
+        } finally {
+            deleteRecursively(dir);
+        }
+    }
+
+    /**
+     * The message {@link ModelCompiler#prepare} fails with when the kit reset
+     * left files behind. What matters is that it names the surviving file and
+     * the likely cause, since the user's only route out is to stop whatever is
+     * holding it - on Windows, typically a previous build's still-running
+     * simulator. The failure path itself (a genuinely undeletable file) needs
+     * real filesystem permissions and is exercised outside this harness.
+     */
+    private static void checkKitResetMessage() {
+        java.io.File kit = null;
+        try {
+            kit = java.io.File.createTempFile("stepss-harness-kit", "");
+            if (!kit.delete() || !kit.mkdir()) {
+                fail("kit reset message: could not create a scratch directory");
+                return;
+            }
+            java.io.File nested = new java.io.File(kit, "Release_l");
+            if (!nested.mkdir()) {
+                fail("kit reset message: could not create the nested directory");
+                return;
+            }
+            java.io.File survivor = new java.io.File(nested, "dynsim");
+            if (!survivor.createNewFile()) {
+                fail("kit reset message: could not create the surviving file");
+                return;
+            }
+            String message = ModelCompiler.resetFailedMessage(kit);
+            expect("names the kit directory", true,
+                    message.contains(kit.getAbsolutePath()));
+            expect("names the surviving file, not just the directory holding it", true,
+                    message.contains(survivor.getAbsolutePath()));
+            expect("names the likely cause", true,
+                    message.contains("still running"));
+            expect("says the build was stopped rather than continued", true,
+                    message.contains("build was stopped"));
+        } catch (java.io.IOException ex) {
+            fail("kit reset message threw: " + ex);
+        } finally {
+            deleteRecursively(kit);
+        }
+    }
+
+    private static void deleteRecursively(java.io.File f) {
+        if (f == null || !f.exists()) {
+            return;
+        }
+        java.io.File[] kids = f.listFiles();
+        if (kids != null) {
+            for (java.io.File kid : kids) {
+                deleteRecursively(kid);
+            }
+        }
+        f.delete();
+    }
+
     /** A minimal stand-in with the same shape as the real router. */
     private static String pristine() {
         List<String> lines = new ArrayList<String>();
@@ -253,7 +360,10 @@ public final class CompileHarness {
     }
 
     private static void expect(String what, Object want, Object got) {
-        if (want.equals(got)) {
+        // Null-safe on both sides: some checks assert that a lookup found
+        // nothing, and a null expectation must read as a comparison, not as
+        // an NPE inside the harness itself.
+        if (want == null ? got == null : want.equals(got)) {
             pass(what);
         } else {
             fail(what + ": wanted <" + want + "> got <" + got + ">");

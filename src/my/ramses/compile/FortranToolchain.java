@@ -100,19 +100,30 @@ public final class FortranToolchain {
      * the leniency contract itself is {@link #choose}, kept pure and separate
      * so it is testable without depending on which compilers happen to be
      * installed on the machine running the checks.
+     *
+     * <p>The lookup searches {@link #extraPathEntries} before PATH, for the
+     * same reason {@link #findMake} falls back to MSYS2: on Windows the MSYS2
+     * installer does not add {@code C:\msys64\mingw64\bin} to the system PATH,
+     * so a user who installed exactly what the missing-tool dialog and the
+     * README tell them to install still has no gfortran on the JVM's PATH.
+     * Probing PATH alone told those users to install what they had just
+     * installed, and {@code make} never ran. These are the same directories
+     * {@code ModelCompiler.buildEnvironment} prepends to the build's own PATH,
+     * so the compiler picked here is the compiler the build will resolve.
      */
     static String pickCompiler(File kitDir, Platform p) {
         int kitAbi = kitAbi(kitDir, p);
         List<Candidate> found = new ArrayList<Candidate>();
+        List<String> extra = extraPathEntries(p);
 
         String plain = p.isWindows() ? "gfortran.exe" : "gfortran";
-        File plainFile = PlatformLauncher.findOnPath(plain);
+        File plainFile = PlatformLauncher.findOnPath(plain, extra);
         if (plainFile != null) {
             found.add(new Candidate("gfortran", true, compilerAbi(plainFile.getAbsolutePath())));
         }
         for (int i = 0; i < CANDIDATE_VERSIONS.length; i++) {
             String name = "gfortran-" + CANDIDATE_VERSIONS[i] + (p.isWindows() ? ".exe" : "");
-            File candidate = PlatformLauncher.findOnPath(name);
+            File candidate = PlatformLauncher.findOnPath(name, extra);
             if (candidate != null) {
                 found.add(new Candidate("gfortran-" + CANDIDATE_VERSIONS[i], false,
                         compilerAbi(candidate.getAbsolutePath())));

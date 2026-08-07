@@ -16,6 +16,17 @@ public final class Toolchain {
     public static final String GNUPLOT = "gnuplot";
     public static final String URAMSES = "uramses";
 
+    /**
+     * The single definition of the directory the uramses kit unpacks into,
+     * relative to {@link #directory()}. It is the {@code extractedName} of
+     * every uramses payload below <em>and</em> what callers outside this
+     * package resolve the kit against, so the name cannot drift between the
+     * manifest and the code that deletes, re-extracts or recognises the kit.
+     * Read it through {@link #uramsesKitDirectory()} rather than rebuilding
+     * the path by hand.
+     */
+    public static final String URAMSES_DIR = "uramses";
+
     public static final List<ToolSpec> SPECS = buildSpecs();
 
     private static List<ToolSpec> buildSpecs() {
@@ -70,15 +81,15 @@ public final class Toolchain {
 
         s.add(new ToolSpec(URAMSES)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "payload/uramses-kit-v3.55.zip", "uramses",
+                "payload/uramses-kit-v3.55.zip", URAMSES_DIR,
                 java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
                                         "README.md", "LICENSE.rst", "modules_wg/")))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "payload/uramses-kit-v3.55.zip", "uramses",
+                "payload/uramses-kit-v3.55.zip", URAMSES_DIR,
                 java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
                                         "README.md", "LICENSE.rst", "modules_l/")))
             .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
-                "payload/uramses-kit-v3.55.zip", "uramses",
+                "payload/uramses-kit-v3.55.zip", URAMSES_DIR,
                 java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
                                         "README.md", "LICENSE.rst", "modules_m/"))));
 
@@ -168,6 +179,19 @@ public final class Toolchain {
     /** @return the extracted uramses kit root, or null if it has not been extracted yet. */
     public File uramsesKit() {
         return get(URAMSES);
+    }
+
+    /**
+     * Where the uramses kit lives (or will live) under {@link #directory()},
+     * whether or not it has been extracted yet - unlike {@link #uramsesKit()},
+     * which only answers once extraction has run. The one place this path is
+     * formed, so {@code ModelCompiler.prepare} (which deletes and re-extracts
+     * it) and the UI (which recognises a previous build's output inside it)
+     * cannot disagree, and neither can drift from {@link #URAMSES_DIR} in the
+     * payload manifest.
+     */
+    public File uramsesKitDirectory() {
+        return new File(dir, URAMSES_DIR);
     }
 
     /** The module-kit directory name inside the uramses kit, per platform. */
