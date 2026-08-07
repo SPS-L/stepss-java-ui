@@ -25,6 +25,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.text.BadLocationException;
@@ -38,6 +39,7 @@ import my.ramses.platform.UnsupportedPlatformException;
 import org.apache.commons.exec.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.output.TeeOutputStream;
 
 /**
  *
@@ -4035,13 +4037,25 @@ public class RamsesUI extends javax.swing.JFrame {
 
         simulExecutorResultHandler = new DefaultExecuteResultHandler();
         simulExecutor = new DefaultExecutor();
-        simulExecutor.setExitValue(1);
+        // helios' documented exit-status contract (../stepss-helios/README.md,
+        // docs/tui-guide.md#exit-status): 0 is the only success value. 1 and 2
+        // are both failures as far as Commons Exec is concerned; the distinction
+        // between them is reported to the user by reportHeliosExitStatus below.
+        simulExecutor.setExitValue(0);
         ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-        PumpStreamHandler streamHandler = new PumpStreamHandler(outputstreamPFC, outputstreamPFC);
+        // stderr also goes through a tee into heliosStderr so the completion
+        // thread can look for the "helios: status: ..." line without disturbing
+        // what already gets shown, merged with stdout, in pfcPane.
+        final ByteArrayOutputStream heliosStderr = new ByteArrayOutputStream();
+        PumpStreamHandler streamHandler = new PumpStreamHandler(outputstreamPFC, new TeeOutputStream(outputstreamPFC, heliosStderr));
         simulExecutor.setStreamHandler(streamHandler);
 
         simulExecutor.setWorkingDirectory(myTempDir);
         simulExecutor.setProcessDestroyer(processDestroyer);
+        // Captured so the completion thread below reports on the run this
+        // invocation started, even if the shared simulExecutorResultHandler
+        // field is reassigned by another action before the thread wakes up.
+        final DefaultExecuteResultHandler resultHandler = simulExecutorResultHandler;
         try {
             simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
         } catch (IOException ex) {
@@ -4050,28 +4064,169 @@ public class RamsesUI extends javax.swing.JFrame {
         (new Thread() {
             @Override
             public void run() {
+                File f = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "in_volt_trfo.dat");
                 try {
                     Thread.sleep(2000);
-                    File f = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "in_volt_trfo.dat");
-                    while (!f.exists()) {
+                    // Also bail out once helios has exited: on exit 1 (input/usage
+                    // error) there may be no results at all, so in_volt_trfo.dat can
+                    // legitimately never appear and this loop must not wait forever.
+                    while (!f.exists() && !resultHandler.hasResult()) {
                         Thread.sleep(1000);
                     }
-                    Thread.sleep(1000);
+                    if (f.exists()) {
+                        Thread.sleep(1000);
+                    }
                 } catch (InterruptedException ex) {
                     Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
                 }
-                
-                loadOutput.setEnabled(true);
-                loadBusOverview.setEnabled(true);
-                loadGens.setEnabled(true);
-                loadTrfos.setEnabled(true);
-                loadPow.setEnabled(true);
-                loadLFRESV2DAT.setEnabled(true);
+
+                if (f.exists()) {
+                    loadOutput.setEnabled(true);
+                    loadBusOverview.setEnabled(true);
+                    loadGens.setEnabled(true);
+                    loadTrfos.setEnabled(true);
+                    loadPow.setEnabled(true);
+                    loadLFRESV2DAT.setEnabled(true);
+                }
+
+                reportHeliosExitStatus(resultHandler, heliosStderr);
             }
         }).start();
         clearPFCOutput.setEnabled(true);
 
     }//GEN-LAST:event_runPFActionPerformed
+
+    /**
+     * Matches helios' machine-readable status line, written once to stderr on
+     * every non-interactive run:
+     * {@code helios: status: CONVERGED (2 iterations)} or
+     * {@code helios: status: NOT_CONVERGED (max iterations)}. Group 1 is the
+     * token ({@code CONVERGED}/{@code NOT_CONVERGED}/{@code NOT_RUN}), group 2
+     * the optional parenthesised detail. See
+     * ../stepss-helios/docs/tui-guide.md#exit-status.
+     */
+    private static final Pattern HELIOS_STATUS_LINE = Pattern.compile("helios: status: (\\S+)(?: \\(([^)]*)\\))?");
+
+    /**
+     * Reports the outcome of the helios run started by
+     * {@link #runPFActionPerformed} per its normative exit-status contract
+     * (../stepss-helios/README.md, docs/tui-guide.md#exit-status,
+     * docs/api-reference.md#shared-status-contract-api-and-cli):
+     * <ul>
+     * <li>0 (converged): silent, exactly as before the contract existed.</li>
+     * <li>2 (did not converge): a prominent warning — helios still exported
+     * result files and the GUI will display them, but they are not a valid
+     * solution.</li>
+     * <li>1 (input/usage error): an error explaining there may be no results
+     * at all.</li>
+     * <li>anything else: a generic failure naming the exit value.</li>
+     * </ul>
+     * The pinned helios v1.2.0 predates this contract: it always exits 0 and
+     * never writes the status line, so this method is a no-op with it, and
+     * starts reporting the moment a contract-implementing release is pinned,
+     * with no further code change.
+     * <p>
+     * Called off the EDT (from the completion thread above); every dialog is
+     * dispatched with {@code invokeLater}, following the pattern used by the
+     * launch-failure listener registered in the constructor.
+     *
+     * @param resultHandler the result handler for the run being reported on
+     * @param heliosStderr the run's captured stderr, searched for the
+     * {@code helios: status: ...} line
+     */
+    private void reportHeliosExitStatus(DefaultExecuteResultHandler resultHandler, ByteArrayOutputStream heliosStderr) {
+        try {
+            resultHandler.waitFor();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        if (!resultHandler.hasResult()) {
+            return;
+        }
+        final HeliosStatusDialog dialog = describeHeliosExit(resultHandler.getExitValue(), heliosStderr.toString());
+        if (dialog == null) {
+            return;
+        }
+        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, dialog.message, dialog.title, dialog.messageType));
+    }
+
+    /**
+     * Immutable description of the dialog {@link #reportHeliosExitStatus}
+     * should show for a given helios exit status. A plain field holder
+     * rather than a record: RamsesUI targets Java 11 syntax.
+     */
+    static final class HeliosStatusDialog {
+
+        final String title;
+        final String message;
+        final int messageType;
+
+        HeliosStatusDialog(String title, String message, int messageType) {
+            this.title = title;
+            this.message = message;
+            this.messageType = messageType;
+        }
+    }
+
+    /**
+     * Pure decision logic behind {@link #reportHeliosExitStatus}: given a
+     * completed helios run's exit value and its raw captured stderr, decides
+     * what to tell the user, per the normative exit-status contract in
+     * ../stepss-helios/README.md and docs/tui-guide.md#exit-status. Touches
+     * no Swing state, so it is exercised directly by tests without needing a
+     * live GUI. Package-visible for that reason.
+     *
+     * @param exitValue the process exit value ({@link DefaultExecuteResultHandler#getExitValue()})
+     * @param heliosStderrText the run's captured stderr, searched for the
+     * {@code helios: status: ...} line
+     * @return the dialog to show, or {@code null} for exit 0 (converged:
+     * show nothing, exactly as before this contract existed)
+     */
+    static HeliosStatusDialog describeHeliosExit(int exitValue, String heliosStderrText) {
+        if (exitValue == 0) {
+            return null;
+        }
+
+        // The "helios: status: TOKEN (detail)" line, when present, distinguishes
+        // *why* a non-converged run failed (max iterations, divergence, singular
+        // Jacobian). It is not required: the pinned v1.2.0 binary never writes it.
+        String statusDetail = null;
+        Matcher statusMatcher = HELIOS_STATUS_LINE.matcher(heliosStderrText);
+        if (statusMatcher.find()) {
+            statusDetail = statusMatcher.group(2);
+        }
+        final String detailSuffix = (statusDetail == null || statusDetail.isEmpty()) ? "" : " (" + statusDetail + ")";
+
+        switch (exitValue) {
+            case 2:
+                return new HeliosStatusDialog(
+                        "Power Flow Did NOT Converge!",
+                        "<html><body style='width: 350px'>"
+                        + "<b><font color='red'>The power flow did NOT converge" + detailSuffix + ".</font></b>"
+                        + "<br><br>helios still produced and exported result files, and the "
+                        + "buttons below now show them, but <b>they are NOT a valid "
+                        + "power-flow solution.</b> Do not use the displayed values."
+                        + "</body></html>",
+                        JOptionPane.WARNING_MESSAGE);
+            case 1:
+                return new HeliosStatusDialog(
+                        "Helios Could Not Process The Input!",
+                        "<html><body style='width: 350px'>"
+                        + "helios reported an input or usage error and stopped early"
+                        + detailSuffix + ". <b>There may be no results at all.</b>"
+                        + "</body></html>",
+                        JOptionPane.ERROR_MESSAGE);
+            default:
+                return new HeliosStatusDialog(
+                        "Helios Exited Abnormally!",
+                        "<html><body style='width: 350px'>"
+                        + "helios exited with status " + exitValue + ", which is not a "
+                        + "documented outcome. Treat any displayed results with suspicion."
+                        + "</body></html>",
+                        JOptionPane.ERROR_MESSAGE);
+        }
+    }
 
     private void loadBusOverviewActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadBusOverviewActionPerformed
         try {
