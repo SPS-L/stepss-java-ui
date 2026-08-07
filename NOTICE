@@ -42,13 +42,35 @@ RAMSES internally uses the KLU sparse linear solver from SuiteSparse
 (Timothy A. Davis and Ekanathan Palamadai Natarajan), distributed under the
 GNU LGPL; see the bundled KLU license text.
 
-PFC (Power Flow Computation) and CODEGEN (Model Generator)
-----------------------------------------------------------
+STEPSS-Helios (Power Flow)
+---------------------------
 
-PFC and CODEGEN are the property of Dr. Thierry Van Cutsem. They are
-distributed as compiled executables that are free to use but are not
-open-source. Their source code is not included in any of the STEPSS
-repositories.
+STEPSS-Helios, the power flow engine, has been developed by the Sustainable
+Power Systems Laboratory (SPS-L) at the Cyprus University of Technology,
+under the direction of Dr Petros Aristidou, and is distributed under the
+Academic Public License for STEPSS-Helios:
+
+  - Permission is granted to use the Software free of charge for any
+    non-commercial purpose, including teaching and research at universities,
+    colleges, and other educational institutions, research at non-profit
+    research institutions, and personal non-profit purposes.
+
+  - For commercial use, including but not restricted to consulting
+    activities, design of commercial hardware or software products, or
+    participation by a commercial entity in research projects, you must
+    contact the Authors (info@sps-lab.org) for a commercial license.
+
+  - STEPSS-Helios is provided "as is", without warranty of any kind.
+
+See the bundled STEPSS-Helios license text (src/my/ramses/heliosLicense.txt)
+for the complete terms.
+
+CODEGEN (Model Generator)
+--------------------------
+
+CODEGEN is the property of Dr. Thierry Van Cutsem. It is distributed as a
+compiled executable that is free to use but is not open-source. Its source
+code is not included in any of the STEPSS repositories.
 
 DYNGRAPH (Curve Viewer)
 -----------------------
@@ -57,19 +79,24 @@ DYNGRAPH, the post-processing tool for extracting and plotting RAMSES
 simulation curves, is distributed as a compiled executable that is free to
 use but is not open-source.
 
+Fetched Components
+===================
+
+RAMSES, STEPSS-Helios, DYNGRAPH (on Linux and macOS), and CODEGEN are not
+committed to this repository. The build downloads the pinned per-platform
+binaries from their respective SPS-L GitHub releases and verifies each
+against a checksum recorded in versions.properties before packaging it into
+the jar; this does not change the licensing terms above. The Windows
+DYNGRAPH build bundled here is committed directly, as the published DYNGRAPH
+releases are console-only and do not include the dialog-based build STEPSS
+uses on Windows.
+
 Bundled Third-Party Tools
 =========================
 
   - gnuplot - real-time plotting; distributed unmodified under the gnuplot
-    license (see the bundled gnuplot license text).
-
-  - Notepad++ - data file editor (Don Ho); free software distributed under
-    the GNU GPL (see the bundled Notepad++ license text). Its source code is
-    available at https://github.com/notepad-plus-plus/notepad-plus-plus.
-
-  - vswhere (Microsoft) - locates Visual Studio installations on Windows;
-    distributed under the MIT License
-    (https://github.com/microsoft/vswhere).
+    license (see the bundled gnuplot license text). Bundled on Windows;
+    resolved from PATH on Linux and macOS.
 
 Third-Party Java Libraries
 ==========================
