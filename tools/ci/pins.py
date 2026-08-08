@@ -8,6 +8,7 @@ COMPONENTS = ("ramses", "helios", "dyngraph", "codegen", "uramses")
 PLATFORMS = ("windows", "linux", "macos")
 
 VERSION_TOKEN = "@VERSION@"
+PAYLOAD_PREFIX = "payload/"
 
 
 def load(path):
@@ -59,3 +60,60 @@ def uramses_url(props, version):
     if key not in props:
         raise KeyError("Missing asset pattern: " + key)
     return expand(props[key], version)
+
+
+def set_values(path, updates):
+    """Updates existing keys in place, preserving comments and layout.
+
+    versions.properties carries the documentation for its own format, so it is
+    rewritten line by line rather than regenerated. Keys are only ever updated,
+    never appended: a key that is absent means the caller has a typo, and
+    appending it would produce a file the Ant build silently ignores.
+    """
+    with open(path, "r", encoding="utf-8") as handle:
+        lines = handle.readlines()
+
+    remaining = dict(updates)
+    out = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" in stripped:
+            key = stripped.split("=", 1)[0].strip()
+            if key in remaining:
+                out.append("%s=%s\n" % (key, remaining.pop(key)))
+                continue
+        out.append(line)
+
+    if remaining:
+        raise KeyError("Not present in %s: %s" % (path, ", ".join(sorted(remaining))))
+
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.writelines(out)
+
+
+def rewrite_toolchain(path, renames):
+    """Repoints Toolchain.java's payload resource names at the new assets.
+
+    Exact literal replacement, never pattern matching: the old names come from
+    the pins the caller just read, so a replacement either matches exactly or
+    is a bug worth failing on. An old name that is missing means Toolchain.java
+    and versions.properties had already drifted apart.
+    """
+    with open(path, "r", encoding="utf-8") as handle:
+        text = handle.read()
+
+    original = text
+    replacements = 0
+    for old, new in renames.items():
+        if old == new:
+            continue
+        needle = PAYLOAD_PREFIX + old
+        if needle not in text:
+            raise ValueError("%s does not name %s" % (path, needle))
+        replacements += text.count(needle)
+        text = text.replace(needle, PAYLOAD_PREFIX + new)
+
+    if text != original:
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(text)
+    return replacements

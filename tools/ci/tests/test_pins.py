@@ -109,5 +109,105 @@ class UramsesUrlTest(unittest.TestCase):
         )
 
 
+TOOLCHAIN = """\
+package my.ramses.platform;
+
+public final class Toolchain {
+    static void build() {
+        s.add(new ToolSpec(RAMSES)
+            .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
+                "payload/ramses-linux-x86_64-v3.55.tar.gz", ToolSpec.Kind.TGZ,
+                "ramses", "dynsim", true)));
+        s.add(new ToolSpec(URAMSES)
+            .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
+                "payload/uramses-kit-v3.55.zip", URAMSES_DIR,
+                java.util.Arrays.asList("build/"))));
+    }
+}
+"""
+
+
+def write_toolchain(text=TOOLCHAIN):
+    handle, path = tempfile.mkstemp(suffix=".java")
+    with os.fdopen(handle, "w") as out:
+        out.write(text)
+    return path
+
+
+class SetValuesTest(unittest.TestCase):
+    def test_updates_the_named_key(self):
+        path = write_sample()
+        pins.set_values(path, {"ramses.version": "3.56"})
+        self.assertEqual("3.56", pins.load(path)["ramses.version"])
+
+    def test_leaves_other_keys_alone(self):
+        path = write_sample()
+        pins.set_values(path, {"ramses.version": "3.56"})
+        self.assertEqual("v3.55", pins.load(path)["ramses.tag"])
+
+    def test_preserves_comments_and_blank_lines(self):
+        path = write_sample()
+        pins.set_values(path, {"ramses.version": "3.56"})
+        with open(path) as handle:
+            text = handle.read()
+        self.assertIn("# a comment", text)
+        self.assertIn("\n\nhelios.linux.asset.pattern=", text)
+
+    def test_preserves_line_count(self):
+        path = write_sample()
+        before = len(open(path).readlines())
+        pins.set_values(path, {"ramses.version": "3.56"})
+        self.assertEqual(before, len(open(path).readlines()))
+
+    def test_unknown_key_raises_and_writes_nothing(self):
+        path = write_sample()
+        original = open(path).read()
+        with self.assertRaises(KeyError):
+            pins.set_values(path, {"ramses.version": "3.56", "nope.version": "1"})
+        self.assertEqual(original, open(path).read())
+
+
+class RewriteToolchainTest(unittest.TestCase):
+    def test_replaces_the_resource_name(self):
+        path = write_toolchain()
+        count = pins.rewrite_toolchain(
+            path,
+            {"ramses-linux-x86_64-v3.55.tar.gz": "ramses-linux-x86_64-v3.56.tar.gz"},
+        )
+        self.assertEqual(1, count)
+        self.assertIn("payload/ramses-linux-x86_64-v3.56.tar.gz", open(path).read())
+
+    def test_leaves_the_old_name_behind_nowhere(self):
+        path = write_toolchain()
+        pins.rewrite_toolchain(
+            path,
+            {"ramses-linux-x86_64-v3.55.tar.gz": "ramses-linux-x86_64-v3.56.tar.gz"},
+        )
+        self.assertNotIn("ramses-linux-x86_64-v3.55.tar.gz", open(path).read())
+
+    def test_handles_the_uramses_kit_name(self):
+        path = write_toolchain()
+        count = pins.rewrite_toolchain(
+            path, {"uramses-kit-v3.55.zip": "uramses-kit-v3.60.zip"}
+        )
+        self.assertEqual(1, count)
+        self.assertIn("payload/uramses-kit-v3.60.zip", open(path).read())
+
+    def test_unchanged_name_is_a_no_op(self):
+        path = write_toolchain()
+        count = pins.rewrite_toolchain(
+            path,
+            {"stepss-helios-linux-x86_64.tar.gz": "stepss-helios-linux-x86_64.tar.gz"},
+        )
+        self.assertEqual(0, count)
+
+    def test_absent_old_name_raises_and_writes_nothing(self):
+        path = write_toolchain()
+        original = open(path).read()
+        with self.assertRaises(ValueError):
+            pins.rewrite_toolchain(path, {"not-there-v1.zip": "not-there-v2.zip"})
+        self.assertEqual(original, open(path).read())
+
+
 if __name__ == "__main__":
     unittest.main()
