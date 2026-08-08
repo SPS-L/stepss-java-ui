@@ -1,5 +1,7 @@
+import io
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -73,22 +75,88 @@ class LatestReleaseTest(unittest.TestCase):
 
 
 class DownloadAssetTest(unittest.TestCase):
+    def setUp(self):
+        self.dest_dir = tempfile.mkdtemp(prefix="upstream-download-asset-")
+        self.addCleanup(shutil.rmtree, self.dest_dir, True)
+
     def test_returns_the_destination_path(self):
         run = FakeRun()
-        path = upstream.download_asset("r", "v1.2.0", "a.tar.gz", "/tmp/x", run=run)
-        self.assertEqual(os.path.join("/tmp/x", "a.tar.gz"), path)
+        path = upstream.download_asset("r", "v1.2.0", "a.tar.gz", self.dest_dir, run=run)
+        self.assertEqual(os.path.join(self.dest_dir, "a.tar.gz"), path)
 
     def test_passes_the_pattern_and_dir_to_gh(self):
         run = FakeRun()
-        upstream.download_asset("r", "v1.2.0", "a.tar.gz", "/tmp/x", run=run)
+        upstream.download_asset("r", "v1.2.0", "a.tar.gz", self.dest_dir, run=run)
         argv = run.calls[0]
         self.assertIn("a.tar.gz", argv)
-        self.assertIn("/tmp/x", argv)
+        self.assertIn(self.dest_dir, argv)
+
+
+class DownloadUrlTest(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp(prefix="upstream-download-url-")
+        self.addCleanup(shutil.rmtree, self.tempdir, True)
+
+    def test_downloaded_bytes_land_in_the_destination_file(self):
+        opener = _RecordingOpener(b"hello world")
+        dest = os.path.join(self.tempdir, "out.bin")
+        result = upstream.download_url("https://example.invalid/f", dest, opener=opener)
+        self.assertEqual(dest, result)
+        with open(dest, "rb") as handle:
+            self.assertEqual(b"hello world", handle.read())
+
+    def test_creates_the_missing_parent_directory(self):
+        opener = _RecordingOpener(b"payload")
+        dest = os.path.join(self.tempdir, "nested", "sub", "out.bin")
+        upstream.download_url("https://example.invalid/f", dest, opener=opener)
+        self.assertTrue(os.path.isfile(dest))
+
+    def test_closes_the_response_even_when_writing_fails(self):
+        response = _FlakyResponse(first_chunk=b"partial")
+        dest = os.path.join(self.tempdir, "flaky.bin")
+        with self.assertRaises(IOError):
+            upstream.download_url(
+                "https://example.invalid/f", dest, opener=lambda url: response
+            )
+        self.assertTrue(response.closed)
+
+
+class _RecordingOpener(object):
+    """Fake urlopen: hands back an in-memory response, remembers it."""
+
+    def __init__(self, data=b""):
+        self.data = data
+        self.response = None
+
+    def __call__(self, url):
+        self.response = io.BytesIO(self.data)
+        return self.response
+
+
+class _FlakyResponse(object):
+    """Fake response whose read() fails on its second call, after some
+    bytes have already been written, so download_url's write step blows up
+    partway through -- used to prove the response still gets closed."""
+
+    def __init__(self, first_chunk=b"partial"):
+        self._first_chunk = first_chunk
+        self._calls = 0
+        self.closed = False
+
+    def read(self, *args, **kwargs):
+        self._calls += 1
+        if self._calls == 1:
+            return self._first_chunk
+        raise IOError("boom")
+
+    def close(self):
+        self.closed = True
 
 
 class Sha256Test(unittest.TestCase):
     def test_hashes_known_content(self):
-        handle, path = tempfile.mkstemp()
+        handle, path = tempfile.mkstemp(prefix="upstream-sha256-")
+        self.addCleanup(os.remove, path)
         with os.fdopen(handle, "wb") as out:
             out.write(b"abc")
         self.assertEqual(
