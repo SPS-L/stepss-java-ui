@@ -44,6 +44,16 @@ On macOS, the current RAMSES, DYNGRAPH, and CODEGEN builds are dynamically linke
 
 Compiling custom models is optional and needs a Fortran toolchain on your machine: `gfortran`, GNU `make`, and OpenBLAS. On Debian/Ubuntu that is `sudo apt install gfortran make libopenblas-dev`; on macOS `brew install gcc openblas`; on Windows install [MSYS2](https://www.msys2.org/) and run `pacman -S mingw-w64-x86_64-gcc-fortran mingw-w64-x86_64-openblas make` (STEPSS looks in `C:\msys64`, or wherever `MSYS2_ROOT` points). The bundled module kits are gfortran-ABI-specific and each platform's default compiler matches its own kit; if yours does not, STEPSS reports the exact compiler version to install. Everything else in STEPSS works without any of this.
 
+### Releases
+
+Releases are cut automatically. A daily GitHub Actions run checks the five pinned components — RAMSES, Helios, DYNGRAPH, CODEGEN, and URAMSES — for new releases; when one has moved, it re-pins `versions.properties` and the matching resource names in `Toolchain.java`, rebuilds, verifies that the bundled toolchain extracts correctly, and publishes a release with `stepss.jar` attached. The release notes embed each component's own release notes, since four of the five component repos are private and cannot be linked to usefully. Nothing durable is written until the build and the toolchain check have both passed, so a failed run leaves no commit, no tag, and no release; it opens an issue instead.
+
+Release numbers follow the pinned RAMSES version, with a counter for releases driven by the other components: `v3.55`, then `v3.55.1`, `v3.55.2`, and so on until RAMSES itself moves.
+
+Running the workflow by hand (Actions → Release → Run workflow) also picks up any new component releases first, then publishes regardless — that is how a change to the Java sources alone reaches a release.
+
+To re-pin locally instead, run `python3 -m tools.ci bump` from the repository root (add `--dry-run` to see what would change without downloading or writing anything). It rewrites `versions.properties` and `Toolchain.java` together; editing only the former leaves the build naming the old asset, which `ant jar` catches.
+
 ## Quick Start
 
 ```bash
