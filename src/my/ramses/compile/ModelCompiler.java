@@ -75,6 +75,14 @@ public final class ModelCompiler {
             throw new IOException("No generated model files to compile. Run Codegen first.");
         }
 
+        // Cleared before the delete, not after it. The guard below throws when
+        // the kit survives, and the file it names is the previous build's
+        // simulator - which is exactly what `built` still points at. Clearing
+        // afterwards would leave that stale reference alive on the throw path,
+        // so a later working-directory change would re-adopt a simulator this
+        // method had already tried to delete.
+        built = null;
+
         File existing = toolchain.uramsesKitDirectory();
         deleteRecursively(existing);
         if (existing.exists()) {
@@ -87,7 +95,6 @@ public final class ModelCompiler {
         // deleted above instead of actually re-unpacking it.
         toolchain.forgetExtracted(Toolchain.URAMSES);
         kitDir = toolchain.extractOnDemand(Toolchain.URAMSES);
-        built = null;
 
         Map<String, List<String>> byKind = new HashMap<String, List<String>>();
         for (File f : generated) {

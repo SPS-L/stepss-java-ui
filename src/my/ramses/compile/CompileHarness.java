@@ -28,6 +28,7 @@ public final class CompileHarness {
         checkCompilerSelection();
         checkExtraDirectorySearch();
         checkKitResetMessage();
+        checkGuardFailureClearsBuiltExecutable();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -314,6 +315,80 @@ public final class CompileHarness {
             fail("kit reset message threw: " + ex);
         } finally {
             deleteRecursively(kit);
+        }
+    }
+
+    /**
+     * When {@code prepare()}'s kit-reset guard fires, {@code builtExecutable()}
+     * must come back null.
+     *
+     * <p>The file the guard names is the previous build's simulator, and that
+     * is exactly what {@code built} still refers to. If the field were cleared
+     * after the guard rather than before it, the reference would outlive the
+     * throw, and a later working-directory change would re-adopt a simulator
+     * {@code prepare()} had already tried to delete. This check pins the
+     * ordering: it fails against the ordering that shipped before it existed.
+     *
+     * <p>The unwritable directory is what makes the delete fail without
+     * needing a running process to hold the file open.
+     */
+    private static void checkGuardFailureClearsBuiltExecutable() {
+        java.io.File toolDir = null;
+        java.io.File nested = null;
+        try {
+            toolDir = java.io.File.createTempFile("stepss-harness-guard", "");
+            if (!toolDir.delete() || !toolDir.mkdir()) {
+                fail("guard clears built: could not create a scratch directory");
+                return;
+            }
+            nested = new java.io.File(new java.io.File(toolDir, "uramses"), "Release_l");
+            if (!nested.mkdirs()) {
+                fail("guard clears built: could not create the kit directory");
+                return;
+            }
+            java.io.File survivor = new java.io.File(nested, "dynsim");
+            if (!survivor.createNewFile()) {
+                fail("guard clears built: could not create the surviving file");
+                return;
+            }
+            if (!nested.setWritable(false, false)) {
+                pass("guard clears built: skipped, cannot make a directory unwritable here");
+                return;
+            }
+
+            ModelCompiler compiler = new ModelCompiler(
+                    my.ramses.platform.Platform.current(),
+                    new my.ramses.platform.Toolchain(
+                            my.ramses.platform.Platform.current(), toolDir));
+            java.lang.reflect.Field built = ModelCompiler.class.getDeclaredField("built");
+            built.setAccessible(true);
+            built.set(compiler, survivor);
+
+            java.io.File model = new java.io.File(toolDir, "exc_HARNESS.f90");
+            if (!model.createNewFile()) {
+                fail("guard clears built: could not create the model file");
+                return;
+            }
+            try {
+                compiler.prepare(java.util.Arrays.asList(model));
+                fail("guard clears built: prepare should have thrown");
+                return;
+            } catch (java.io.IOException expected) {
+                pass("guard fires when the kit survives the delete");
+            }
+            java.io.File after = compiler.builtExecutable();
+            if (after == null) {
+                pass("guard failure clears builtExecutable");
+            } else {
+                fail("guard failure clears builtExecutable: still <" + after + ">");
+            }
+        } catch (Exception ex) {
+            fail("guard clears built threw: " + ex);
+        } finally {
+            if (nested != null) {
+                nested.setWritable(true, false);
+            }
+            deleteRecursively(toolDir);
         }
     }
 
