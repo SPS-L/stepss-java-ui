@@ -368,6 +368,58 @@ class UramsesTest(BumpTestCase):
         self.assertIn("payload/uramses-kit-v3.60.zip", open(self.toolchain).read())
 
 
+HOTFIX_ASSET = "dyngraph-linux-x86_64-v1.1.0-hotfix2.tar.gz"
+
+
+class RecordedAssetNameTest(BumpTestCase):
+    """The rename starts from the recorded asset name, not a re-expanded pattern.
+
+    versions.properties records what was last pinned in <component>.<platform>
+    .asset, and Toolchain.java names exactly that string. Those two are the
+    contract; the pattern is only how the *next* name is derived. They can
+    legitimately disagree with what the pattern would produce at the old
+    version - upstream re-cut one platform's asset under a different name, or
+    the pattern was edited after the pin - and every other fixture here has
+    them agreeing, so re-expanding the pattern at old_version passes those
+    tests while being wrong.
+
+    This fixture makes them diverge on purpose: dyngraph's linux pin records a
+    -hotfix2 asset no pattern expansion produces. A bumper that re-expanded the
+    pattern would try to rename payload/dyngraph-linux-x86_64-v1.1.0.tar.gz,
+    which this Toolchain.java does not contain - failing loudly here, and, were
+    that check ever relaxed, leaving Toolchain.java naming a payload the build
+    no longer stages. That is the silent-wrong-binary case the whole design
+    exists to prevent.
+    """
+
+    def setUp(self):
+        super(RecordedAssetNameTest, self).setUp()
+        pins.set_values(self.properties, {"dyngraph.linux.asset": HOTFIX_ASSET})
+        text = open(self.toolchain).read().replace(
+            "payload/dyngraph-linux-x86_64-v1.1.0.tar.gz", "payload/" + HOTFIX_ASSET
+        )
+        open(self.toolchain, "w").write(text)
+
+    def test_renames_the_recorded_payload_name(self):
+        bump.run(self.root, up=self.upstream_with("v1.2.0", DYNGRAPH_1_2_0))
+        text = open(self.toolchain).read()
+        self.assertIn("payload/dyngraph-linux-x86_64-v1.2.0.tar.gz", text)
+        self.assertNotIn("hotfix2", text)
+
+    def test_records_the_pattern_expanded_new_name(self):
+        bump.run(self.root, up=self.upstream_with("v1.2.0", DYNGRAPH_1_2_0))
+        self.assertEqual(
+            "dyngraph-linux-x86_64-v1.2.0.tar.gz",
+            pins.load(self.properties)["dyngraph.linux.asset"],
+        )
+
+    def test_downloads_the_pattern_expanded_new_name(self):
+        fake = self.upstream_with("v1.2.0", DYNGRAPH_1_2_0)
+        bump.run(self.root, up=fake)
+        self.assertIn("dyngraph-linux-x86_64-v1.2.0.tar.gz", fake.downloaded)
+        self.assertNotIn(HOTFIX_ASSET, fake.downloaded)
+
+
 class MissingAssetTest(BumpTestCase):
     def test_renamed_asset_raises_rather_than_guessing(self):
         renamed = [
