@@ -56,7 +56,26 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m tools.ci bump > summary.json
-          cat summary.json
+          # A line per component, never summary.json itself: its `changed`
+          # entries carry the verbatim release bodies of four PRIVATE component
+          # repos. On the success path those get published anyway, but a run
+          # that fails later at `ant jar` would have disclosed them in this log
+          # with no release ever cut. Names and version numbers only.
+          python3 - <<'PY'
+          import json
+
+          summary = json.load(open("summary.json"))
+          for entry in summary["changed"]:
+              print("bumped:  %s %s -> %s"
+                    % (entry["component"], entry["old_version"],
+                       entry["new_version"]))
+          for entry in summary["skipped"]:
+              print("skipped: %s pinned %s, upstream %s"
+                    % (entry["component"], entry["pinned_version"],
+                       entry["upstream_version"]))
+          if not summary["changed"] and not summary["skipped"]:
+              print("No component moved.")
+          PY
           count=$(python3 -c "import json;print(len(json.load(open('summary.json'))['changed']))")
           if [ "$count" -gt 0 ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "proceed=true" >> "$GITHUB_OUTPUT"
