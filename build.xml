@@ -213,6 +213,8 @@
   <fetch-asset repo="${helios.repo}" tag="${helios.tag}"
                asset="${helios.macos.asset}" sha256="${helios.macos.sha256}"/>
   <fetch-asset repo="${dyngraph.repo}" tag="${dyngraph.tag}"
+               asset="${dyngraph.windows.asset}" sha256="${dyngraph.windows.sha256}"/>
+  <fetch-asset repo="${dyngraph.repo}" tag="${dyngraph.tag}"
                asset="${dyngraph.linux.asset}" sha256="${dyngraph.linux.sha256}"/>
   <fetch-asset repo="${dyngraph.repo}" tag="${dyngraph.tag}"
                asset="${dyngraph.macos.asset}" sha256="${dyngraph.macos.sha256}"/>
@@ -261,6 +263,7 @@
     <include name="${helios.windows.asset}"/>
     <include name="${helios.linux.asset}"/>
     <include name="${helios.macos.asset}"/>
+    <include name="${dyngraph.windows.asset}"/>
     <include name="${dyngraph.linux.asset}"/>
     <include name="${dyngraph.macos.asset}"/>
     <include name="${codegen.windows.asset}"/>
