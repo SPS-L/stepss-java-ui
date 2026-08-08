@@ -83,15 +83,42 @@ def update_readme_main(argv, path="README.md"):
     return 0
 
 
+_MISSING = object()
+
+
+def _option_value(argv, name):
+    """Returns (present, value). `value` is None if `name` is absent, if it
+    is the last item in argv, or if the next token itself looks like another
+    flag (starts with "--").
+
+    That last case matters as much as the other two: without it, a flag
+    left valueless because the caller forgot it - `--version --summary
+    x.json ...` - silently consumes the *next* flag's name as its own value,
+    and the option intended for that next flag is then missing too. That
+    used to surface several calls later as a bare, uncaught exception (e.g.
+    open("--jar", ...)) rather than as a usage message - exactly the
+    traceback-instead-of-exit-2 failure this module exists to prevent. No
+    option accepted here ever has a legitimate value starting with "--", so
+    this rule cannot misfire on real input.
+    """
+    if name not in argv:
+        return False, None
+    index = argv.index(name)
+    if index + 1 >= len(argv) or argv[index + 1].startswith("--"):
+        return True, None
+    return True, argv[index + 1]
+
+
 def _required_option(argv, name, usage=None):
     """Returns the value following `name` in argv, or None on misuse.
 
     Never raises: a missing option and a present-but-valueless option (the
-    flag is the last item in argv) both print a usage message to stderr and
-    return None, so callers can turn that into main()'s exit-2 convention
-    - matching bump.main's style - without an uncaught exception (a raw
-    IndexError, or a SystemExit carrying a string, which exits 1 rather
-    than 2) ever reaching the caller.
+    flag is the last item in argv, or is followed by another flag rather
+    than a value) both print a usage message to stderr and return None, so
+    callers can turn that into main()'s exit-2 convention - matching
+    bump.main's style - without an uncaught exception (a raw IndexError, or
+    a SystemExit carrying a string, which exits 1 rather than 2) ever
+    reaching the caller.
 
     `usage` defaults to update-readme's own usage line, so the one existing
     caller is unaffected; notes_main (which has three required options, not
@@ -100,14 +127,34 @@ def _required_option(argv, name, usage=None):
     """
     if usage is None:
         usage = "Usage: python3 -m tools.ci update-readme --version <tag>\n"
-    if name not in argv:
+    present, value = _option_value(argv, name)
+    if not present or value is None:
         sys.stderr.write(usage)
         return None
-    index = argv.index(name)
-    if index + 1 >= len(argv):
-        sys.stderr.write(usage)
+    return value
+
+
+def _optional_option(argv, name, usage):
+    """Like _required_option, but an absent flag is valid and returns None.
+
+    --previous is genuinely optional - absent means this is the first-ever
+    release, and compose_notes already treats that previous_tag=None as a
+    legitimate case - but once the flag is present at all, its value has to
+    pass the same guard as a required option's. Without that, a missing or
+    `--`-prefixed value would flow straight through `previous or None` and
+    into compose_notes' "Manual release. No component changes since %s."
+    line, publishing something like "since --jar" on a real release page
+    instead of failing the command. _MISSING (not None) is returned on that
+    failure so the caller can tell "absent, None is the real answer" apart
+    from "present but invalid, treat as exit 2" without a second flag.
+    """
+    present, value = _option_value(argv, name)
+    if not present:
         return None
-    return argv[index + 1]
+    if value is None:
+        sys.stderr.write(usage)
+        return _MISSING
+    return value
 
 
 DISPLAY_NAMES = {
@@ -198,7 +245,9 @@ def notes_main(argv):
     jar_path = _required_option(argv, "--jar", usage)
     if jar_path is None:
         return 2
-    previous = argv[argv.index("--previous") + 1] if "--previous" in argv else None
+    previous = _optional_option(argv, "--previous", usage)
+    if previous is _MISSING:
+        return 2
 
     from . import upstream
 
@@ -211,7 +260,7 @@ def notes_main(argv):
             props,
             summary["changed"],
             upstream.sha256_file(jar_path),
-            previous or None,
+            previous,
         )
     )
     return 0

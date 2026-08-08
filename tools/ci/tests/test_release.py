@@ -236,46 +236,74 @@ class NotesMainTest(unittest.TestCase):
 
     Task 5's review found that missing CLI coverage - not missing logic
     coverage - was exactly how a traceback bug shipped: _required_option's
-    None-on-misuse contract is only actually exercised through the *_main
-    function that calls it. Each of the three required options is checked
-    missing in isolation (the other two supplied with placeholder values) so
-    a bug that checks the wrong flag, or checks them in the wrong order,
-    would fail one of these rather than all three uniformly. --jar also gets
-    a valueless case (the flag as the last item in argv, _required_option's
-    own definition of "no value") since it is last in notes_main's own
-    checking order and so is the one place a valueless flag is not itself
-    followed immediately by another recognised flag - the other two options'
-    valueless case is not exercised here because it lands on the documented
-    open edge described in the task report, not on _required_option's
-    documented contract.
+    (and _optional_option's) None/_MISSING-on-misuse contract is only
+    actually exercised through the *_main function that calls it. Each of
+    the three required options is checked missing in isolation (the other
+    two supplied with placeholder values) so a bug that checks the wrong
+    flag, or checks them in the wrong order, would fail one of these rather
+    than all three uniformly. Each required option also gets a valueless
+    case: --jar as the last item in argv (the flag genuinely has nothing
+    after it), and --version/--summary each followed immediately by the
+    *next* recognised flag rather than a value of their own - the exact
+    shape of traceback a Task 6 review reproduced against this file
+    (`open("--jar", ...)` and friends) before _option_value treated a
+    "--"-prefixed next token as no value at all. One test per required
+    option also inspects the captured stderr, so a regression that keeps
+    returning 2 but reverts to a message naming the wrong subcommand (e.g.
+    "update-readme" instead of "notes") would still fail here. --previous
+    gets its own trio: absent (valid, defaults to None - exercised by the
+    happy path below), present-but-invalid (exit 2, usage message, no
+    traceback), and a check that an invalid --previous is never allowed to
+    reach print() at all, i.e. never gets rendered into a real release page.
     """
 
     def test_missing_version_option_exits_2_without_raising(self):
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as fake_stderr:
+            result = release.notes_main(
+                ["--summary", "summary.json", "--jar", "dist/stepss.jar"]
+            )
+        self.assertEqual(2, result)
+        self.assertIn("tools.ci notes", fake_stderr.getvalue())
+        self.assertNotIn("update-readme", fake_stderr.getvalue())
+
+    def test_version_flag_followed_by_another_flag_exits_2_without_raising(self):
+        # Regression: --version consuming --summary as its own "value" used
+        # to leave summary_path unset and crash several lines later on
+        # open("--jar", ...) - a traceback, not a usage message.
         with mock.patch("sys.stderr", new_callable=io.StringIO):
             self.assertEqual(
                 2,
                 release.notes_main(
-                    ["--summary", "summary.json", "--jar", "dist/stepss.jar"]
+                    ["--version", "--summary", "summary.json", "--jar", "dist/stepss.jar"]
                 ),
             )
 
     def test_missing_summary_option_exits_2_without_raising(self):
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as fake_stderr:
+            result = release.notes_main(
+                ["--version", "v3.55.1", "--jar", "dist/stepss.jar"]
+            )
+        self.assertEqual(2, result)
+        self.assertIn("tools.ci notes", fake_stderr.getvalue())
+        self.assertNotIn("update-readme", fake_stderr.getvalue())
+
+    def test_summary_flag_followed_by_another_flag_exits_2_without_raising(self):
         with mock.patch("sys.stderr", new_callable=io.StringIO):
             self.assertEqual(
                 2,
                 release.notes_main(
-                    ["--version", "v3.55.1", "--jar", "dist/stepss.jar"]
+                    ["--version", "v1", "--summary", "--jar", "dist/stepss.jar"]
                 ),
             )
 
     def test_missing_jar_option_exits_2_without_raising(self):
-        with mock.patch("sys.stderr", new_callable=io.StringIO):
-            self.assertEqual(
-                2,
-                release.notes_main(
-                    ["--version", "v3.55.1", "--summary", "summary.json"]
-                ),
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as fake_stderr:
+            result = release.notes_main(
+                ["--version", "v3.55.1", "--summary", "summary.json"]
             )
+        self.assertEqual(2, result)
+        self.assertIn("tools.ci notes", fake_stderr.getvalue())
+        self.assertNotIn("update-readme", fake_stderr.getvalue())
 
     def test_jar_flag_with_no_value_exits_2_without_raising(self):
         with mock.patch("sys.stderr", new_callable=io.StringIO):
@@ -285,6 +313,37 @@ class NotesMainTest(unittest.TestCase):
                     ["--version", "v3.55.1", "--summary", "summary.json", "--jar"]
                 ),
             )
+
+    def test_missing_previous_value_exits_2_without_raising(self):
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as fake_stderr:
+            result = release.notes_main(
+                [
+                    "--version", "v1",
+                    "--summary", "/dev/null",
+                    "--jar", "x",
+                    "--previous",
+                ]
+            )
+        self.assertEqual(2, result)
+        self.assertIn("tools.ci notes", fake_stderr.getvalue())
+
+    def test_bad_previous_value_never_reaches_the_rendered_body(self):
+        # --previous followed by --jar (a recognised flag, not a tag) must
+        # fail before compose_notes is ever called - otherwise "since --jar"
+        # would be printed straight into a real release page.
+        with mock.patch("sys.stderr", new_callable=io.StringIO), mock.patch(
+            "sys.stdout", new_callable=io.StringIO
+        ) as fake_stdout:
+            result = release.notes_main(
+                [
+                    "--version", "v1",
+                    "--summary", "/dev/null",
+                    "--jar", "x",
+                    "--previous", "--jar", "x",
+                ]
+            )
+        self.assertEqual(2, result)
+        self.assertEqual("", fake_stdout.getvalue())
 
     def test_happy_path_prints_the_composed_notes(self):
         handle, summary_path = tempfile.mkstemp(suffix=".json")
@@ -310,6 +369,37 @@ class NotesMainTest(unittest.TestCase):
             self.assertIn("# STEPSS v3.55.1", printed)
             self.assertIn("abc123", printed)
             self.assertIn("The Windows build is now a console program.", printed)
+            # --previous was absent, which is the valid first-ever-release
+            # case (compose_notes' previous_tag=None branch), not a failure.
+            self.assertIn("Rebuilt for", printed)
+        finally:
+            os.remove(summary_path)
+
+    def test_valid_previous_is_used_when_there_are_no_changes(self):
+        handle, summary_path = tempfile.mkstemp(suffix=".json")
+        with os.fdopen(handle, "w") as out:
+            json.dump({"changed": []}, out)
+        try:
+            with mock.patch.object(
+                release.pins, "load", return_value=PROPS
+            ), mock.patch(
+                "tools.ci.upstream.sha256_file", return_value="abc123"
+            ), mock.patch(
+                "sys.stdout", new_callable=io.StringIO
+            ) as fake_stdout:
+                result = release.notes_main(
+                    [
+                        "--version", "v3.55.1",
+                        "--summary", summary_path,
+                        "--jar", "dist/stepss.jar",
+                        "--previous", "v3.55",
+                    ]
+                )
+            self.assertEqual(0, result)
+            self.assertIn(
+                "Manual release. No component changes since v3.55.",
+                fake_stdout.getvalue(),
+            )
         finally:
             os.remove(summary_path)
 
