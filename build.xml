@@ -242,16 +242,30 @@
        current one. Clearing it here means it always reflects exactly the
        pinned set in payload-cache/, never a superset. This only touches the
        staged copies under src/my/ramses/payload/ - payload-cache/ itself
-       (the download cache Finding 1 relies on) is left untouched. -->
+       (the download cache) is left untouched. -->
   <delete dir="src/my/ramses/payload" quiet="true"/>
   <mkdir dir="src/my/ramses/payload"/>
+  <!-- Named one by one from versions.properties rather than matched by glob.
+       payload-cache/ deliberately keeps superseded downloads so an offline
+       build still works after a version bump, and a glob like "dyngraph-linux-*"
+       cannot tell the pinned asset from the one it replaced: bumping dyngraph
+       1.1.0 to 1.2.0 staged both, and the jar shipped a dead copy of the old
+       one. The manifest check does not catch it either, since it only asserts
+       that every resource Toolchain.java names is present, not that nothing
+       else is. Adding a component means adding its lines here. -->
   <copy todir="src/my/ramses/payload" flatten="true">
    <fileset dir="${payload.cache}">
-    <include name="ramses-*"/>
-    <include name="stepss-helios-*"/>
-    <include name="dyngraph-linux-*"/>
-    <include name="dyngraph-macos-*"/>
-    <include name="codegen-*"/>
+    <include name="${ramses.windows.asset}"/>
+    <include name="${ramses.linux.asset}"/>
+    <include name="${ramses.macos.asset}"/>
+    <include name="${helios.windows.asset}"/>
+    <include name="${helios.linux.asset}"/>
+    <include name="${helios.macos.asset}"/>
+    <include name="${dyngraph.linux.asset}"/>
+    <include name="${dyngraph.macos.asset}"/>
+    <include name="${codegen.windows.asset}"/>
+    <include name="${codegen.linux.asset}"/>
+    <include name="${codegen.macos.asset}"/>
    </fileset>
   </copy>
   <mkdir dir="${build.classes.dir}"/>
