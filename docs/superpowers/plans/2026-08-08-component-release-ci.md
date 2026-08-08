@@ -127,9 +127,8 @@ class LoadTest(unittest.TestCase):
         self.assertEqual("3.55", props["ramses.version"])
 
     def test_drops_comments_and_blank_lines(self):
-        props = pins.load(write_sample())
-        self.assertNotIn("# a comment", props)
-        self.assertNotIn("", props)
+        path = write_sample("# only a comment\n\n   \nx.y=1\n")
+        self.assertEqual({"x.y": "1"}, pins.load(path))
 
     def test_keeps_values_containing_equals(self):
         path = write_sample("x.url=https://example.invalid/?a=b\n")
@@ -2160,8 +2159,6 @@ jobs:
 ```
 
 - [ ] **Step 2: Check the workflow parses**
-
-Run: `python3 -c "import json,sys; sys.exit(0)"` is not enough — parse the YAML:
 
 ```bash
 python3 -c "
