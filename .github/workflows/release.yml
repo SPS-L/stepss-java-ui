@@ -84,6 +84,43 @@ jobs:
             echo "No component moved and this is a scheduled run; nothing to publish."
           fi
 
+      # Deliberately NOT gated on `proceed`: a tick whose only movement is a
+      # refused downgrade leaves `changed` empty, so a scheduled run stops
+      # right after the bump - and that is exactly the case somebody has to
+      # hear about. Issues live in this repository, so the default
+      # GITHUB_TOKEN is enough here, as with the URAMSES caveat below.
+      - name: Flag components that were not re-pinned
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          body=$(python3 - <<'PY'
+          import json
+
+          entries = json.load(open("summary.json"))["skipped"]
+          if entries:
+              print("The bump refused to re-pin these components:")
+              print()
+              for entry in entries:
+                  print("- **%s**: pinned %s, upstream latest %s - %s"
+                        % (entry["component"], entry["pinned_version"],
+                           entry["upstream_version"], entry["reason"]))
+              print()
+              print("The build still carries the pinned versions, and nothing "
+                    "was published on their account. Re-pinning downwards "
+                    "would rebuild STEPSS on older components and demote the "
+                    "newest release, so this is left to a human: either the "
+                    "upstream release is a backport and nothing is wrong, or "
+                    "the pin has to be moved by hand.")
+          PY
+          )
+          if [ -n "$body" ]; then
+            python3 -m tools.ci notify \
+              --title "A component release was not pinned" \
+              --body "$body" \
+              --label release-automation
+          fi
+
       - name: Derive the release version
         id: version
         if: steps.bump.outputs.proceed == 'true'
