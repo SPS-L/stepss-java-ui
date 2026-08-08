@@ -91,14 +91,37 @@ def set_values(path, updates):
         handle.writelines(out)
 
 
+def validate_toolchain(path, renames):
+    """Checks every rename's old payload name is present, writing nothing.
+
+    A caller that needs to touch more than one file for a single logical
+    change (see bump.run) can call this before writing any of them, so a
+    rename that would later fail rewrite_toolchain is caught while every file
+    is still untouched, rather than partway through a multi-file write.
+    """
+    with open(path, "r", encoding="utf-8") as handle:
+        text = handle.read()
+
+    for old, new in renames.items():
+        if old == new:
+            continue
+        needle = PAYLOAD_PREFIX + old
+        if needle not in text:
+            raise ValueError("%s does not name %s" % (path, needle))
+
+
 def rewrite_toolchain(path, renames):
     """Repoints Toolchain.java's payload resource names at the new assets.
 
     Exact literal replacement, never pattern matching: the old names come from
     the pins the caller just read, so a replacement either matches exactly or
     is a bug worth failing on. An old name that is missing means Toolchain.java
-    and versions.properties had already drifted apart.
+    and versions.properties had already drifted apart. Delegates that check to
+    validate_toolchain first, so this function can never raise partway through
+    its own write.
     """
+    validate_toolchain(path, renames)
+
     with open(path, "r", encoding="utf-8") as handle:
         text = handle.read()
 
@@ -108,8 +131,6 @@ def rewrite_toolchain(path, renames):
         if old == new:
             continue
         needle = PAYLOAD_PREFIX + old
-        if needle not in text:
-            raise ValueError("%s does not name %s" % (path, needle))
         replacements += text.count(needle)
         text = text.replace(needle, PAYLOAD_PREFIX + new)
 

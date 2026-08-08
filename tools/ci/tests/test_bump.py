@@ -1,4 +1,3 @@
-import json
 import os
 import shutil
 import tempfile
@@ -79,7 +78,8 @@ class FakeUpstream(object):
         path = os.path.join(dest_dir, asset)
         if not os.path.isdir(dest_dir):
             os.makedirs(dest_dir)
-        open(path, "wb").write(b"payload-" + asset.encode())
+        with open(path, "wb") as handle:
+            handle.write(b"payload-" + asset.encode())
         return path
 
     def download_url(self, url, dest):
@@ -87,7 +87,8 @@ class FakeUpstream(object):
         directory = os.path.dirname(dest)
         if directory and not os.path.isdir(directory):
             os.makedirs(directory)
-        open(dest, "wb").write(b"uramses")
+        with open(dest, "wb") as handle:
+            handle.write(b"uramses")
         return dest
 
     def sha256_file(self, path):
@@ -101,6 +102,12 @@ DYNGRAPH_1_2_0 = [
     "dyngraph-windows-x86_64-v1.2.0.zip",
     "dyngraph-linux-x86_64-v1.2.0.tar.gz",
     "dyngraph-macos-arm64-v1.2.0.tar.gz",
+]
+
+DYNGRAPH_1_1_0 = [
+    "dyngraph-windows-x86_64-v1.1.0.zip",
+    "dyngraph-linux-x86_64-v1.1.0.tar.gz",
+    "dyngraph-macos-arm64-v1.1.0.tar.gz",
 ]
 
 
@@ -128,12 +135,7 @@ class BumpTestCase(unittest.TestCase):
                 ),
                 "SPS-L/stepss-dyngraph": release(
                     dyngraph_tag,
-                    dyngraph_assets
-                    or [
-                        "dyngraph-windows-x86_64-v1.1.0.zip",
-                        "dyngraph-linux-x86_64-v1.1.0.tar.gz",
-                        "dyngraph-macos-arm64-v1.1.0.tar.gz",
-                    ],
+                    DYNGRAPH_1_1_0 if dyngraph_assets is None else dyngraph_assets,
                 ),
                 "SPS-L/stepss-uramses": release(uramses, []),
             }
@@ -163,10 +165,20 @@ class ChangeTest(BumpTestCase):
             up=self.upstream_with("v1.2.0", DYNGRAPH_1_2_0),
         )
         self.assertEqual(1, len(summary["changed"]))
-        entry = summary["changed"][0]
-        self.assertEqual("dyngraph", entry["component"])
-        self.assertEqual("1.1.0", entry["old_version"])
-        self.assertEqual("1.2.0", entry["new_version"])
+        self.assertEqual(
+            {
+                "component": "dyngraph",
+                "old_version": "1.1.0",
+                "new_version": "1.2.0",
+                "old_tag": "v1.1.0",
+                "new_tag": "v1.2.0",
+                "title": "Some release",
+                "body": "Notes.",
+                "url": "https://example.invalid/v1.2.0",
+                "published": "2026-08-08",
+            },
+            summary["changed"][0],
+        )
 
     def test_carries_the_upstream_notes(self):
         summary = bump.run(
@@ -205,6 +217,22 @@ class ChangeTest(BumpTestCase):
         self.assertIn("# header comment", open(self.properties).read())
 
 
+class MultipleChangesTest(BumpTestCase):
+    def test_changed_entries_follow_component_order(self):
+        # dyngraph and uramses both move; ramses does not. pins.COMPONENTS
+        # orders them ramses, helios, dyngraph, codegen, uramses, so dyngraph
+        # must precede uramses in the summary regardless of iteration or dict
+        # order upstream.
+        summary = bump.run(
+            self.root,
+            up=self.upstream_with("v1.2.0", DYNGRAPH_1_2_0, uramses="v3.60"),
+        )
+        self.assertEqual(
+            ["dyngraph", "uramses"],
+            [entry["component"] for entry in summary["changed"]],
+        )
+
+
 class UramsesTest(BumpTestCase):
     def test_rewrites_url_and_manifest_digest(self):
         summary = bump.run(self.root, up=self.upstream_with(uramses="v3.60"))
@@ -236,11 +264,32 @@ class MissingAssetTest(BumpTestCase):
         self.assertIn("dyngraph-win64-1.2.0.zip", message)
 
     def test_writes_nothing_when_an_asset_is_missing(self):
-        original = open(self.properties).read()
+        original_properties = open(self.properties).read()
+        original_toolchain = open(self.toolchain).read()
         renamed = ["only-this.zip"]
         with self.assertRaises(bump.AssetNotFound):
             bump.run(self.root, up=self.upstream_with("v1.2.0", renamed))
-        self.assertEqual(original, open(self.properties).read())
+        self.assertEqual(original_properties, open(self.properties).read())
+        self.assertEqual(original_toolchain, open(self.toolchain).read())
+
+
+class ToolchainDriftTest(BumpTestCase):
+    def test_stale_toolchain_entry_leaves_both_files_untouched(self):
+        # Simulate Toolchain.java having already drifted from
+        # versions.properties: the payload name it carries for
+        # dyngraph-linux no longer matches dyngraph.linux.asset.
+        drifted = open(self.toolchain).read().replace(
+            "payload/dyngraph-linux-x86_64-v1.1.0.tar.gz",
+            "payload/dyngraph-linux-x86_64-v0.9.0.tar.gz",
+        )
+        open(self.toolchain, "w").write(drifted)
+        original_properties = open(self.properties).read()
+
+        with self.assertRaises(ValueError):
+            bump.run(self.root, up=self.upstream_with("v1.2.0", DYNGRAPH_1_2_0))
+
+        self.assertEqual(original_properties, open(self.properties).read())
+        self.assertEqual(drifted, open(self.toolchain).read())
 
 
 class DryRunTest(BumpTestCase):
@@ -251,11 +300,18 @@ class DryRunTest(BumpTestCase):
         self.assertEqual("dyngraph", summary["changed"][0]["component"])
 
     def test_writes_nothing(self):
-        original = open(self.properties).read()
+        original_properties = open(self.properties).read()
+        original_toolchain = open(self.toolchain).read()
         bump.run(
             self.root, dry_run=True, up=self.upstream_with("v1.2.0", DYNGRAPH_1_2_0)
         )
-        self.assertEqual(original, open(self.properties).read())
+        self.assertEqual(original_properties, open(self.properties).read())
+        self.assertEqual(original_toolchain, open(self.toolchain).read())
+
+    def test_downloads_nothing(self):
+        fake = self.upstream_with("v1.2.0", DYNGRAPH_1_2_0)
+        bump.run(self.root, dry_run=True, up=fake)
+        self.assertEqual([], fake.downloaded)
 
 
 if __name__ == "__main__":
