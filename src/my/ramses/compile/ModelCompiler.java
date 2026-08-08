@@ -149,8 +149,16 @@ public final class ModelCompiler {
         executor.setExitValue(0);
         executor.setWorkingDirectory(kitDir);
         executor.setProcessDestroyer(new ShutdownHookProcessDestroyer());
-        OutputStream sink = new LineSink(listener);
-        executor.setStreamHandler(new PumpStreamHandler(sink, sink));
+        // One sink per stream, never one shared between them. Both pumps
+        // sharing a sink share its line buffer, so make's recipe echo on
+        // stdout and gfortran's diagnostics on stderr get concatenated
+        // mid-line - the same way helios output reached the power-flow pane
+        // with its characters woven together. Synchronizing the sink does not
+        // help: one stream's partial line is still sitting in the buffer when
+        // the other appends to it. Both sinks feed the same listener, which
+        // marshals whole lines to the UI.
+        executor.setStreamHandler(
+                new PumpStreamHandler(new LineSink(listener), new LineSink(listener)));
 
         DefaultExecuteResultHandler handler = new DefaultExecuteResultHandler() {
             @Override
@@ -333,9 +341,11 @@ public final class ModelCompiler {
         /**
          * {@code PumpStreamHandler.stop()} flushes rather than closes a
          * non-piped sink ({@code closeWhenExhausted} is false for these),
-         * and it does so exactly once, after both pump threads have
-         * finished - so this is where the last, newline-less partial line
-         * must be emitted, or it is silently dropped.
+         * after both pump threads have finished - so this is where the last,
+         * newline-less partial line must be emitted, or it is silently
+         * dropped. With a sink per stream, stop() flushes each of them once
+         * ({@code err != out}), so each stream's trailing partial line is
+         * emitted on its own rather than appended to the other's.
          */
         @Override
         public synchronized void flush() {

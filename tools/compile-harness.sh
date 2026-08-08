@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the headless compile-pipeline checks against the built classes.
+# Runs the headless checks against the built classes.
 # This repository has no unit-test framework; this is the substitute.
 set -eu
 cd "$(dirname "$0")/.."
@@ -11,4 +11,10 @@ fi
 # harness checks) has commons-exec types in its signatures, so loading it needs
 # that jar even though no check ever launches a process. 'ant jar' produces
 # dist/lib, so the guard above already covers it.
-exec java -cp "build/classes:dist/lib/*" my.ramses.compile.CompileHarness
+CP="build/classes:dist/lib/*"
+
+java -cp "$CP" my.ramses.compile.CompileHarness
+
+# Headless so the Swing sink checks need no display; they construct a
+# JTextArea and drain the event queue, never a window.
+java -Djava.awt.headless=true -cp "$CP" my.ramses.ConsoleSinkCheck
