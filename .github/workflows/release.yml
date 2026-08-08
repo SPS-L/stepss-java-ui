@@ -48,6 +48,13 @@ jobs:
           distribution: temurin
           java-version: "11"
 
+      # Deliberately ungated: tools/ci decides what gets pinned, built and
+      # published, so an edit that breaks it has to fail here rather than
+      # halfway through an unattended release. Runs on every invocation,
+      # scheduled or manual, before anything is fetched or written.
+      - name: Test the release tooling
+        run: python3 -m unittest discover -s tools/ci/tests -t .
+
       - name: Re-pin to the latest component releases
         id: bump
         env:
