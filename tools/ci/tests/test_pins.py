@@ -58,6 +58,24 @@ class TagVersionTest(unittest.TestCase):
         self.assertEqual("v1.2.0", pins.tag_of(pins.version_of("v1.2.0")))
 
 
+class VersionKeyTest(unittest.TestCase):
+    def test_parses_dotted_integers(self):
+        self.assertEqual((3, 55), pins.version_key("3.55"))
+        self.assertEqual((1, 2, 0), pins.version_key("1.2.0"))
+
+    def test_orders_numerically_not_lexically(self):
+        self.assertLess(pins.version_key("3.9"), pins.version_key("3.10"))
+
+    def test_a_longer_version_with_an_equal_prefix_is_greater(self):
+        self.assertLess(pins.version_key("3.55"), pins.version_key("3.55.1"))
+
+    def test_a_non_integer_segment_is_incomparable(self):
+        self.assertIsNone(pins.version_key("1.2.0-rc1"))
+        self.assertIsNone(pins.version_key("3.55b"))
+        self.assertIsNone(pins.version_key(""))
+        self.assertIsNone(pins.version_key("nightly"))
+
+
 class ExpandTest(unittest.TestCase):
     def test_substitutes_the_token(self):
         self.assertEqual(

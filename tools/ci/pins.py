@@ -34,6 +34,28 @@ def tag_of(version):
     return version if version.startswith("v") else "v" + version
 
 
+def version_key(version):
+    """A dotted version as a tuple of ints, or None if it is not one.
+
+    Tuple ordering is exactly the ordering wanted here: the common prefix is
+    compared element by element, and when that prefix is equal the longer
+    version is the greater one, so (3, 55) < (3, 55, 1).
+
+    A segment that is not an integer ('1.2.0-rc1', '3.55b') makes the whole
+    version incomparable and yields None rather than being coerced into some
+    position in the order. Callers must read None as "do not act": this is the
+    one boundary in an unattended pipeline where guessing wrong re-pins the
+    build at a version nobody chose.
+    """
+    key = []
+    for part in version.split("."):
+        try:
+            key.append(int(part))
+        except ValueError:
+            return None
+    return tuple(key)
+
+
 def expand(pattern, version):
     return pattern.replace(VERSION_TOKEN, version)
 

@@ -98,6 +98,17 @@ class FakeUpstream(object):
         return "new-manifest"
 
 
+RAMSES_PATTERNS = {
+    "windows": "ramses-windows-x86_64-v%s.zip",
+    "linux": "ramses-linux-x86_64-v%s.tar.gz",
+    "macos": "ramses-macos-arm64-v%s.tar.gz",
+}
+
+
+def ramses_assets(version):
+    return [RAMSES_PATTERNS[platform] % version for platform in pins.PLATFORMS]
+
+
 DYNGRAPH_1_2_0 = [
     "dyngraph-windows-x86_64-v1.2.0.zip",
     "dyngraph-linux-x86_64-v1.2.0.tar.gz",
@@ -122,16 +133,17 @@ class BumpTestCase(unittest.TestCase):
         self.toolchain = os.path.join(toolchain_dir, "Toolchain.java")
         open(self.toolchain, "w").write(TOOLCHAIN)
 
-    def upstream_with(self, dyngraph_tag="v1.1.0", dyngraph_assets=None, uramses="v3.55"):
+    def upstream_with(
+        self,
+        dyngraph_tag="v1.1.0",
+        dyngraph_assets=None,
+        uramses="v3.55",
+        ramses_tag="v3.55",
+    ):
         return FakeUpstream(
             {
                 "SPS-L/stepss-ramses": release(
-                    "v3.55",
-                    [
-                        "ramses-windows-x86_64-v3.55.zip",
-                        "ramses-linux-x86_64-v3.55.tar.gz",
-                        "ramses-macos-arm64-v3.55.tar.gz",
-                    ],
+                    ramses_tag, ramses_assets(pins.version_of(ramses_tag))
                 ),
                 "SPS-L/stepss-dyngraph": release(
                     dyngraph_tag,
@@ -141,11 +153,28 @@ class BumpTestCase(unittest.TestCase):
             }
         )
 
+    def repin_ramses(self, version):
+        """Move the fixture's RAMSES pin, assets and payload names to `version`."""
+        updates = {"ramses.version": version, "ramses.tag": "v" + version}
+        for platform in pins.PLATFORMS:
+            updates["ramses.%s.asset" % platform] = RAMSES_PATTERNS[platform] % version
+        pins.set_values(self.properties, updates)
+        text = open(self.toolchain).read()
+        for platform in pins.PLATFORMS:
+            text = text.replace(
+                RAMSES_PATTERNS[platform] % "3.55", RAMSES_PATTERNS[platform] % version
+            )
+        open(self.toolchain, "w").write(text)
+
 
 class NoChangeTest(BumpTestCase):
     def test_reports_nothing_changed(self):
         summary = bump.run(self.root, up=self.upstream_with())
         self.assertEqual([], summary["changed"])
+
+    def test_reports_nothing_skipped(self):
+        summary = bump.run(self.root, up=self.upstream_with())
+        self.assertEqual([], summary["skipped"])
 
     def test_downloads_nothing(self):
         fake = self.upstream_with()
@@ -215,6 +244,95 @@ class ChangeTest(BumpTestCase):
     def test_preserves_the_header_comment(self):
         bump.run(self.root, up=self.upstream_with("v1.2.0", DYNGRAPH_1_2_0))
         self.assertIn("# header comment", open(self.properties).read())
+
+
+class DowngradeTest(BumpTestCase):
+    """A version that differs from the pin is not automatically an upgrade.
+
+    GitHub answers "latest release" with the most recently *created* one, so a
+    backport cut after a newer release is what the bumper sees. Re-pinning to
+    it would rebuild STEPSS on older components and publish the result with
+    --latest, demoting the real newest release - and nothing between here and
+    `gh release create` looks at version numbers again. The releases below
+    deliberately carry no assets at all: if the refusal ever moved to after
+    asset validation, these would fail with AssetNotFound instead of passing.
+    """
+
+    def test_a_backport_is_not_bumped(self):
+        summary = bump.run(self.root, up=self.upstream_with("v1.0.9", []))
+        self.assertEqual([], summary["changed"])
+
+    def test_a_backport_is_reported_as_skipped(self):
+        summary = bump.run(self.root, up=self.upstream_with("v1.0.9", []))
+        self.assertEqual(1, len(summary["skipped"]))
+        entry = summary["skipped"][0]
+        self.assertEqual("dyngraph", entry["component"])
+        self.assertEqual("1.1.0", entry["pinned_version"])
+        self.assertEqual("1.0.9", entry["upstream_version"])
+        self.assertIn("sorts below", entry["reason"])
+
+    def test_a_backport_leaves_the_files_untouched(self):
+        original_properties = open(self.properties).read()
+        original_toolchain = open(self.toolchain).read()
+        bump.run(self.root, up=self.upstream_with("v1.0.9", []))
+        self.assertEqual(original_properties, open(self.properties).read())
+        self.assertEqual(original_toolchain, open(self.toolchain).read())
+
+    def test_a_higher_version_is_still_bumped(self):
+        summary = bump.run(self.root, up=self.upstream_with("v1.2.0", DYNGRAPH_1_2_0))
+        self.assertEqual(["dyngraph"], [e["component"] for e in summary["changed"]])
+        self.assertEqual([], summary["skipped"])
+        self.assertEqual("1.2.0", pins.load(self.properties)["dyngraph.version"])
+
+    def test_an_added_segment_is_an_upgrade(self):
+        # 3.55 < 3.55.1: equal common prefix, so the longer version wins.
+        summary = bump.run(self.root, up=self.upstream_with(ramses_tag="v3.55.1"))
+        self.assertEqual(["ramses"], [e["component"] for e in summary["changed"]])
+        self.assertEqual([], summary["skipped"])
+        self.assertEqual("3.55.1", pins.load(self.properties)["ramses.version"])
+
+    def test_a_dropped_segment_is_a_downgrade(self):
+        # ...and the same comparison the other way round: pinned at 3.55.1,
+        # upstream answering v3.55 is a backport, not a new release.
+        self.repin_ramses("3.55.1")
+        summary = bump.run(self.root, up=self.upstream_with(ramses_tag="v3.55"))
+        self.assertEqual([], summary["changed"])
+        self.assertEqual("ramses", summary["skipped"][0]["component"])
+        self.assertEqual("3.55.1", pins.load(self.properties)["ramses.version"])
+
+    def test_an_unparseable_upstream_version_is_skipped(self):
+        summary = bump.run(self.root, up=self.upstream_with("v1.2.0-rc1", []))
+        self.assertEqual([], summary["changed"])
+        entry = summary["skipped"][0]
+        self.assertEqual("1.2.0-rc1", entry["upstream_version"])
+        self.assertIn("indeterminate", entry["reason"])
+
+    def test_an_unparseable_upstream_version_leaves_the_files_untouched(self):
+        original_properties = open(self.properties).read()
+        original_toolchain = open(self.toolchain).read()
+        bump.run(self.root, up=self.upstream_with("v1.2.0-rc1", []))
+        self.assertEqual(original_properties, open(self.properties).read())
+        self.assertEqual(original_toolchain, open(self.toolchain).read())
+
+    def test_an_unparseable_pinned_version_is_skipped(self):
+        # The other half of the same guard: whatever "1.1.0-hotfix" was, a
+        # numeric upstream version cannot be shown to be newer than it.
+        pins.set_values(self.properties, {"dyngraph.version": "1.1.0-hotfix"})
+        summary = bump.run(self.root, up=self.upstream_with("v1.2.0", DYNGRAPH_1_2_0))
+        self.assertEqual([], summary["changed"])
+        entry = summary["skipped"][0]
+        self.assertEqual("1.1.0-hotfix", entry["pinned_version"])
+        self.assertIn("indeterminate", entry["reason"])
+
+    def test_a_skipped_component_does_not_block_another_bump(self):
+        summary = bump.run(
+            self.root, up=self.upstream_with("v1.0.9", [], uramses="v3.60")
+        )
+        self.assertEqual(["uramses"], [e["component"] for e in summary["changed"]])
+        self.assertEqual(["dyngraph"], [e["component"] for e in summary["skipped"]])
+        props = pins.load(self.properties)
+        self.assertEqual("3.60", props["uramses.version"])
+        self.assertEqual("1.1.0", props["dyngraph.version"])
 
 
 class MultipleChangesTest(BumpTestCase):

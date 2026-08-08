@@ -36,6 +36,7 @@ def run(repo_root, dry_run=False, up=_upstream):
     props = pins.load(properties_path)
 
     changed = []
+    skipped = []
     updates = {}
     renames = {}
 
@@ -47,6 +48,18 @@ def run(repo_root, dry_run=False, up=_upstream):
         new_version = pins.version_of(release.tag)
         old_version = props["%s.version" % component]
         if new_version == old_version:
+            continue
+
+        reason = _refusal(old_version, new_version)
+        if reason is not None:
+            skipped.append(
+                {
+                    "component": component,
+                    "pinned_version": old_version,
+                    "upstream_version": new_version,
+                    "reason": reason,
+                }
+            )
             continue
 
         if component == "uramses":
@@ -81,7 +94,39 @@ def run(repo_root, dry_run=False, up=_upstream):
         pins.set_values(properties_path, updates)
         pins.rewrite_toolchain(toolchain_path, renames)
 
-    return {"changed": changed}
+    return {"changed": changed, "skipped": skipped}
+
+
+def _refusal(old_version, new_version):
+    """Why this bump must not happen, or None if it may.
+
+    A difference from the pinned version is not by itself an upgrade. GitHub's
+    "latest release" is the most recently *created* non-draft non-prerelease
+    release, not the highest-numbered one, so a backport cut after a newer
+    release - v3.54.1 published the day after v3.55 - is what `gh release view`
+    answers with. Bumping on that re-pins the build *down*, and the workflow
+    then publishes the result with `--latest`, demoting the genuinely newest
+    STEPSS release. Nothing downstream of here would notice, so the comparison
+    has to happen here.
+
+    Refusing is always the safe answer: the pins stay where a human last left
+    them, and the summary's "skipped" list makes the run say so out loud.
+    """
+    old_key = pins.version_key(old_version)
+    new_key = pins.version_key(new_version)
+    if old_key is None or new_key is None:
+        return (
+            "cannot order %r against the pinned %r - a version segment is not "
+            "an integer, so the comparison is indeterminate and the pin is "
+            "left alone" % (new_version, old_version)
+        )
+    if new_key < old_key:
+        return (
+            "upstream %s sorts below the pinned %s - GitHub's latest release "
+            "is the most recently created one, so this looks like a backport "
+            "rather than an upgrade" % (new_version, old_version)
+        )
+    return None
 
 
 def _plan_component(
