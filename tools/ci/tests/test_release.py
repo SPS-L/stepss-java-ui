@@ -193,6 +193,28 @@ class ComposeNotesTest(unittest.TestCase):
         self.assertIn("| 1.4.1 ", body)
         self.assertIn("| 5.1.0 ", body)
 
+    def test_table_has_four_columns(self):
+        body = self.notes([DYNGRAPH_CHANGE])
+        self.assertIn("| Component | Version | Upstream release | Published |", body)
+        self.assertIn("|---|---|---|---|", body)
+
+    def test_a_changed_component_carries_its_publication_date(self):
+        body = self.notes([DYNGRAPH_CHANGE])
+        self.assertIn("| DYNGRAPH | 1.2.0 | v1.2.0 | 2026-08-08 |", body)
+
+    def test_an_unchanged_component_has_no_publication_date(self):
+        # Only the components this run bumped come with an upstream date; the
+        # rest get an em dash rather than a plausible-looking wrong one.
+        body = self.notes([DYNGRAPH_CHANGE])
+        self.assertIn("| RAMSES | 3.55 | v3.55 | &mdash; |", body)
+        self.assertIn("| Helios | 1.4.1 | v1.4.1 | &mdash; |", body)
+
+    def test_every_row_has_a_published_cell_when_nothing_changed(self):
+        body = self.notes([])
+        for name in ("RAMSES", "Helios", "DYNGRAPH", "CODEGEN", "URAMSES"):
+            self.assertIn("| %s | " % name, body)
+        self.assertEqual(5, body.count("| &mdash; |"))
+
     def test_embeds_the_upstream_body_verbatim(self):
         body = self.notes([DYNGRAPH_CHANGE])
         self.assertIn("The Windows build is now a console program.", body)

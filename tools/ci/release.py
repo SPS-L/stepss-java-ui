@@ -174,6 +174,13 @@ def compose_notes(version, props, changed, jar_sha256, previous_tag):
     therefore embedded rather than linked, which is the whole point of the
     exercise: the bundle's provenance has to be readable here or it is not
     readable anywhere.
+
+    The bundle table's Published column is the upstream release date, which is
+    known only for the components this run bumped - it arrives on the summary
+    entry, and a component that did not move has no summary entry. Rather than
+    fetch four more releases to date pins that have not changed, those cells
+    carry an em dash: the date is genuinely absent here, and the release page
+    for the run that did bump the component still carries it.
     """
     lines = ["# STEPSS %s" % version, ""]
 
@@ -191,17 +198,22 @@ def compose_notes(version, props, changed, jar_sha256, previous_tag):
         lines.append("Manual release.")
     lines.append("")
 
+    published = {
+        entry["component"]: entry.get("published") for entry in changed
+    }
+
     lines.append("## Bundled components")
     lines.append("")
-    lines.append("| Component | Version | Upstream release |")
-    lines.append("|---|---|---|")
+    lines.append("| Component | Version | Upstream release | Published |")
+    lines.append("|---|---|---|---|")
     for component in pins.COMPONENTS:
         lines.append(
-            "| %s | %s | %s |"
+            "| %s | %s | %s | %s |"
             % (
                 DISPLAY_NAMES[component],
                 props["%s.version" % component],
                 props["%s.tag" % component],
+                published.get(component) or "&mdash;",
             )
         )
     lines.append("")
