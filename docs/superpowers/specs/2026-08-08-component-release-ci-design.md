@@ -30,7 +30,8 @@ step in the happy path.
 | Human gate | None. Fully automatic publish. |
 | Components watched | All five, including CODEGEN. |
 | Version scheme | RAMSES version plus a patch counter: `v3.55`, `v3.55.1`, … |
-| Detection | Scheduled poll, not `repository_dispatch`. |
+| Detection | Daily scheduled poll, not `repository_dispatch`. |
+| Manual runs | `workflow_dispatch` bumps to the latest assets first, then publishes unconditionally. |
 | Structure | One workflow; bump logic in a script that also runs locally. |
 
 Fully automatic publishing is safe here only because the build itself is the
@@ -47,26 +48,37 @@ notification is not worth a silent blind spot in an unattended pipeline.
 ## Architecture
 
 ```
-cron (every 6h) + workflow_dispatch
+cron (daily) + workflow_dispatch
   │
-  ├─ tools/bump-components.sh
+  ├─ tools/bump-components.sh          ← always runs, on both triggers
   │    ├─ read current pins from versions.properties
   │    ├─ gh release view, per component, via STEPSS_TOKEN
-  │    ├─ no component moved → exit 0, workflow ends green, nothing published
+  │    ├─ no component moved → empty change summary
   │    └─ some moved → download new assets, digest them,
   │                    rewrite versions.properties + Toolchain.java,
   │                    emit a JSON change summary
   │
+  ├─ nothing moved and trigger is cron → stop here, green, nothing published
+  ├─ derive next version from tags
+  ├─ rewrite README's "Current release" line
   ├─ ant jar                 → PayloadManifestCheck guards the two-file sync
   ├─ ToolchainDump           → extracts every payload, hashes what lands
-  ├─ commit pins to main
+  ├─ commit pins + README to main
   ├─ tag vX.Y[.N]
   └─ gh release create, jar attached, notes composed from the change summary
 ```
 
-Every step before the commit is side-effect-free with respect to the outside
-world. A failed run leaves no tag, no release and no commit; the next tick
-retries from unchanged pins.
+The bump runs on both triggers, so a manually launched release picks up any
+component assets released since the last run rather than rebuilding stale pins.
+The triggers differ in one respect only: when nothing moved, cron stops without
+publishing, whereas a manual dispatch goes on to cut a release anyway. That is
+what makes `workflow_dispatch` the button for "release the current GUI source" —
+without it, changes to the Java code alone would never reach a release, since
+only component bumps drive the schedule.
+
+Nothing before the commit publishes anything. A failed run leaves no tag, no
+release and no commit — only an issue saying so — and the next tick retries from
+unchanged pins.
 
 ### `tools/bump-components.sh`
 
@@ -125,6 +137,24 @@ and take the next free name: `v3.55` when unused, otherwise `v3.55.<max n + 1>`.
 A RAMSES bump to 3.56 restarts the sequence at `v3.56` with no special case, and
 a hand-made `v3.55` release simply pushes the first automatic one to `v3.55.1`.
 
+### README
+
+`README.md` line 7 states `Current release: **3.55**.` and would go stale the
+moment a release is cut unattended. The workflow rewrites it with the version it
+just derived — so it names the STEPSS release, `3.55.1`, not `ramses.version` —
+and includes the change in the same commit as the pins. This runs after the
+version is derived and before the build, and it is a single anchored
+substitution on that one line, not a search for the version string anywhere in
+the file.
+
+The known-limitation paragraph further down is deliberately left alone. It
+names the pinned URAMSES version while asserting that the version predates the
+model-router marker comments, and whether that still holds after a bump is a
+content judgement — substituting a new number there would keep the claim alive
+while making it look freshly verified. Instead, when the URAMSES pin moves, the
+run opens a review-reminder issue through the same mechanism used for failures,
+naming the paragraph and the new version.
+
 ### Verification
 
 `ant jar` runs `PayloadManifestCheck`, which fails when `Toolchain.java` and the
@@ -179,12 +209,18 @@ Only components that changed in this release get their notes expanded; the rest
 appear in the table alone, so the page does not repeat the bundle's whole
 history every time. A tick that catches two bumps produces two sections.
 
-### Failure handling
+A manual release with no component change has no upstream notes to show. Its
+body carries the table alone, under a line reading `Manual release. No component
+changes since v3.55.1.` rather than an empty `Upstream release notes` heading.
 
-Nobody watches a cron job, so a failing run must announce itself. On failure the
-workflow opens a GitHub issue naming the failing stage and component with a link
-to the run log, and updates the existing issue instead of opening a second one
-if a matching issue is already open.
+### Failure handling and notices
+
+Nobody watches a cron job, so a run that needs attention must announce itself.
+The workflow raises a GitHub issue in two cases, through one shared step: a
+failed run, naming the failing stage and component with a link to the run log;
+and a URAMSES bump, flagging the README's known-limitation paragraph for review.
+Both update a matching open issue rather than opening a second one, so a
+component that fails on every tick produces one issue, not one a day.
 
 This is what makes unattended publishing tolerable: the build gates mean the
 pipeline cannot ship a broken jar, and the issue means it cannot stop working
@@ -199,7 +235,8 @@ quietly either.
   dispatch queues behind a cron run rather than racing it to the same tag.
 - Auth: `STEPSS_TOKEN` throughout. Actions' default `GITHUB_TOKEN` is scoped to
   this repository and cannot read the component repos.
-- Schedule: every 6 hours, plus `workflow_dispatch`.
+- Schedule: daily, plus `workflow_dispatch`. Both run the bump; only cron
+  declines to publish when nothing moved.
 
 ## Out of scope
 
@@ -208,5 +245,6 @@ quietly either.
   reused as they stand.
 - Publishing per-platform artifacts. One jar, as today.
 - Watching anything other than the five pinned components.
-- README maintenance. `README.md` states a current release number; keeping that
-  line in step is left to the human editing pass that already touches it.
+- README prose beyond the `Current release` line. The known-limitation
+  paragraph's version reference is a content judgement, not a substitution, and
+  is flagged for review rather than rewritten.
