@@ -58,10 +58,10 @@ public final class Toolchain {
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
                 "dyngraph.exe", ToolSpec.Kind.RAW, null, "dyngraph.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "payload/dyngraph-linux-x86_64-v1.1.0.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/dyngraph-linux-x86_64-v1.2.0.tar.gz", ToolSpec.Kind.TGZ,
                 "dyngraph", "dyngraph", true))
             .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
-                "payload/dyngraph-macos-arm64-v1.1.0.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/dyngraph-macos-arm64-v1.2.0.tar.gz", ToolSpec.Kind.TGZ,
                 "dyngraph", "dyngraph", true)));
 
         s.add(new ToolSpec(CODEGEN)
