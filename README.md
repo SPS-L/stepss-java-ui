@@ -60,19 +60,19 @@ Then, in the GUI:
 
 ## Bundled tools
 
-The jar embeds the toolchain executables for the platform it runs on and extracts them at runtime. RAMSES, Helios, DYNGRAPH (on Linux and macOS), and CODEGEN are fetched from their pinned SPS-L releases at build time (see [Installation](#installation)); gnuplot on Windows and the Windows DYNGRAPH build are committed directly.
+The jar embeds the toolchain executables for the platform it runs on and extracts them at runtime. RAMSES, Helios, DYNGRAPH, and CODEGEN are fetched from their pinned SPS-L releases at build time (see [Installation](#installation)) on all three platforms; gnuplot on Windows is the only binary committed directly.
 
 | Tool | Role | Windows | Linux | macOS (Apple Silicon) |
 |---|---|---|---|---|
 | RAMSES (`dynsim`) | Dynamic simulation | yes | yes | yes |
 | Helios | Power flow | yes | yes | yes |
-| DYNGRAPH | Curve viewer | yes (dialog build) | yes (console) | yes (console) |
+| DYNGRAPH | Curve viewer | yes (console) | yes (console) | yes (console) |
 | CODEGEN | Model generation | yes | yes | yes |
 | Model compilation | Custom models | yes (MSYS2/MinGW) | yes (gfortran) | yes (Homebrew gcc) |
 | gnuplot | Real-time plotting | bundled | resolved from `PATH` | resolved from `PATH` |
 | Data file editing | OS default editor | yes | yes | yes |
 
-DYNGRAPH on Windows is the one exception to "fetched from a release": its published binaries are console-only, so the GUI still ships the committed Intel dialog build.
+DYNGRAPH is the same console program on all three platforms and opens in a terminal window. Windows previously shipped a committed Intel build that drew its own observable-picker dialog; that build is gone, and with it the dialog — the console prompts replace it everywhere.
 
 The bundled RAMSES is the free *Limited* build (up to 1000 buses, 2 cores).
 

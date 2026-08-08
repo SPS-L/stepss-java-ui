@@ -170,9 +170,24 @@ public final class PlatformLauncher {
             throws IOException {
         CommandLine cmd;
         if (p == Platform.WINDOWS_X86_64) {
-            cmd = new CommandLine(argv.get(0));
-            for (int i = 1; i < argv.size(); i++) {
-                cmd.addArgument(argv.get(i), false);
+            // Launched through `cmd /c start`, which gives a console
+            // subsystem program its own console window. Running the
+            // executable directly was right only while Windows shipped the
+            // Intel dialog build of dyngraph: that one drew its own GUI and
+            // needed no console. The release build is console on every
+            // platform, and a console program started from a GUI process
+            // inherits no console at all - its prompts would go nowhere and
+            // the user would see an apparently dead button.
+            //
+            // The empty "" is the window title `start` expects; without it
+            // start treats a quoted program path as the title and never runs
+            // it.
+            cmd = new CommandLine("cmd.exe");
+            cmd.addArgument("/c", false);
+            cmd.addArgument("start", false);
+            cmd.addArgument("\"\"", false);
+            for (String a : argv) {
+                cmd.addArgument(a, false);
             }
         } else if (p == Platform.MACOS_ARM64) {
             cmd = new CommandLine("osascript");
@@ -269,13 +284,16 @@ public final class PlatformLauncher {
 
     /**
      * Windows needs gnuplot's bin directory on PATH for the exec'd children.
-     * It also needs the {@code dynsim} directory on PATH: that is how a
-     * Codegen-built {@code Release_intel_w64/dynsim.exe} locates the Intel
-     * Fortran runtime DLLs shipped alongside it in {@code dynsim.zip} (they
-     * are not on the system PATH and are not next to the custom-model
-     * executable itself). Do not drop this entry without understanding that
-     * it serves the Codegen-built executable, not the bundled one.
      * Other platforms inherit the ambient environment, signalled by null.
+     *
+     * <p>A {@code dynsim} directory used to be prepended here as well, so a
+     * Codegen-built {@code Release_intel_w64/dynsim.exe} could find the Intel
+     * Fortran runtime DLLs that shipped beside it in {@code dynsim.zip}.
+     * Nothing is left of that arrangement: {@code dynsim.zip} is gone, the
+     * bundled engine extracts to {@code dynsim.exe} as a file rather than a
+     * directory - so the entry pointed at a path that never existed - and the
+     * custom-model build is statically linked MinGW, which needs no runtime
+     * DLLs on PATH at all.
      */
     public static Map execEnvironment(Platform p, File toolDir) throws IOException {
         if (p != Platform.WINDOWS_X86_64) {
@@ -284,9 +302,8 @@ public final class PlatformLauncher {
         Map env = EnvironmentUtils.getProcEnvironment();
         String path = (String) env.get("PATH");
         String gnuplotBin = new File(new File(toolDir, "gnuplot"), "bin").getAbsolutePath();
-        String dynsimDir = new File(toolDir, "dynsim").getAbsolutePath();
         EnvironmentUtils.addVariableToEnvironment(env, "PATH=" + gnuplotBin
-                + File.pathSeparator + dynsimDir + File.pathSeparator + path);
+                + File.pathSeparator + path);
         return env;
     }
 

@@ -56,7 +56,8 @@ public final class Toolchain {
 
         s.add(new ToolSpec(DYNGRAPH)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "dyngraph.exe", ToolSpec.Kind.RAW, null, "dyngraph.exe", true))
+                "payload/dyngraph-windows-x86_64-v1.2.0.zip", ToolSpec.Kind.ZIP,
+                "dyngraph.exe", "dyngraph.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
                 "payload/dyngraph-linux-x86_64-v1.2.0.tar.gz", ToolSpec.Kind.TGZ,
                 "dyngraph", "dyngraph", true))
