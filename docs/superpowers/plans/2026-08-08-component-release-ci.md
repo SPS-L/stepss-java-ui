@@ -127,9 +127,8 @@ class LoadTest(unittest.TestCase):
         self.assertEqual("3.55", props["ramses.version"])
 
     def test_drops_comments_and_blank_lines(self):
-        props = pins.load(write_sample())
-        self.assertNotIn("# a comment", props)
-        self.assertNotIn("", props)
+        path = write_sample("# only a comment\n\n   \nx.y=1\n")
+        self.assertEqual({"x.y": "1"}, pins.load(path))
 
     def test_keeps_values_containing_equals(self):
         path = write_sample("x.url=https://example.invalid/?a=b\n")
@@ -853,7 +852,6 @@ git commit -m "Add the upstream boundary: gh queries, downloads, digests"
 **Interfaces:**
 - Consumes: `pins.load`, `pins.set_values`, `pins.rewrite_toolchain`, `pins.asset_names`, `pins.uramses_url`, `pins.version_of`, `pins.tag_of` (Tasks 1–2); `upstream.Release`, `upstream.latest_release`, `upstream.download_asset`, `upstream.download_url`, `upstream.sha256_file`, `upstream.uramses_manifest_digest` (Task 3).
 - Produces:
-  - `bump.REPOS: dict[str, str]` — component → `owner/repo`, read from the pins at runtime.
   - `bump.run(repo_root: str, dry_run: bool = False, up=upstream) -> dict` — returns `{"changed": [...]}` matching the change-summary schema in File Structure.
 - CLI: `python3 -m tools.ci bump [--dry-run]` prints that dict as JSON to stdout.
 
@@ -2160,8 +2158,6 @@ jobs:
 ```
 
 - [ ] **Step 2: Check the workflow parses**
-
-Run: `python3 -c "import json,sys; sys.exit(0)"` is not enough — parse the YAML:
 
 ```bash
 python3 -c "

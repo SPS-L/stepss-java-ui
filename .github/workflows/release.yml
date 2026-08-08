@@ -1,0 +1,280 @@
+name: Release
+
+# Watches the five pinned component repos daily. When any of them has a new
+# release, re-pins the build to it, verifies the jar, and publishes a STEPSS
+# release carrying the upstream notes. A manual run always publishes, which is
+# how a GUI-only change reaches a release - the schedule alone never would,
+# since only component bumps drive it.
+#
+# No `${{ }}` expression is ever interpolated into the text of a `run:` script.
+# Everything a script needs arrives through `env:` and is read as a quoted
+# shell variable, because `${{ }}` is a textual substitution performed before
+# bash sees the line: a component release tagged `v1.0";id;"` would otherwise
+# close the quote and run arbitrary commands in a job holding STEPSS_TOKEN.
+# Nothing validates upstream tag names - pins.version_of only strips a leading
+# "v" - so this is the only thing standing between an upstream repo and this
+# job's credentials. Keep it that way when adding steps.
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: stepss-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          # Full history so the next version can be derived from the existing
+          # tags, and STEPSS_TOKEN so the push at the end is authorised.
+          fetch-depth: 0
+          token: ${{ secrets.STEPSS_TOKEN }}
+
+      # Before the bump, not just before the build: re-pinning URAMSES compiles
+      # and runs UramsesKitPack to compute the content-manifest digest, so the
+      # bump step needs a JDK too, not only `ant jar`.
+      - name: Set up Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+
+      # Deliberately ungated: tools/ci decides what gets pinned, built and
+      # published, so an edit that breaks it has to fail here rather than
+      # halfway through an unattended release. Runs on every invocation,
+      # scheduled or manual, before anything is fetched or written.
+      - name: Test the release tooling
+        run: python3 -m unittest discover -s tools/ci/tests -t .
+
+      - name: Re-pin to the latest component releases
+        id: bump
+        env:
+          GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          python3 -m tools.ci bump > summary.json
+          # A line per component, never summary.json itself: its `changed`
+          # entries carry the verbatim release bodies of four PRIVATE component
+          # repos. On the success path those get published anyway, but a run
+          # that fails later at `ant jar` would have disclosed them in this log
+          # with no release ever cut. Names and version numbers only.
+          python3 - <<'PY'
+          import json
+
+          summary = json.load(open("summary.json"))
+          for entry in summary["changed"]:
+              print("bumped:  %s %s -> %s"
+                    % (entry["component"], entry["old_version"],
+                       entry["new_version"]))
+          for entry in summary["skipped"]:
+              print("skipped: %s pinned %s, upstream %s"
+                    % (entry["component"], entry["pinned_version"],
+                       entry["upstream_version"]))
+          if not summary["changed"] and not summary["skipped"]:
+              print("No component moved.")
+          PY
+          count=$(python3 -c "import json;print(len(json.load(open('summary.json'))['changed']))")
+          if [ "$count" -gt 0 ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "No component moved and this is a scheduled run; nothing to publish."
+          fi
+
+      # Deliberately NOT gated on `proceed`: a tick whose only movement is a
+      # refused downgrade leaves `changed` empty, so a scheduled run stops
+      # right after the bump - and that is exactly the case somebody has to
+      # hear about. Issues live in this repository, so the default
+      # GITHUB_TOKEN is enough here, as with the URAMSES caveat below.
+      - name: Flag components that were not re-pinned
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          body=$(python3 - <<'PY'
+          import json
+
+          entries = json.load(open("summary.json"))["skipped"]
+          if entries:
+              print("The bump refused to re-pin these components:")
+              print()
+              for entry in entries:
+                  print("- **%s**: pinned %s, upstream latest %s - %s"
+                        % (entry["component"], entry["pinned_version"],
+                           entry["upstream_version"], entry["reason"]))
+              print()
+              print("The build still carries the pinned versions, and nothing "
+                    "was published on their account. Re-pinning downwards "
+                    "would rebuild STEPSS on older components and demote the "
+                    "newest release, so this is left to a human: either the "
+                    "upstream release is a backport and nothing is wrong, or "
+                    "the pin has to be moved by hand.")
+          PY
+          )
+          if [ -n "$body" ]; then
+            python3 -m tools.ci notify \
+              --title "A component release was not pinned" \
+              --body "$body" \
+              --label release-automation
+          fi
+
+      - name: Derive the release version
+        id: version
+        if: steps.bump.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          version=$(python3 -m tools.ci next-version)
+          # for-each-ref rather than `git tag --list | head -n 1`: head exits
+          # after the first line, and under `set -o pipefail` the SIGPIPE that
+          # kills git turns the whole pipeline into a failure once there are
+          # enough tags to fill the pipe buffer. --count=1 asks git for one
+          # ref and no pipe is involved. strip=2 rather than :short so a
+          # branch sharing a tag's name cannot make git disambiguate the tag
+          # as "tags/v3.55". Empty output - no tags at all - is the first-ever
+          # release, which the notes composer handles.
+          previous=$(git for-each-ref --sort=-v:refname --format='%(refname:strip=2)' --count=1 refs/tags)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
+
+      - name: Update the README's release line
+        if: steps.bump.outputs.proceed == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: python3 -m tools.ci update-readme --version "$VERSION"
+
+      # `ant` happens to be preinstalled on today's ubuntu-latest image, and
+      # the build step assumes it silently. Runner images drop tools between
+      # versions, so check for it here rather than meet a "command not found"
+      # in the middle of a release run. No `|| true`: if ant is neither
+      # present nor installable there is no jar to publish and the job must
+      # stop. Gated like the build it exists to protect - a scheduled tick
+      # with nothing to publish has no reason to touch apt.
+      - name: Ensure ant is available
+        if: steps.bump.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          if ! command -v ant > /dev/null 2>&1; then
+            echo "ant is not on this runner image; installing it."
+            sudo apt-get update
+            sudo apt-get install -y ant
+          fi
+          ant -version
+
+      # `ant jar` fetches the pinned payloads from the private component repos
+      # through `gh`, so it needs STEPSS_TOKEN just as the bump does. It also
+      # runs PayloadManifestCheck, which fails the build if Toolchain.java and
+      # the staged payloads disagree.
+      - name: Build the jar
+        if: steps.bump.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
+        run: ant jar
+
+      - name: Verify the bundled toolchain
+        if: steps.bump.outputs.proceed == 'true'
+        run: java -cp dist/stepss.jar my.ramses.platform.ToolchainDump
+
+      - name: Compose the release notes
+        if: steps.bump.outputs.proceed == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PREVIOUS: ${{ steps.version.outputs.previous }}
+        run: |
+          set -euo pipefail
+          # "$PREVIOUS" is quoted because it is empty on the first-ever
+          # release, and an unquoted empty expansion would drop the argument
+          # entirely rather than passing "".
+          python3 -m tools.ci notes \
+            --version "$VERSION" \
+            --summary summary.json \
+            --jar dist/stepss.jar \
+            --previous "$PREVIOUS" > notes.md
+          cat notes.md
+
+      # Nothing above this point writes anything durable: a failure in the
+      # build or the toolchain check leaves no commit, no tag and no release.
+      - name: Commit and push the pin
+        id: commit
+        if: steps.bump.outputs.proceed == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git config user.name "stepss-release-bot"
+          git config user.email "actions@github.com"
+          git add versions.properties src/my/ramses/platform/Toolchain.java README.md
+          if git diff --cached --quiet; then
+            echo "No pin changes to commit (manual release of unchanged sources)."
+          else
+            git commit -m "Release $VERSION"
+            git push origin HEAD:"$REF_NAME"
+          fi
+          # The release has to point at a commit that exists on the remote,
+          # and that is HEAD either way: the else branch just pushed it, and
+          # the if branch means HEAD is still the commit that was checked out.
+          # GITHUB_SHA is not a substitute - it names the triggering commit,
+          # which is the parent of the pin commit, so the release would point
+          # one commit behind the versions.properties it actually shipped.
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the release
+        if: steps.bump.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TARGET_SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          set -euo pipefail
+          # The tag is created by this call, not by a `git tag` + `git push`
+          # beforehand. Tagging separately opens a window in which a failure
+          # here leaves an orphan tag: the version number is then burnt, since
+          # next-version derives the next release from the tags that exist, and
+          # a re-run would skip to v3.55.1 with no v3.55 release. One API call
+          # creates the tag and the release together or neither, so a failed
+          # publish is recoverable by re-running with the same number.
+          gh release create "$VERSION" \
+            dist/stepss.jar \
+            --target "$TARGET_SHA" \
+            --title "STEPSS $VERSION" \
+            --notes-file notes.md \
+            --latest
+
+      # Issues live in this repository, so the default GITHUB_TOKEN is enough
+      # here - STEPSS_TOKEN is only needed where the component repos are.
+      - name: Flag the README's URAMSES caveat for review
+        if: steps.bump.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          bumped=$(python3 -c "import json;print(any(c['component']=='uramses' for c in json.load(open('summary.json'))['changed']))")
+          if [ "$bumped" = "True" ]; then
+            python3 -m tools.ci notify \
+              --title "Review the README's URAMSES known-limitation paragraph" \
+              --body "URAMSES was re-pinned in $VERSION. README.md's known-limitation paragraph still names the previous version while asserting that it predates the model-router marker comments. Whether that limitation still holds is a content judgement the workflow deliberately does not make - please check it." \
+              --label release-automation
+          fi
+
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          python3 -m tools.ci notify \
+            --title "Release workflow failed" \
+            --body "The release workflow failed. Run: $RUN_URL" \
+            --label release-automation
