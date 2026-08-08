@@ -152,6 +152,24 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: python3 -m tools.ci update-readme --version "$VERSION"
 
+      # `ant` happens to be preinstalled on today's ubuntu-latest image, and
+      # the build step assumes it silently. Runner images drop tools between
+      # versions, so check for it here rather than meet a "command not found"
+      # in the middle of a release run. No `|| true`: if ant is neither
+      # present nor installable there is no jar to publish and the job must
+      # stop. Gated like the build it exists to protect - a scheduled tick
+      # with nothing to publish has no reason to touch apt.
+      - name: Ensure ant is available
+        if: steps.bump.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          if ! command -v ant > /dev/null 2>&1; then
+            echo "ant is not on this runner image; installing it."
+            sudo apt-get update
+            sudo apt-get install -y ant
+          fi
+          ant -version
+
       # `ant jar` fetches the pinned payloads from the private component repos
       # through `gh`, so it needs STEPSS_TOKEN just as the bump does. It also
       # runs PayloadManifestCheck, which fails the build if Toolchain.java and
