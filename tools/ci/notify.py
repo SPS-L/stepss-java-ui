@@ -15,6 +15,8 @@ USAGE = "Usage: python3 -m tools.ci notify --title <t> --body <b> [--label <l>]\
 
 DEFAULT_LABEL = "release-automation"
 
+LABEL_DESCRIPTION = "Opened by the release workflow"
+
 
 def raise_or_update(title, body, label, run=subprocess.run):
     """Create an issue, or comment on a matching open one.
@@ -48,6 +50,28 @@ def raise_or_update(title, body, label, run=subprocess.run):
         )
         return "commented"
 
+    # `gh issue create --label X` errors outright when X does not exist, and
+    # the one path that must never be silent is the failure path: a missing
+    # label would mean a broken release run produces no issue at all. Creating
+    # it here makes the workflow self-provisioning rather than dependent on a
+    # manual setup step nobody will remember. `--force` is what keeps this
+    # from needing error suppression - it creates the label when absent and
+    # updates it when present, exiting 0 either way, so no `|| true` (which
+    # would also swallow a genuine auth failure) is involved.
+    #
+    # Only on the create path. Commenting on an existing issue does not
+    # mention the label at all, so provisioning it there would be a wasted
+    # API call on the far more common branch.
+    run(
+        [
+            "gh", "label", "create", label,
+            "--force",
+            "--description", LABEL_DESCRIPTION,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     run(
         ["gh", "issue", "create", "--title", title, "--body", body, "--label", label],
         check=True,

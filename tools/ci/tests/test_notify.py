@@ -20,12 +20,55 @@ class ScriptedRun(object):
         return subprocess.CompletedProcess(argv, 0, stdout, "")
 
 
+def index_of(calls, *prefix):
+    """The position of the first call whose argv starts with `prefix`.
+
+    Asserting on positions rather than mere membership is the point of the
+    label tests below: `gh label create` and `gh issue create` both contain
+    "create", so an `assertIn` cannot tell them apart, and the ordering
+    between them is exactly what matters - provisioning the label after the
+    issue that needs it would be useless.
+    """
+    for position, argv in enumerate(calls):
+        if tuple(argv[: len(prefix)]) == prefix:
+            return position
+    return -1
+
+
 class RaiseOrUpdateTest(unittest.TestCase):
     def test_creates_when_no_open_issue_matches(self):
-        run = ScriptedRun(["[]", ""])
+        run = ScriptedRun(["[]", "", ""])
         result = notify.raise_or_update("Release failed", "log link", "ci", run=run)
         self.assertEqual("created", result)
-        self.assertIn("create", run.calls[1])
+        create = index_of(run.calls, "gh", "issue", "create")
+        self.assertNotEqual(-1, create)
+        self.assertIn("--title", run.calls[create])
+        self.assertIn("Release failed", run.calls[create])
+
+    def test_provisions_the_label_before_creating_the_issue(self):
+        # gh issue create --label errors if the label is absent, so the
+        # ordering here is the whole guarantee: the label call has to land
+        # first or the issue never gets created.
+        run = ScriptedRun(["[]", "", ""])
+        notify.raise_or_update("Release failed", "log link", "ci", run=run)
+        label = index_of(run.calls, "gh", "label", "create")
+        create = index_of(run.calls, "gh", "issue", "create")
+        self.assertNotEqual(-1, label, "no `gh label create` call was made")
+        self.assertNotEqual(-1, create)
+        self.assertLess(label, create)
+        self.assertIn("ci", run.calls[label])
+        # --force, not `|| true`: idempotent whether or not the label exists,
+        # and still loud if the call fails for any other reason.
+        self.assertIn("--force", run.calls[label])
+        self.assertIn(notify.LABEL_DESCRIPTION, run.calls[label])
+
+    def test_does_not_provision_the_label_on_the_comment_path(self):
+        # Commenting never mentions the label, so touching it there would be
+        # a wasted API call on the common branch.
+        existing = json.dumps([{"number": 12, "title": "Release failed"}])
+        run = ScriptedRun([existing, ""])
+        notify.raise_or_update("Release failed", "log link", "ci", run=run)
+        self.assertEqual(-1, index_of(run.calls, "gh", "label", "create"))
 
     def test_comments_when_an_open_issue_matches(self):
         existing = json.dumps([{"number": 12, "title": "Release failed"}])
