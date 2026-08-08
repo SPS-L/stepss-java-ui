@@ -108,6 +108,15 @@ public class RamsesUI extends javax.swing.JFrame {
             outputstream = new TextareaOutputStream(simulationOutput);
             outputstreamCG = new TextareaOutputStream(codegenPane);
             outputstreamPFC = new TextareaOutputStream(pfcPane);
+            // A second sink per pane, for the child's stderr. Commons Exec
+            // pumps stdout and stderr on separate threads, so passing one
+            // sink to both put two threads on a single line buffer and wove
+            // their characters together mid-word. Each stream buffers its
+            // own partial line now; they share the text area safely because
+            // appends are marshalled onto the EDT.
+            outputstreamErr = new TextareaOutputStream(simulationOutput);
+            outputstreamCGErr = new TextareaOutputStream(codegenPane);
+            outputstreamPFCErr = new TextareaOutputStream(pfcPane);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -3509,7 +3518,7 @@ public class RamsesUI extends javax.swing.JFrame {
         simulExecutor.setExitValue(1);
         ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
         if (!ssa) {
-            PumpStreamHandler streamHandler = new PumpStreamHandler(outputstream, outputstream);
+            PumpStreamHandler streamHandler = new PumpStreamHandler(outputstream, outputstreamErr);
             simulExecutor.setStreamHandler(streamHandler);
         } else {
             ssa = false;
@@ -4048,7 +4057,8 @@ public class RamsesUI extends javax.swing.JFrame {
         // thread can look for the "helios: status: ..." line without disturbing
         // what already gets shown, merged with stdout, in pfcPane.
         final ByteArrayOutputStream heliosStderr = new ByteArrayOutputStream();
-        PumpStreamHandler streamHandler = new PumpStreamHandler(outputstreamPFC, new TeeOutputStream(outputstreamPFC, heliosStderr));
+        PumpStreamHandler streamHandler = new PumpStreamHandler(outputstreamPFC,
+                new TeeOutputStream(outputstreamPFCErr, heliosStderr));
         simulExecutor.setStreamHandler(streamHandler);
 
         simulExecutor.setWorkingDirectory(myTempDir);
@@ -4448,7 +4458,7 @@ public class RamsesUI extends javax.swing.JFrame {
     // change to an unrelated path with no defect behind it.
     simulExecutor.setExitValue(0);
     ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-    PumpStreamHandler streamHandler = new PumpStreamHandler(outputstreamCG, outputstreamCG);
+    PumpStreamHandler streamHandler = new PumpStreamHandler(outputstreamCG, outputstreamCGErr);
     simulExecutor.setStreamHandler(streamHandler);
 
     simulExecutor.setWorkingDirectory(myTempDir);
@@ -4908,6 +4918,9 @@ public class RamsesUI extends javax.swing.JFrame {
     private TextareaOutputStream outputstream;
     private TextareaOutputStream outputstreamCG;
     private TextareaOutputStream outputstreamPFC;
+    private TextareaOutputStream outputstreamErr;
+    private TextareaOutputStream outputstreamCGErr;
+    private TextareaOutputStream outputstreamPFCErr;
     private File[] codeGenFiles = null;
     private JFileChooser mfileChooser = new JFileChooser();
     // Variables declaration - do not modify//GEN-BEGIN:variables
