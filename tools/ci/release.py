@@ -3,9 +3,8 @@
 Pure. Everything here is derived from what the bump already produced.
 """
 
-import json
-import os
 import re
+import sys
 
 from . import pins
 
@@ -61,6 +60,10 @@ def update_readme(path, version):
 
 
 def next_version_main(argv):
+    if argv:
+        sys.stderr.write("Usage: python3 -m tools.ci next-version\n")
+        return 2
+
     import subprocess
 
     props = pins.load("versions.properties")
@@ -71,13 +74,30 @@ def next_version_main(argv):
     return 0
 
 
-def update_readme_main(argv):
+def update_readme_main(argv, path="README.md"):
     version = _required_option(argv, "--version")
-    update_readme("README.md", version)
+    if version is None:
+        return 2
+    update_readme(path, version)
     return 0
 
 
 def _required_option(argv, name):
+    """Returns the value following `name` in argv, or None on misuse.
+
+    Never raises: a missing option and a present-but-valueless option (the
+    flag is the last item in argv) both print a usage message to stderr and
+    return None, so callers can turn that into main()'s exit-2 convention
+    - matching bump.main's style - without an uncaught exception (a raw
+    IndexError, or a SystemExit carrying a string, which exits 1 rather
+    than 2) ever reaching the caller.
+    """
+    usage = "Usage: python3 -m tools.ci update-readme --version <tag>\n"
     if name not in argv:
-        raise SystemExit("Missing required option: " + name)
-    return argv[argv.index(name) + 1]
+        sys.stderr.write(usage)
+        return None
+    index = argv.index(name)
+    if index + 1 >= len(argv):
+        sys.stderr.write(usage)
+        return None
+    return argv[index + 1]

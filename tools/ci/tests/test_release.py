@@ -1,6 +1,8 @@
+import io
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 from tools.ci import release
 
@@ -88,6 +90,46 @@ class UpdateReadmeTest(unittest.TestCase):
         path = write_readme("# STEPSS\n\nNo version line here.\n")
         with self.assertRaises(ValueError):
             release.update_readme(path, "v3.55.1")
+
+
+class UpdateReadmeMainTest(unittest.TestCase):
+    def test_missing_version_option_exits_2_without_raising(self):
+        # A raise SystemExit("...") here would surface as exit code 1, and a
+        # bug that indexes past argv would surface as an uncaught IndexError
+        # (a traceback) rather than as this assertion failing - both are the
+        # regressions this test guards against.
+        with mock.patch("sys.stderr", new_callable=io.StringIO):
+            self.assertEqual(2, release.update_readme_main([]))
+
+    def test_version_flag_with_no_value_exits_2_without_raising(self):
+        with mock.patch("sys.stderr", new_callable=io.StringIO):
+            self.assertEqual(2, release.update_readme_main(["--version"]))
+
+    def test_happy_path_updates_the_given_readme(self):
+        path = write_readme()
+        self.assertEqual(
+            0, release.update_readme_main(["--version", "v3.55.1"], path=path)
+        )
+        self.assertIn("Current release: **3.55.1**.", open(path).read())
+
+
+class NextVersionMainTest(unittest.TestCase):
+    def test_rejects_unrecognised_arguments(self):
+        with mock.patch("sys.stderr", new_callable=io.StringIO):
+            self.assertEqual(2, release.next_version_main(["--bogus-flag"]))
+
+    def test_happy_path_prints_the_next_version(self):
+        fake_result = mock.Mock(stdout="v3.55\n")
+        with mock.patch.object(
+            release.pins, "load", return_value={"ramses.version": "3.55"}
+        ), mock.patch(
+            "subprocess.run", return_value=fake_result
+        ), mock.patch(
+            "sys.stdout", new_callable=io.StringIO
+        ) as fake_stdout:
+            result = release.next_version_main([])
+        self.assertEqual(0, result)
+        self.assertEqual("v3.55.1\n", fake_stdout.getvalue())
 
 
 if __name__ == "__main__":
