@@ -852,7 +852,6 @@ git commit -m "Add the upstream boundary: gh queries, downloads, digests"
 **Interfaces:**
 - Consumes: `pins.load`, `pins.set_values`, `pins.rewrite_toolchain`, `pins.asset_names`, `pins.uramses_url`, `pins.version_of`, `pins.tag_of` (Tasks 1–2); `upstream.Release`, `upstream.latest_release`, `upstream.download_asset`, `upstream.download_url`, `upstream.sha256_file`, `upstream.uramses_manifest_digest` (Task 3).
 - Produces:
-  - `bump.REPOS: dict[str, str]` — component → `owner/repo`, read from the pins at runtime.
   - `bump.run(repo_root: str, dry_run: bool = False, up=upstream) -> dict` — returns `{"changed": [...]}` matching the change-summary schema in File Structure.
 - CLI: `python3 -m tools.ci bump [--dry-run]` prints that dict as JSON to stdout.
 
