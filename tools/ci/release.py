@@ -3,6 +3,7 @@
 Pure. Everything here is derived from what the bump already produced.
 """
 
+import json
 import re
 import sys
 
@@ -82,7 +83,7 @@ def update_readme_main(argv, path="README.md"):
     return 0
 
 
-def _required_option(argv, name):
+def _required_option(argv, name, usage=None):
     """Returns the value following `name` in argv, or None on misuse.
 
     Never raises: a missing option and a present-but-valueless option (the
@@ -91,8 +92,14 @@ def _required_option(argv, name):
     - matching bump.main's style - without an uncaught exception (a raw
     IndexError, or a SystemExit carrying a string, which exits 1 rather
     than 2) ever reaching the caller.
+
+    `usage` defaults to update-readme's own usage line, so the one existing
+    caller is unaffected; notes_main (which has three required options, not
+    one) passes its own so the message printed actually names the command
+    and option the caller got wrong instead of an unrelated one.
     """
-    usage = "Usage: python3 -m tools.ci update-readme --version <tag>\n"
+    if usage is None:
+        usage = "Usage: python3 -m tools.ci update-readme --version <tag>\n"
     if name not in argv:
         sys.stderr.write(usage)
         return None
@@ -101,3 +108,110 @@ def _required_option(argv, name):
         sys.stderr.write(usage)
         return None
     return argv[index + 1]
+
+
+DISPLAY_NAMES = {
+    "ramses": "RAMSES",
+    "helios": "Helios",
+    "dyngraph": "DYNGRAPH",
+    "codegen": "CODEGEN",
+    "uramses": "URAMSES",
+}
+
+
+def compose_notes(version, props, changed, jar_sha256, previous_tag):
+    """The release body.
+
+    Four of the five component repos are private, so a link to an upstream
+    release is a 404 for most people reading this page. The upstream bodies are
+    therefore embedded rather than linked, which is the whole point of the
+    exercise: the bundle's provenance has to be readable here or it is not
+    readable anywhere.
+    """
+    lines = ["# STEPSS %s" % version, ""]
+
+    if changed:
+        described = ", ".join(
+            "**%s %s** (was %s)"
+            % (DISPLAY_NAMES[entry["component"]], entry["new_version"],
+               entry["old_version"])
+            for entry in changed
+        )
+        lines.append("Rebuilt for %s." % described)
+    elif previous_tag:
+        lines.append("Manual release. No component changes since %s." % previous_tag)
+    else:
+        lines.append("Manual release.")
+    lines.append("")
+
+    lines.append("## Bundled components")
+    lines.append("")
+    lines.append("| Component | Version | Upstream release |")
+    lines.append("|---|---|---|")
+    for component in pins.COMPONENTS:
+        lines.append(
+            "| %s | %s | %s |"
+            % (
+                DISPLAY_NAMES[component],
+                props["%s.version" % component],
+                props["%s.tag" % component],
+            )
+        )
+    lines.append("")
+
+    if changed:
+        lines.append("## Upstream release notes")
+        lines.append("")
+        for entry in changed:
+            summary = "<b>%s %s</b>" % (
+                DISPLAY_NAMES[entry["component"]],
+                entry["new_tag"],
+            )
+            if entry["title"]:
+                summary += " &mdash; %s" % entry["title"]
+            lines.append("<details open><summary>%s</summary>" % summary)
+            lines.append("")
+            lines.append(entry["body"] or "_No release notes upstream._")
+            lines.append("")
+            lines.append("</details>")
+            lines.append("")
+
+    lines.append("## Artifact")
+    lines.append("")
+    lines.append("`stepss.jar` &mdash; SHA-256 `%s`" % jar_sha256)
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def notes_main(argv):
+    usage = (
+        "Usage: python3 -m tools.ci notes --version <tag> --summary <path.json> "
+        "--jar <path> [--previous <tag>]\n"
+    )
+    version = _required_option(argv, "--version", usage)
+    if version is None:
+        return 2
+    summary_path = _required_option(argv, "--summary", usage)
+    if summary_path is None:
+        return 2
+    jar_path = _required_option(argv, "--jar", usage)
+    if jar_path is None:
+        return 2
+    previous = argv[argv.index("--previous") + 1] if "--previous" in argv else None
+
+    from . import upstream
+
+    with open(summary_path, "r", encoding="utf-8") as handle:
+        summary = json.load(handle)
+    props = pins.load("versions.properties")
+    print(
+        compose_notes(
+            version,
+            props,
+            summary["changed"],
+            upstream.sha256_file(jar_path),
+            previous or None,
+        )
+    )
+    return 0
