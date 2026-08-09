@@ -124,6 +124,17 @@ public final class PickerHarness {
 
     public static void main(String[] args) {
         checkFixtureParses();
+        checkTypeTables();
+        checkInstanceNames();
+        checkPerInstanceSubLists();
+        checkEmptyIndexDetection();
+        checkVersionRefused();
+        checkForeignHeaderRefused();
+        checkTruncationNamesTheLine();
+        checkMissingEndNamed();
+        checkUnexpectedTagNamed();
+        checkMisplacedSubListNamed();
+        checkUnreadableCountNamed();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -135,6 +146,140 @@ public final class PickerHarness {
             pass("the extended fixture parses");
         } catch (Exception ex) {
             fail("the extended fixture parses: threw " + ex);
+        }
+    }
+
+    private static ObservableIndex parsedFixture() {
+        try {
+            return ObservableIndex.parse(fixture());
+        } catch (java.io.IOException ex) {
+            return null;
+        }
+    }
+
+    private static void checkTypeTables() {
+        ObservableIndex index = parsedFixture();
+        if (index == null) {
+            fail("type tables: fixture did not parse");
+            return;
+        }
+        expect("BUS type count", 2, index.types("BUS").size());
+        expect("SHUNT type count", 1, index.types("SHUNT").size());
+        expect("LOAD type count", 2, index.types("LOAD").size());
+        expect("BRANCH type count", 6, index.types("BRANCH").size());
+        expect("SYNC type count", 17, index.types("SYNC").size());
+        expect("first BUS keyword", "BM", index.types("BUS").get(0).keyword);
+        expect("first BUS label", "voltage magnitude (pu)", index.types("BUS").get(0).label);
+        expect("a label may contain spaces and parentheses", "P (MW) entering at FROM end",
+                index.types("BRANCH").get(0).label);
+        expect("SOE sits at SYNC entry 16", "SOE", index.types("SYNC").get(15).keyword);
+        expect("SOT sits at SYNC entry 17", "SOT", index.types("SYNC").get(16).keyword);
+        expect("INJ has no TYPES table", 0, index.types("INJ").size());
+    }
+
+    private static void checkInstanceNames() {
+        ObservableIndex index = parsedFixture();
+        if (index == null) {
+            fail("instance names: fixture did not parse");
+            return;
+        }
+        expect("bus count", 4, index.instances("BUS").size());
+        expect("first bus", "BUS1", index.instances("BUS").get(0).name);
+        expect("a leading blank is part of the name", " LEADBUS",
+                index.instances("BUS").get(2).name);
+        expect("a bus named END is a name, not a terminator", "END",
+                index.instances("BUS").get(3).name);
+        expect("the block after the END-named bus still parses", "SHUNT1",
+                index.instances("SHUNT").get(0).name);
+        expect("an empty line is a legitimate all-blank name", "",
+                index.instances("LOAD").get(1).name);
+        expect("a branch named S is a name, not the stop keyword", "S",
+                index.instances("BRANCH").get(1).name);
+    }
+
+    private static void checkPerInstanceSubLists() {
+        ObservableIndex index = parsedFixture();
+        if (index == null) {
+            fail("per-instance sub-lists: fixture did not parse");
+            return;
+        }
+        ObservableIndex.Instance gen1 = index.instances("SYNC").get(0);
+        ObservableIndex.Instance gen2 = index.instances("SYNC").get(1);
+        expect("GEN1 exciter list", "[VF]", gen1.exc.toString());
+        expect("GEN1 torque list", "[TM]", gen1.tor.toString());
+        expect("EXC 0 parses to an empty list", 0, gen2.exc.size());
+        expect("GEN2 keeps its own torque list", "[Pm]", gen2.tor.toString());
+        ObservableIndex.Instance inj1 = index.instances("INJ").get(0);
+        ObservableIndex.Instance inj2 = index.instances("INJ").get(1);
+        expect("INJ1 observables", "[P]", inj1.obs.toString());
+        expect("INJ2 observables differ from INJ1's - sub-lists are per instance, never pooled",
+                "[Q, omega]", inj2.obs.toString());
+        expect("LINK1 observables", "[I1]", index.instances("LINK").get(0).obs.toString());
+        expect("DCTL1 observables", "[ST]", index.instances("DCTL").get(0).obs.toString());
+        expect("OBS 0 parses to an empty list", 0, index.instances("DCTL").get(1).obs.size());
+    }
+
+    private static void checkEmptyIndexDetection() {
+        ObservableIndex index = parsedFixture();
+        if (index == null) {
+            fail("empty-index detection: fixture did not parse");
+            return;
+        }
+        expect("the fixture is not empty", false, index.isEmpty());
+        try {
+            expect("an index with no instances reports empty", true,
+                    ObservableIndex.parse("DYNGRAPH-INDEX 1\nEND\n").isEmpty());
+        } catch (java.io.IOException ex) {
+            fail("an index with no instances reports empty: threw " + ex);
+        }
+    }
+
+    private static void checkVersionRefused() {
+        expectParseError("a higher DYNGRAPH-INDEX version is refused",
+                "DYNGRAPH-INDEX 2\nEND\n", "version 2");
+    }
+
+    private static void checkForeignHeaderRefused() {
+        expectParseError("a non-index first line is reported verbatim",
+                "some entirely foreign first line\n", "some entirely foreign first line");
+    }
+
+    private static void checkTruncationNamesTheLine() {
+        expectParseError("a count overrunning the stream names the line",
+                "DYNGRAPH-INDEX 1\nBUS 3\nBUS1\nBUS2", "line 5: unexpected end of input");
+    }
+
+    private static void checkMissingEndNamed() {
+        expectParseError("a stream without END says so",
+                "DYNGRAPH-INDEX 1\nBUS 1\nBUS1\n", "missing END");
+    }
+
+    private static void checkUnexpectedTagNamed() {
+        expectParseError("an unexpected tag names its line",
+                "DYNGRAPH-INDEX 1\nBOGUS 1\nA\nEND\n", "line 2: unexpected tag");
+    }
+
+    private static void checkMisplacedSubListNamed() {
+        expectParseError("an INJ name without its OBS block names the expectation",
+                "DYNGRAPH-INDEX 1\nINJ 1\nINJ1\nEND\n", "expected 'OBS <count>' after 'INJ1'");
+    }
+
+    private static void checkUnreadableCountNamed() {
+        expectParseError("an unreadable count names its header line",
+                "DYNGRAPH-INDEX 1\nBUS x\nEND\n", "line 2: unreadable count");
+    }
+
+    private static void expectParseError(String what, String text, String mustContain) {
+        try {
+            ObservableIndex.parse(text);
+            fail(what + ": no exception");
+        } catch (java.io.IOException ex) {
+            String message = String.valueOf(ex.getMessage());
+            if (message.contains(mustContain)) {
+                pass(what);
+            } else {
+                fail(what + ": message <" + message + "> does not mention <" + mustContain + ">");
+            }
         }
     }
 
