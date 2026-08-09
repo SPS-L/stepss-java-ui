@@ -22,8 +22,6 @@ STEPSS is the Java (Swing) desktop GUI for the RAMSES dynamic power system simul
 
 **Requirements:** 64-bit Java 11 or later (JRE to run, JDK to build), [Apache Ant](https://ant.apache.org/) to build. Windows and Linux are x86_64; macOS is Apple Silicon (arm64) only, Intel Macs are not supported.
 
-**Known limitation in this release:** compiling custom models needs a [stepss-uramses](https://github.com/SPS-L/stepss-uramses) release whose model routers carry the STEPSS GUI marker comments, which is where STEPSS inserts your generated models. The pinned v3.55 predates them, so until a release carrying them is pinned in `versions.properties`, *Compile* stops with a message about the bundled kit not carrying the marker contract — no compiler you install will change that. This applies to the prebuilt jar and to a build from source alike. Simulation, power flow, and model generation itself are unaffected.
-
 The prebuilt jar is published as a **release artifact** on the [releases page](https://github.com/SPS-L/stepss-java-ui/releases), not committed to this repository — `build/` and `dist/` are untracked. Download it there if you just want to run STEPSS.
 
 ### Build from source
