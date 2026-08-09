@@ -27,16 +27,26 @@ dropdowns. It has been sitting unused since v1.2.0 was pinned.
 
 ## What is already done
 
-Four of the six `stepss-java-ui` items in the 2026-08-07 design have landed:
+Every `stepss-java-ui` item in the 2026-08-07 design has landed except the two
+that are the point of it — the picker and the handler rewrite. The plumbing
+went in as a side effect of pinning v1.2.0:
 
 | Item | Status |
 |---|---|
-| `versions.properties` bumped to 1.2.0 with Windows asset and sha256 | done, `8eedc74` |
-| `Toolchain.java` Windows DYNGRAPH switched to the ZIP payload | done, `8eedc74` |
+| `versions.properties` Linux and macOS pins bumped to 1.2.0 | done, `8eedc74` |
+| `versions.properties` Windows asset and sha256 added | done, `c07a85b` |
+| `Toolchain.java` Windows DYNGRAPH switched from `Kind.RAW` to the ZIP payload | done, `c07a85b` |
 | Committed `src/my/ramses/dyngraph.exe` deleted | done, `c07a85b` |
 | `README.md` updated | done, `c07a85b` |
 | `ObservablePicker` | **this document** |
 | `runDyngraphButtonActionPerformed` rewritten | **this document** |
+
+The two commits split along a line worth keeping straight: `8eedc74` bumped
+only the Linux and macOS pins and says so — "Windows still ships the committed
+Intel dialog build ... whether it carries the dialog observable picker the GUI
+needs is unverified". `c07a85b` is where that question was answered (the v1.2.0
+Windows build reports `BUILDINFO: interface console`) and where the Windows
+payload, the `Toolchain` switch and the deletion all landed.
 
 `README.md:83` currently states that the console prompts replace the dialog
 everywhere. That sentence becomes wrong when this work lands and is listed
@@ -51,7 +61,8 @@ under Changes below.
         ├─ ObservableIndex.parse(stdout)       count-prefixed text -> model
         ├─ ObservablePicker.show(index)        modal dialog -> List<Selection>
         ├─ ReplayFile.write(selections, trj)   -> <temp>/sel.cmd
-        └─ DyngraphRunner.plot(sel.cmd, base)  dyngraph -c -t sel.cmd -o<base>
+        └─ DyngraphRunner.plot(sel.cmd)        dyngraph -c -t sel.cmd
+                                                 -o<temp>/tempGnupOut
                                                headless; stderr on failure
 ```
 
@@ -59,10 +70,20 @@ The trajectory file stays `<temp>/output.trj`. That is already the single
 contract: loading a saved `.trj` copies it there (`RamsesUI.java:3134`), so the
 picker needs no file chooser of its own.
 
+**The output base name is fixed at `<temp>/tempGnupOut`, absolute**, exactly as
+today (`RamsesUI.java:3275`). It is not a free parameter: `viewCurvesButton`
+opens `<temp>/tempGnupOut.plt` by name (`RamsesUI.java:3245`), and
+`saveCurrentCurveButton` rewrites the `.plt` by string-replacing the
+**absolute** path `<temp>/tempGnupOut.cur` inside it (`RamsesUI.java:3157,3163`).
+A relative base, or any other name, still plots correctly and silently breaks
+both buttons.
+
 The replay file passes the trajectory path as its first line and `-a` is not
-used, so the invocation is byte for byte the configuration DYNGRAPH's smoke
-gate pins. It also sidesteps quoting — a path containing spaces is a whole
-line here, but would be an argv-quoting problem as `-a<path>`.
+used. That sidesteps quoting — a path containing spaces is a whole line here,
+but would be an argv-quoting problem as `-a<path>`. The `-o` argument still
+carries a possibly-space-containing absolute path as one argv token, so it must
+be added with `CommandLine.addArgument(value, false)`; the default handling
+re-quotes and would corrupt it.
 
 ## Structure
 
@@ -72,14 +93,18 @@ precedent.
 | File | Responsibility | Depends on |
 |---|---|---|
 | `ObservableIndex.java` | Parse the index into categories, type tables, instance names and per-instance sub-lists. No Swing, no I/O. | nothing |
-| `Selection.java` | One picked observable: keyword, instance name, optional sub-observable, display label. | nothing |
+| `Selection.java` | One picked observable: keyword, instance name, optional sub-observable. Composes its own display label. | nothing |
 | `ReplayFile.java` | Selections -> the console keyword stream. Pure text. | `Selection` |
-| `ObservablePicker.java` | The modal `JDialog`. Takes an index, returns selections. No parsing, no formatting, no process calls. | `ObservableIndex`, `Selection` |
-| `DyngraphRunner.java` | Both invocations, via `DefaultExecutor` + `PumpStreamHandler`. | `Toolchain`, `Platform` |
-| `PickerHarness.java` | Headless `main()`: fixture -> parse -> scripted selections -> emit -> diff. | all but the dialog |
+| `ObservablePicker.java` | The modal `JDialog`. Takes an index, returns selections. No parsing, no label composition, no process calls. | `ObservableIndex`, `Selection` |
+| `DyngraphRunner.java` | Both invocations, off the EDT. | `Toolchain`, `Platform` |
+| `PickerHarness.java` | Headless `main()`: fixture -> parse -> scripted selections -> emit -> compare. | `ObservableIndex`, `Selection`, `ReplayFile` |
 
 Plus `tools/picker-harness.sh`, wrapping the harness against a built classes
 dir the way `tools/compile-harness.sh` does.
+
+`PickerHarness` deliberately does **not** depend on `DyngraphRunner`: it
+launches no process and needs no extracted payload, so it runs on a bare
+checkout with `build/classes` present.
 
 The split is driven by the repository's verification convention: there is no
 unit-test framework and none is being added, so anything that must be checked
@@ -88,6 +113,30 @@ the two error-prone parts, so neither lives inside the dialog.
 
 `RamsesUI.runDyngraphButtonActionPerformed` shrinks to orchestration: resolve
 the executable, list, parse, show, write, plot, enable buttons.
+
+### Display labels
+
+`Selection.label()` composes the label, and it reproduces the exact strings
+DYNGRAPH writes into `desc_obs` — which become the `.plt` curve titles — so the
+Selected list reads the same as the plot the user gets
+(`stepss-dyngraph/src/selec_observ.f90:92,123,157,203,299,316,322,355,388,432`):
+
+```
+bus <name>: <type label>
+shunt <name>: <type label>
+impedance load <name>: <type label>
+branch <name>: <type label>
+sync mach <name>: <type label>
+sync mach <name>: excit control: <observable>
+sync mach <name>: torque control: <observable>
+injector <name>: <observable>
+link <name>: <observable>
+DCTL <name>: <observable>
+```
+
+Note that `SOE` and `SOT` render as `excit control:` and `torque control:`
+rather than with their `TYPES` labels ("observable of excitation controller"),
+because that is what the console produces.
 
 ## Interface: reading the index
 
@@ -100,12 +149,11 @@ anything.
 
 Rules the parser enforces:
 
-- Line 1 must be exactly `DYNGRAPH-INDEX 1`. Anything else is an error, and
-  the two cases are reported differently: a line that is not a
-  `DYNGRAPH-INDEX` header at all means the binary is too old to know `--list`
-  (an old DYNGRAPH ignores the flag and prompts on stdin), while a higher
-  version number means a deliberate incompatible change and parsing on would
-  be a bug.
+- Line 1 must be exactly `DYNGRAPH-INDEX 1`. A higher version number means a
+  deliberate incompatible change, so parsing on would be a bug; refuse.
+  Anything that is not a `DYNGRAPH-INDEX` header at all is also refused, but
+  see the note on detection below — that check is a backstop, not the primary
+  signal.
 - `TYPES <CATEGORY> <count>` blocks carry `<keyword><space><label>` pairs for
   the five categories whose types are fixed by the trajectory layout: BUS,
   SHUNT, LOAD, BRANCH, SYNC. The keyword is echoed back in the replay file;
@@ -124,6 +172,42 @@ This is the one real trap in the format and the harness asserts it directly.
 
 Malformed input — a count that overruns the stream, a missing `END`, an
 unexpected tag — throws with the offending line number.
+
+### Detecting an old DYNGRAPH is exit-status-first, not header-first
+
+The 2026-08-07 design says an old DYNGRAPH "ignores `--list` and prompts for a
+filename on stdin", implying the Java side should recognise that prompt on
+stdout. It will not appear there. `main.f90:25` sets `log=0` and the prompt at
+`main.f90:41` writes to `log`, so it goes to **stderr** and stdout stays empty;
+with the child's stdin closed the subsequent `read` hits EOF and the process
+exits non-zero. DYNGRAPH's own gate pins this discrimination
+(`stepss-dyngraph/tools/smoke_gate.sh:144-151`, `README.md:126-129`).
+
+So the order is: **exit status first**, and only then the header. A non-zero
+exit is reported with its captured stderr — which covers both "trajectory file
+missing" and "binary too old" — and the header check catches a zero-exit
+program that printed something unexpected. The friendly "does not support
+`--list`" wording therefore belongs on the non-zero-exit path when stdout came
+back empty, not on the header mismatch.
+
+### Charset
+
+`--list` output is read and `sel.cmd` is written as **ISO-8859-1**, explicitly,
+on both sides. DYNGRAPH has no encoding concept: names are raw bytes copied out
+of the trajectory file and compared byte-for-byte on the way back in.
+ISO-8859-1 maps bytes 0–255 onto the first 256 code points and back, so the
+round-trip is exact for any byte the trajectory can contain. Reading as UTF-8
+would turn a byte ≥ 0x80 into a replacement character and write different bytes
+back.
+
+This matters more than it looks, because the failure is silent. An unmatched
+name does not abort DYNGRAPH — the console selector re-prompts — so a desynced
+replay file can consume the blank and `S` lines as if they were answers and
+still exit 0, having plotted fewer or different curves than the user asked for.
+Nothing in the failure table below catches exit-zero-but-wrong.
+
+A non-ASCII name will render as mojibake in the dialog. That is the accepted
+trade: a wrong glyph the user can see beats a wrong plot they cannot.
 
 ### Sub-lists are keyed by instance, never by category
 
@@ -179,7 +263,14 @@ S                        stop
 ```
 
 Keyword then name, with a third line — the sub-observable — when the keyword
-is `SOE`, `SOT`, `I`, `T` or `D`. Terminated by a blank line and `S`.
+is `SOE`, `SOT`, `I`, `T` or `D`, and for no other keyword. Terminated by a
+blank line and `S`. Keywords are matched case-sensitively in upper case; only
+the trailing stop accepts `s` as well.
+
+`sel.cmd` is written into the temp directory and left there after the run, like
+`output.trj` and `tempGnupOut.*`. The temp directory is already the UI's
+scratch space and is cleaned as a whole; a leftover replay file is also the
+first thing worth looking at when a plot comes out wrong.
 
 Selection order is column order in the `.cur` and curve order in the `.plt`,
 so the dialog's list order is meaningful and is what Remove operates on.
@@ -224,10 +315,18 @@ changes, not merely on category change:
 | SYNC | the fixed 17 `TYPES` entries | on `SOE` or `SOT`, a second dropdown holding *that machine's* `EXC` or `TOR` list |
 | INJECTOR, LINK, DCTL | *that instance's* `OBS` list | none |
 
-`SOE` and `SOT` are greyed out for a machine whose corresponding sub-list is
-empty, rather than offering an empty dropdown. `Add` is disabled unless the
+The empty-sub-list rule is symmetric across every category that has one. `SOE`
+and `SOT` are greyed out for a machine whose `EXC` or `TOR` block is empty, and
+an INJECTOR, LINK or DCTL instance whose `OBS` block is empty is greyed out in
+the name list for the same reason. DYNGRAPH's console does the same — it hides
+such DCTLs from its prompt (`stepss-dyngraph/src/selec_observ.f90:399-408`) —
+and a replay file naming one would loop to EOF. `Add` is disabled unless the
 current row resolves to a complete selection. `Plot` is disabled while Selected
 is empty, so the "no `.plt` written" case cannot arise from the UI.
+
+Duplicate selections are allowed. The console permits them and they produce
+duplicate columns, which is occasionally what someone wants; suppressing them
+would need an equality rule the format does not imply.
 
 The dialog opens with an empty Selected list every time. Carrying a selection
 across invocations was considered and rejected as unearned complexity: names
@@ -240,19 +339,33 @@ five bus voltages meant five round-trips.
 
 ## Running DYNGRAPH
 
-Both invocations run headless through `DefaultExecutor` with a
-`PumpStreamHandler` capturing stdout and stderr, the pattern
-`viewCurvesButtonActionPerformed` already uses for gnuplot
-(`RamsesUI.java:3243-3254`).
+Both invocations run through `DefaultExecutor` with a `PumpStreamHandler`
+wired to `ByteArrayOutputStream`s, so stdout and stderr are captured rather
+than inherited. The precedent for capture-and-check is the Helios run
+(`RamsesUI.java:4059-4060`, a dedicated stderr buffer feeding
+`reportHeliosExitStatus`) and the simulation run (`RamsesUI.java:3521`). It is
+**not** `viewCurvesButtonActionPerformed`, which constructs a no-arg
+`PumpStreamHandler` inheriting the JVM's streams and captures nothing
+(`RamsesUI.java:3249`); that call is the precedent for the async structure
+only.
 
 `--list` needs stdout captured to a buffer; DYNGRAPH's chatty per-category
 counts go to unit 0 (stderr), so stdout carries the index alone and needs no
 filtering.
 
-The plot run is not interactive under `-t`, so it gets no terminal window. On
-success the UI enables `View Curves` and `Save Current Curve` exactly as
-today, with no dialog. On a non-zero exit it shows the captured stderr and
-leaves those buttons disabled.
+**Neither call runs on the EDT.** `get_observ_name` rewinds the trajectory
+several times and the plot run reads the whole time series, so both scale with
+file size and would freeze the UI. `--list` runs in a `SwingWorker`, with a
+wait cursor, and the picker opens from its `done()` on the EDT. The plot run
+uses the async `DefaultExecuteResultHandler` the repo already uses elsewhere,
+re-enabling buttons or raising the error dialog on the EDT from its callback.
+
+The plot run is not interactive under `-t`, so it gets no terminal window. Both
+result buttons are **disabled before the run starts**, not merely left alone —
+after a previous successful extraction they are enabled, and a failed re-run
+must not leave them pointing at the stale `tempGnupOut.plt`/`.cur` that DYNGRAPH
+may have truncated or half-written. On success they are re-enabled with no
+dialog, exactly as today.
 
 `PlatformLauncher.runInTerminal` keeps its other callers and is not touched.
 
@@ -263,17 +376,24 @@ Every failure is a modal dialog leaving no partial state:
 | Condition | Behaviour |
 |---|---|
 | `dyngraph` missing or absent from disk | Existing "Executable not found!" dialog, unchanged |
-| `--list` exits non-zero | Captured stderr; picker never opens |
-| First line is not a `DYNGRAPH-INDEX` header | "The bundled DYNGRAPH does not support `--list`" |
+| `--list` exits non-zero, stdout empty | "The bundled DYNGRAPH does not support `--list`", plus the captured stderr — this is the too-old case |
+| `--list` exits non-zero otherwise | Captured stderr; picker never opens |
+| Exits zero but line 1 is not a `DYNGRAPH-INDEX` header | Refuse; report the first line verbatim |
 | `DYNGRAPH-INDEX` version above 1 | Refuse explicitly; do not parse on |
 | Count mismatch, truncation, missing `END`, unexpected tag | Parse error with the offending line number |
 | Every category empty | Say so; do not open an empty picker |
-| `-t` run exits non-zero | Captured stderr; `View Curves` stays disabled |
+| `-t` run exits non-zero | Captured stderr; result buttons stay disabled |
+
+One failure mode is **not** covered and cannot be: a replay file that desyncs
+mid-stream makes the console selector re-prompt rather than abort, so DYNGRAPH
+can exit zero having plotted the wrong curves. The charset rule above is what
+keeps that from happening; there is no runtime check for it. Pinning the
+round-trip in the harness is the mitigation.
 
 There is no fallback to the old `-a<trj>` terminal path. The bundled DYNGRAPH
 is pinned at 1.2.0 and `PayloadManifestCheck` fails the build when the payload
 disagrees with `versions.properties`, so a fallback would be unreachable code
-carrying a second, untested invocation.
+carrying a second invocation to maintain.
 
 ## Testing
 
@@ -301,7 +421,10 @@ adds:
   greying-out rule and the empty-sub-list branch;
 - a **name with a leading blank**, asserted to survive parse -> emit unchanged;
 - **instance names colliding with keywords** (`END`, `S`), proving the parse is
-  count-driven and never scans for a delimiter.
+  count-driven and never scans for a delimiter;
+- an **empty name line**, which `trim()` emits legitimately for an all-blank
+  name and which count-driven parsing must consume as a name rather than treat
+  as the replay file's terminator.
 
 The harness feeds scripted selections through `ReplayFile` and compares the
 result against an expected replay stream, also embedded, pinning the round-trip
@@ -311,6 +434,28 @@ the thrown message names the right line.
 Manual acceptance on all three platforms — pick, plot, view curves — is a plan
 task, as in the toolchain and custom-model-compilation plans. It is the only
 way to cover the dialog itself, which the harness deliberately does not touch.
+Nothing runs the harness automatically; like `tools/compile-harness.sh`, it is
+run by hand and by the plan's task list, not by `release.yml`.
+
+### What no automated gate covers
+
+The UI omits `-eps`, and DYNGRAPH's smoke gate always passes it
+(`stepss-dyngraph/tools/smoke_gate.sh:90`) because without it `caption.f90`
+emits `set terminal windows` on Windows and an empty terminal line elsewhere,
+which would make the `.plt` golden platform-specific. So the `.plt` this UI
+produces is precisely the branch no golden pins.
+
+This is not a regression — today's `Extract Curves` omits `-eps` too — and it
+is the right flag choice, since `-eps` would export an EPS file instead of
+leaving a `.plt` that `viewCurvesButton` can open in a gnuplot window. But the
+gap is real and the 2026-08-07 design's claim that this invocation is "byte for
+byte" the gated configuration is wrong: the gate passes no `-c`, always `-eps`,
+and `-o` as a separate argument.
+
+A follow-up in `stepss-dyngraph` should add a no-`-eps` gate case, diffing the
+`.plt` with the terminal line filtered so one golden serves all three
+platforms. It is a separate repository, review cycle and release, so it does
+not block this work.
 
 ## Changes
 
@@ -331,7 +476,11 @@ way to cover the dialog itself, which the harness deliberately does not touch.
 | File | Change |
 |---|---|
 | `src/my/ramses/RamsesUI.java` | `runDyngraphButtonActionPerformed` becomes orchestration; the `runDyngraphButton` tooltip at line 1817 already promises a selection dialog and becomes true again |
-| `README.md` | Line 13 and the DYNGRAPH paragraph at line 83, which currently say the console prompts replace the dialog everywhere |
+| `README.md:77` | The DYNGRAPH row reads "yes (console)" for all three platforms; the console program is still what ships, but it is no longer what the user meets |
+| `README.md:83` | The paragraph saying DYNGRAPH "opens in a terminal window" and "the console prompts replace it everywhere" — both become false |
+
+`README.md:13` ("Extract Curves launches the bundled DYNGRAPH viewer on saved
+output trajectories") stays true and needs no edit.
 
 No `.form` change. `runDyngraphButton` keeps its initial state, and the picker
 is a hand-written `JDialog` rather than a NetBeans form, because its controls
@@ -339,9 +488,13 @@ are populated from parsed data and its layout does not vary.
 
 ## Constraints
 
-- `javac.source` and `javac.target` are **11**. No `var`, no records, no
-  switch expressions, no text blocks. Match the explicit generics the platform
-  package uses.
+- `javac.source` and `javac.target` are **11**
+  (`nbproject/project.properties:54-55`), so no records, no switch expressions
+  and no text blocks. `var` compiles at this level — it arrived in Java 10 —
+  but the repository does not use it and neither does this work; match the
+  explicit generics the platform package uses. The
+  `custom-model-compilation` plan lists `var` alongside the genuine
+  Java-11 exclusions, which is a style rule stated as a compiler limit.
 - `RamsesUI.form` is the source of truth for generated `initComponents()`.
   This work requires no change to it; do not edit it.
 - This repo is a submodule of the `stepss` umbrella. Commit here, push, then
@@ -349,11 +502,16 @@ are populated from parsed data and its layout does not vary.
 
 ## Accepted costs
 
-- Six new files plus two fixtures for what the 2026-08-07 design described as
-  one class. The split is what makes parsing and emission verifiable without a
-  display, given that this repository has no unit-test framework.
+- Six new classes and a wrapper script for what the 2026-08-07 design described
+  as one class. The split is what makes parsing and emission verifiable without
+  a display, given that this repository has no unit-test framework.
 - Three replay keywords (`I`, `T`, `D`) hardcoded in `ReplayFile`, because the
   index does not carry them.
 - The dialog itself is covered only by manual acceptance.
+- The `.plt` the UI produces is the no-`-eps` branch, which no upstream golden
+  pins. Unchanged from today, with an upstream follow-up noted above.
+- A charset or ordering mistake in the replay file fails silently — DYNGRAPH
+  re-prompts rather than aborting and can still exit zero. The harness
+  round-trip is the only guard.
 - Someone running DYNGRAPH standalone, outside `stepss-java-ui`, still gets
   console mode. Unchanged from today on every platform.
