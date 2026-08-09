@@ -135,6 +135,8 @@ public final class PickerHarness {
         checkUnexpectedTagNamed();
         checkMisplacedSubListNamed();
         checkUnreadableCountNamed();
+        checkLabelComposition();
+        checkSelectionShapeValidation();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -267,6 +269,59 @@ public final class PickerHarness {
     private static void checkUnreadableCountNamed() {
         expectParseError("an unreadable count names its header line",
                 "DYNGRAPH-INDEX 1\nBUS x\nEND\n", "line 2: unreadable count");
+    }
+
+    private static void checkLabelComposition() {
+        expect("bus label", "bus BUS1: voltage magnitude (pu)",
+                new Selection("BUS", "BM", "voltage magnitude (pu)", "BUS1", null).label());
+        expect("shunt label", "shunt SHUNT1: reactive power produced (Mvar)",
+                new Selection("SHUNT", "HQ", "reactive power produced (Mvar)", "SHUNT1", null).label());
+        expect("load label says impedance load", "impedance load LOAD1: active power consumed (MW)",
+                new Selection("LOAD", "LP", "active power consumed (MW)", "LOAD1", null).label());
+        expect("branch label", "branch BR1-2: P (MW) entering at FROM end",
+                new Selection("BRANCH", "RPF", "P (MW) entering at FROM end", "BR1-2", null).label());
+        expect("sync label says sync mach", "sync mach GEN1: rotor speed (pu)",
+                new Selection("SYNC", "SS", "rotor speed (pu)", "GEN1", null).label());
+        expect("SOE renders as excit control, not its TYPES label",
+                "sync mach GEN1: excit control: VF",
+                new Selection("SYNC", "SOE", "observable of excitation controller", "GEN1", "VF").label());
+        expect("SOT renders as torque control, not its TYPES label",
+                "sync mach GEN2: torque control: Pm",
+                new Selection("SYNC", "SOT", "observable of torque controller", "GEN2", "Pm").label());
+        expect("injector label", "injector INJ2: omega",
+                new Selection("INJ", null, null, "INJ2", "omega").label());
+        expect("link label", "link LINK1: I1",
+                new Selection("LINK", null, null, "LINK1", "I1").label());
+        expect("DCTL label keeps DCTL upper-case", "DCTL DCTL1: ST",
+                new Selection("DCTL", null, null, "DCTL1", "ST").label());
+        expect("a leading blank stays visible in the label",
+                "bus  LEADBUS: voltage magnitude (pu)",
+                new Selection("BUS", "BM", "voltage magnitude (pu)", " LEADBUS", null).label());
+    }
+
+    private static void checkSelectionShapeValidation() {
+        expect("SOE requires a sub-observable", true, Selection.requiresSub("SYNC", "SOE"));
+        expect("SOT requires a sub-observable", true, Selection.requiresSub("SYNC", "SOT"));
+        expect("SS does not require a sub-observable", false, Selection.requiresSub("SYNC", "SS"));
+        expect("every injector pick requires one", true, Selection.requiresSub("INJ", null));
+        expectSelectionRejected("SOE without a sub-observable is rejected",
+                "SYNC", "SOE", "observable of excitation controller", "GEN1", null);
+        expectSelectionRejected("a sub-observable on a plain keyword is rejected",
+                "BUS", "BM", "voltage magnitude (pu)", "BUS1", "X");
+        expectSelectionRejected("a replay keyword on an injector is rejected - I belongs to ReplayFile",
+                "INJ", "I", null, "INJ1", "P");
+        expectSelectionRejected("an unknown category is rejected",
+                "BOGUS", "BM", "label", "X", null);
+    }
+
+    private static void expectSelectionRejected(String what, String category,
+            String keyword, String typeLabel, String name, String sub) {
+        try {
+            new Selection(category, keyword, typeLabel, name, sub);
+            fail(what + ": no exception");
+        } catch (IllegalArgumentException expected) {
+            pass(what);
+        }
     }
 
     private static void expectParseError(String what, String text, String mustContain) {
