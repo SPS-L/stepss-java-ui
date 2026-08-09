@@ -3273,6 +3273,23 @@ public class RamsesUI extends javax.swing.JFrame {
         // The single trajectory contract: a saved .trj is copied here on
         // load, so the picker needs no file chooser of its own.
         final File trajectory = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "output.trj");
+        if (!trajectory.exists()) {
+            // Checked before --list ever runs, not inferred from its exit
+            // status afterwards: a missing trajectory and a too-old
+            // DYNGRAPH binary both exit non-zero with empty stdout (see
+            // openPickerFromListing), so without this upfront check a
+            // simulation that aborted before writing output.trj - reachable
+            // in normal use, since runSimulationActionPerformed enables this
+            // button on the "Save output trajectories" checkbox alone, not
+            // on the file existing - would be misreported as an unsupported
+            // binary.
+            JOptionPane.showMessageDialog(this,
+                    "<html>No trajectory was found to extract curves from:<br>"
+                    + escapeHtml(trajectory.getAbsolutePath())
+                    + "<br>Run a simulation with <B>Save output trajectories</B> enabled first.</html>",
+                    "Extract Curves failed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
         final DyngraphRunner runner = new DyngraphRunner(dyngraphExec, myTempDir, WinEnvironment);
 
         // get_observ_name rewinds the trajectory several times, so --list
@@ -3308,15 +3325,18 @@ public class RamsesUI extends javax.swing.JFrame {
 
     /**
      * Continues Extract Curves on the EDT once {@code --list} has returned.
+     * Only reached once {@code runDyngraphButtonActionPerformed} has
+     * confirmed the trajectory exists, so a non-zero exit with empty stdout
+     * here is the genuine "binary too old" case, not a missing trajectory:
+     * an old DYNGRAPH ignores {@code --list}, writes its filename prompt to
+     * stderr (main.f90 sets {@code log=0}), hits EOF on its closed stdin and
+     * exits non-zero with stdout empty.
      *
-     * <p>Detection is exit-status-first, not header-first: an old DYNGRAPH
-     * ignores {@code --list}, writes its filename prompt to stderr (main.f90
-     * sets {@code log=0}), hits EOF on its closed stdin and exits non-zero
-     * with stdout empty - so "binary too old" and "trajectory file missing"
-     * are both non-zero exits, told apart by the captured stderr, and the
-     * header check (inside ObservableIndex.parse) only catches a zero-exit
-     * program that printed something unexpected. Every failure is a modal
-     * dialog leaving no partial state; the picker never opens on one.
+     * <p>Detection stays exit-status-first, not header-first: the header
+     * check (inside ObservableIndex.parse) only catches a zero-exit program
+     * that printed something unexpected, never a non-zero exit. Every
+     * failure is a modal dialog leaving no partial state; the picker never
+     * opens on one.
      */
     private void openPickerFromListing(DyngraphRunner runner, File trajectory,
             DyngraphRunner.ListResult listing) {
@@ -3365,6 +3385,16 @@ public class RamsesUI extends javax.swing.JFrame {
      * string-replacing the absolute tempGnupOut.cur path inside it. A
      * relative base, or any other name, still plots correctly and silently
      * breaks both buttons.
+     *
+     * <p>Line 1 of the replay file is the trajectory's bare name
+     * ({@code trajectory.getName()}, always {@code "output.trj"}), not its
+     * absolute path: DyngraphRunner runs with {@code myTempDir} as the
+     * working directory, so the relative name resolves the same way, and
+     * being pure ASCII it survives {@link ReplayFile#CHARSET}
+     * (ISO-8859-1) untouched. An absolute path here would mangle to '?' on
+     * any byte outside Latin-1 - a working directory such as
+     * {@code .../Πέτρος/} - leaving DYNGRAPH unable to open the trajectory
+     * and the plot run failing with a raw Fortran backtrace.
      */
     private void startPlotRun(DyngraphRunner runner, File trajectory,
             java.util.List<Selection> selections) {
@@ -3374,7 +3404,7 @@ public class RamsesUI extends javax.swing.JFrame {
             // sel.cmd is written into the temp directory and left there
             // after the run, like output.trj and tempGnupOut.*: it is the
             // first thing worth looking at when a plot comes out wrong.
-            ReplayFile.write(selCmd, trajectory.getAbsolutePath(), selections);
+            ReplayFile.write(selCmd, trajectory.getName(), selections);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
             JOptionPane.showMessageDialog(this,

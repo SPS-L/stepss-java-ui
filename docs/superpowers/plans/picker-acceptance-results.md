@@ -324,7 +324,7 @@ Qt/graphics stack, not the `.plt`/DYNGRAPH pipeline — the batch-mode `dumb`-te
 which needs no window system at all, is the real evidence for this row, and it passed cleanly.
 This is recorded plainly rather than glossed over.
 
-### 11. Failure path 1 (Step 3.1): the missing-trajectory case and the known trap
+### 11. Failure path 1 (Step 3.1): the missing-trajectory case, and the fix that removed the trap
 
 ```
 === STEP C: failure path - missing trajectory ===
@@ -337,13 +337,20 @@ Matches RamsesUI's "too old" branch condition (exitCode!=0 && stdout empty): tru
 ```
 
 This is the real bundled DYNGRAPH's real behaviour on a missing trajectory: exit 1, empty
-stdout, the complaint on stderr. `openPickerFromListing`'s detection is
-`listing.exitCode != 0 && listing.stdout.trim().isEmpty()` — both true here — so **this real
-run genuinely hits the "The bundled DYNGRAPH does not support `--list`" branch**, carrying the
-real stderr text `File <path> does not exist. Exiting...` after it. This is exactly the known
-trap the task brief calls out: the missing-trajectory case and an old-binary failure are
-byte-for-byte indistinguishable from stdout/exit code alone (`stepss-dyngraph/tools/smoke_gate.sh:144-151`),
-so the headline is correct, if confusing, and **is not a bug to file**.
+stdout, the complaint on stderr. Read purely from `openPickerFromListing`'s old detection —
+`listing.exitCode != 0 && listing.stdout.trim().isEmpty()`, both true here — this shape was
+byte-for-byte indistinguishable from a genuinely too-old DYNGRAPH binary
+(`stepss-dyngraph/tools/smoke_gate.sh:144-151`), and **this real run used to hit the "The bundled
+DYNGRAPH does not support `--list`" branch**, a false diagnosis. That ambiguity was filed as a
+real bug from this acceptance run (Finding 2 of the whole-branch review) and has since been
+fixed: `runDyngraphButtonActionPerformed` now checks `trajectory.exists()` **before** `--list` is
+ever invoked, so this exact exit-1/empty-stdout/missing-file shape never reaches
+`openPickerFromListing`'s ambiguous branch at all — it is caught upfront and reported as its own
+clear case, "No trajectory was found to extract curves from: `<path>`. Run a simulation with
+**Save output trajectories** enabled first.", with `--list` never launched. The genuine
+too-old-binary case (trajectory present, dyngraph itself exits non-zero with empty stdout) is
+unchanged and still reaches the original "does not support `--list`" branch, verified with a stub
+binary reproducing that exact shape.
 
 ### 12. Failure path 2 (Step 3.2): a failing re-run after a successful one
 
@@ -424,7 +431,7 @@ and the precise remaining action.
 
 | # | Check | Result |
 |---|---|---|
-| 3.1 | Delete the trajectory, press *Extract Curves*: error dialog carrying DYNGRAPH's stderr, headlined "does not support `--list`"; picker never opens; result buttons unchanged | **PENDING** for the dialog actually appearing on screen with that exact text, and the picker not opening — needs a human to delete `<temp>/output.trj` (or load then delete a saved `.trj`), press *Extract Curves*, and read the dialog. The mechanism it depends on is directly observed, not inferred (§11): the real bundled `dyngraph --list` against a missing trajectory exits 1 with empty stdout and stderr `File <path> does not exist. Exiting...`, which is exactly the `exitCode != 0 && stdout empty` condition `openPickerFromListing` uses to raise "The bundled DYNGRAPH does not support `--list`" with that stderr appended. **This is the brief's known trap, confirmed for real, not a bug**: DYNGRAPH's own gate documents the missing-file and too-old-binary cases as indistinguishable from stdout/exit code alone. |
+| 3.1 | Delete the trajectory, press *Extract Curves*: error dialog reporting the missing trajectory by name, headlined "No trajectory was found to extract curves from"; `dyngraph --list` is never launched; picker never opens; result buttons unchanged | **PENDING** for the dialog actually appearing on screen with that exact text, and the picker not opening — needs a human to delete `<temp>/output.trj` (or load then delete a saved `.trj`), press *Extract Curves*, and read the dialog. The mechanism it depends on is directly observed, not inferred (§11): `runDyngraphButtonActionPerformed` now checks `trajectory.exists()` before invoking `--list` at all, so a missing trajectory is caught upfront and reported as its own case — verified with a canary `dyngraph` stand-in that records whether it was ever launched (it was not) and a logic mirror of the guard clause producing exactly that message text. The previously documented trap — a missing trajectory and a too-old binary both exiting non-zero with empty stdout, indistinguishable from `openPickerFromListing` alone — no longer applies to this case: it is now resolved before `openPickerFromListing` is reached. The genuine too-old-binary case (trajectory present) still reaches the original "does not support `--list`" dialog, verified with a stub binary reproducing that exact shape. |
 | 3.2 | After a successful extraction, force a failing re-run: failure dialog, both result buttons **stay disabled** | **PENDING** for the buttons visibly staying grey on screen through the failure dialog — needs a human to extract once successfully, delete the trajectory, extract again, and watch *Preview Curve*/*Save Current Curve* stay disabled. The mechanism it depends on is directly observed, not inferred (§12): a real failing `-t` run (trajectory removed after the replay file was written) exits 2 with a real Fortran stderr trace and writes **no** `.cur`/`.plt` at all. `startPlotRun` disables both result buttons *before* the run starts and only re-enables them from the success branch of `onFinished`, which this failing run never reaches (confirmed by reading `RamsesUI.java:3390-3413`, not re-run live). |
 | 3.3 | Cancel the picker: nothing changes, no files written | **PENDING** — this is pure Swing dialog behaviour (`cancelButton`'s listener disposes with `result` left `null`; `openPickerFromListing` returns without calling `startPlotRun`) confirmed only by reading `ObservablePicker.java` and `RamsesUI.java`, not exercised live. Action: open the picker, make no selection (or make one and don't press Plot), press *Cancel*; confirm no `sel.cmd`/`tempGnupOut.*` files appear or change and no buttons change state. |
 
@@ -513,8 +520,9 @@ this session, none of it inferred:**
   `DyngraphRunner.plot` producing a correct `.cur`/`.plt` pair at the fixed absolute base
   `viewCurvesButton`/`saveCurrentCurveButton` require — confirmed by headless gnuplot rendering,
   not merely file existence.
-- Both failure paths' underlying mechanism: the missing-trajectory case genuinely hits the
-  documented "does not support `--list`" trap with the correct real stderr, and a failing re-run
+- Both failure paths' underlying mechanism: a missing trajectory is now caught before `--list` is
+  ever invoked and reported as its own clear case (§11), the genuine too-old-binary case still
+  reaches the original "does not support `--list`" dialog unchanged, and a failing re-run
   genuinely exits non-zero and writes no partial output.
 - The corrected filter expectation, checked against the shipped predicate and the shipped
   fixture: `bus` matches `BUS1`, `BUS2`, ` LEADBUS`, not `END`.
