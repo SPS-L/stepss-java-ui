@@ -112,6 +112,45 @@ public final class PickerHarness {
         "END"
     };
 
+    /**
+     * The expected replay stream for the scripted picks below, embedded like
+     * the fixture so the round trip is pinned byte for byte, the way
+     * DYNGRAPH's own smoke gate pins its goldens. Note " LEADBUS" keeping
+     * its leading blank, the names "END" and "S" travelling as name lines,
+     * and "ST" travelling as a DCTL observable name - position in the
+     * stream, never content, decides what a line means.
+     */
+    private static final String[] EXPECTED_REPLAY_LINES = {
+        "output.trj",
+        "BM",
+        "BUS1",
+        "BM",
+        " LEADBUS",
+        "BM",
+        "END",
+        "RPF",
+        "S",
+        "SS",
+        "GEN1",
+        "SOE",
+        "GEN1",
+        "VF",
+        "SOT",
+        "GEN2",
+        "Pm",
+        "I",
+        "INJ2",
+        "omega",
+        "T",
+        "LINK1",
+        "I1",
+        "D",
+        "DCTL1",
+        "ST",
+        "",
+        "S"
+    };
+
     private static int failures = 0;
 
     private PickerHarness() {
@@ -137,6 +176,8 @@ public final class PickerHarness {
         checkUnreadableCountNamed();
         checkLabelComposition();
         checkSelectionShapeValidation();
+        checkReplayRoundTrip();
+        checkReplayRejectsEmptySelection();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -312,6 +353,53 @@ public final class PickerHarness {
                 "INJ", "I", null, "INJ1", "P");
         expectSelectionRejected("an unknown category is rejected",
                 "BOGUS", "BM", "label", "X", null);
+    }
+
+    private static void checkReplayRoundTrip() {
+        ObservableIndex index = parsedFixture();
+        if (index == null) {
+            fail("replay round trip: fixture did not parse");
+            return;
+        }
+        // Every name and sub-observable below is taken from the parsed
+        // index, never retyped, so this pins the full parse -> pick -> emit
+        // round trip - the only guard against the silent desync failure,
+        // since DYNGRAPH re-prompts rather than aborting on an unmatched
+        // name and can exit 0 having plotted the wrong curves.
+        ObservableIndex.TypeEntry bm = index.types("BUS").get(0);
+        ObservableIndex.TypeEntry rpf = index.types("BRANCH").get(0);
+        ObservableIndex.TypeEntry ss = index.types("SYNC").get(3);
+        ObservableIndex.TypeEntry soe = index.types("SYNC").get(15);
+        ObservableIndex.TypeEntry sot = index.types("SYNC").get(16);
+        ObservableIndex.Instance gen1 = index.instances("SYNC").get(0);
+        ObservableIndex.Instance gen2 = index.instances("SYNC").get(1);
+        ObservableIndex.Instance inj2 = index.instances("INJ").get(1);
+        ObservableIndex.Instance link1 = index.instances("LINK").get(0);
+        ObservableIndex.Instance dctl1 = index.instances("DCTL").get(0);
+
+        java.util.List<Selection> picks = new java.util.ArrayList<Selection>();
+        picks.add(new Selection("BUS", bm.keyword, bm.label, index.instances("BUS").get(0).name, null));
+        picks.add(new Selection("BUS", bm.keyword, bm.label, index.instances("BUS").get(2).name, null));
+        picks.add(new Selection("BUS", bm.keyword, bm.label, index.instances("BUS").get(3).name, null));
+        picks.add(new Selection("BRANCH", rpf.keyword, rpf.label, index.instances("BRANCH").get(1).name, null));
+        picks.add(new Selection("SYNC", ss.keyword, ss.label, gen1.name, null));
+        picks.add(new Selection("SYNC", soe.keyword, soe.label, gen1.name, gen1.exc.get(0)));
+        picks.add(new Selection("SYNC", sot.keyword, sot.label, gen2.name, gen2.tor.get(0)));
+        picks.add(new Selection("INJ", null, null, inj2.name, inj2.obs.get(1)));
+        picks.add(new Selection("LINK", null, null, link1.name, link1.obs.get(0)));
+        picks.add(new Selection("DCTL", null, null, dctl1.name, dctl1.obs.get(0)));
+
+        expect("emit matches the pinned replay stream", join(EXPECTED_REPLAY_LINES),
+                ReplayFile.emit("output.trj", picks));
+    }
+
+    private static void checkReplayRejectsEmptySelection() {
+        try {
+            ReplayFile.emit("output.trj", new java.util.ArrayList<Selection>());
+            fail("an empty selection list is rejected: no exception");
+        } catch (IllegalArgumentException expected) {
+            pass("an empty selection list is rejected");
+        }
     }
 
     private static void expectSelectionRejected(String what, String category,
