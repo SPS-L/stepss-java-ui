@@ -74,13 +74,13 @@ The jar embeds the toolchain executables for the platform it runs on and extract
 |---|---|---|---|---|
 | RAMSES (`dynsim`) | Dynamic simulation | yes | yes | yes |
 | Helios | Power flow | yes | yes | yes |
-| DYNGRAPH | Curve viewer | yes (console) | yes (console) | yes (console) |
+| DYNGRAPH | Curve viewer | yes | yes | yes |
 | CODEGEN | Model generation | yes | yes | yes |
 | Model compilation | Custom models | yes (MSYS2/MinGW) | yes (gfortran) | yes (Homebrew gcc) |
 | gnuplot | Real-time plotting | bundled | resolved from `PATH` | resolved from `PATH` |
 | Data file editing | OS default editor | yes | yes | yes |
 
-DYNGRAPH is the same console program on all three platforms and opens in a terminal window. Windows previously shipped a committed Intel build that drew its own observable-picker dialog; that build is gone, and with it the dialog — the console prompts replace it everywhere.
+DYNGRAPH is the same console program on all three platforms, but Extract Curves no longer opens it in a terminal window: STEPSS reads the trajectory's observables with `dyngraph --list`, presents them in a selection dialog, and drives the extraction through a generated command file (`-t`). Running DYNGRAPH by hand, outside STEPSS, still gives the console prompts.
 
 The bundled RAMSES is the free *Limited* build (up to 1000 buses, 2 cores).
 

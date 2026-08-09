@@ -33,6 +33,11 @@ import javax.swing.text.DefaultCaret;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
 import my.ramses.compile.ModelCompiler;
+import my.ramses.dyngraph.DyngraphRunner;
+import my.ramses.dyngraph.ObservableIndex;
+import my.ramses.dyngraph.ObservablePicker;
+import my.ramses.dyngraph.ReplayFile;
+import my.ramses.dyngraph.Selection;
 import my.ramses.platform.Platform;
 import my.ramses.platform.PlatformLauncher;
 import my.ramses.platform.Toolchain;
@@ -3261,25 +3266,160 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_viewCurvesButtonActionPerformed
 
     private void runDyngraphButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runDyngraphButtonActionPerformed
+        if (dyngraphExec == null || !dyngraphExec.exists()) {
+            JOptionPane.showMessageDialog(this, "<html>The file <B>dyngraph</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        // The single trajectory contract: a saved .trj is copied here on
+        // load, so the picker needs no file chooser of its own.
+        final File trajectory = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "output.trj");
+        final DyngraphRunner runner = new DyngraphRunner(dyngraphExec, myTempDir, WinEnvironment);
+
+        // get_observ_name rewinds the trajectory several times, so --list
+        // scales with file size and must not run on the EDT: a SwingWorker
+        // with a wait cursor, and the picker opens from done() on the EDT.
+        runDyngraphButton.setEnabled(false);
+        setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.WAIT_CURSOR));
+        new SwingWorker<DyngraphRunner.ListResult, Void>() {
+            @Override
+            protected DyngraphRunner.ListResult doInBackground() throws IOException {
+                return runner.list(trajectory);
+            }
+
+            @Override
+            protected void done() {
+                setCursor(java.awt.Cursor.getDefaultCursor());
+                runDyngraphButton.setEnabled(true);
+                DyngraphRunner.ListResult listing;
+                try {
+                    listing = get();
+                } catch (Exception ex) {
+                    Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
+                    JOptionPane.showMessageDialog(RamsesUI.this,
+                            "<html>Could not run <B>dyngraph --list</B>:<br>"
+                            + escapeHtml(String.valueOf(ex.getMessage())) + "</html>",
+                            "Extract Curves failed", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                openPickerFromListing(runner, trajectory, listing);
+            }
+        }.execute();
+    }//GEN-LAST:event_runDyngraphButtonActionPerformed
+
+    /**
+     * Continues Extract Curves on the EDT once {@code --list} has returned.
+     *
+     * <p>Detection is exit-status-first, not header-first: an old DYNGRAPH
+     * ignores {@code --list}, writes its filename prompt to stderr (main.f90
+     * sets {@code log=0}), hits EOF on its closed stdin and exits non-zero
+     * with stdout empty - so "binary too old" and "trajectory file missing"
+     * are both non-zero exits, told apart by the captured stderr, and the
+     * header check (inside ObservableIndex.parse) only catches a zero-exit
+     * program that printed something unexpected. Every failure is a modal
+     * dialog leaving no partial state; the picker never opens on one.
+     */
+    private void openPickerFromListing(DyngraphRunner runner, File trajectory,
+            DyngraphRunner.ListResult listing) {
+        if (listing.exitCode != 0) {
+            String reason;
+            if (listing.stdout.trim().isEmpty()) {
+                reason = "The bundled DYNGRAPH does not support <B>--list</B>."
+                        + "<br>It reported:<br>" + escapeHtml(listing.stderr);
+            } else {
+                reason = "<B>dyngraph --list</B> failed (exit " + listing.exitCode
+                        + "):<br>" + escapeHtml(listing.stderr);
+            }
+            JOptionPane.showMessageDialog(this, "<html>" + reason + "</html>",
+                    "Extract Curves failed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        ObservableIndex index;
         try {
-            if (dyngraphExec == null || !dyngraphExec.exists()) {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>dyngraph</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            java.util.List<String> argv = new java.util.ArrayList<String>();
-            argv.add(dyngraphExec.getAbsolutePath());
-            if (platform != Platform.WINDOWS_X86_64) {
-                argv.add("-c");
-            }
-            argv.add("-a" + myTempDir.getAbsolutePath() + File.separator + "output.trj");
-            argv.add("-o" + myTempDir.getAbsolutePath() + File.separator + "tempGnupOut");
-            viewCurvesButton.setEnabled(true);
-            saveCurrentCurveButton.setEnabled(true);
-            PlatformLauncher.runInTerminal(platform, argv, myTempDir);
+            index = ObservableIndex.parse(listing.stdout);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "<html>The observable index could not be read:<br>"
+                    + escapeHtml(String.valueOf(ex.getMessage())) + "</html>",
+                    "Extract Curves failed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if (index.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "<html>The trajectory file carries no observables to plot.</html>",
+                    "Nothing to extract", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        java.util.List<Selection> selections = ObservablePicker.show(this, index);
+        if (selections == null || selections.isEmpty()) {
+            return; // cancelled; nothing changed
+        }
+        startPlotRun(runner, trajectory, selections);
+    }
+
+    /**
+     * Writes the replay file and starts the non-interactive {@code -t} run.
+     *
+     * <p>The output base is the fixed, absolute {@code <temp>/tempGnupOut}:
+     * not a free parameter, because viewCurvesButton opens tempGnupOut.plt
+     * by name and saveCurrentCurveButton rewrites the .plt by
+     * string-replacing the absolute tempGnupOut.cur path inside it. A
+     * relative base, or any other name, still plots correctly and silently
+     * breaks both buttons.
+     */
+    private void startPlotRun(DyngraphRunner runner, File trajectory,
+            java.util.List<Selection> selections) {
+        File selCmd = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "sel.cmd");
+        File outputBase = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut");
+        try {
+            // sel.cmd is written into the temp directory and left there
+            // after the run, like output.trj and tempGnupOut.*: it is the
+            // first thing worth looking at when a plot comes out wrong.
+            ReplayFile.write(selCmd, trajectory.getAbsolutePath(), selections);
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this,
+                    "<html>Could not write the selection file:<br>"
+                    + escapeHtml(String.valueOf(ex.getMessage())) + "</html>",
+                    "Extract Curves failed", JOptionPane.ERROR_MESSAGE);
+            return;
         }
-    }//GEN-LAST:event_runDyngraphButtonActionPerformed
+        // Disabled before the run starts, not merely left alone: after a
+        // previous successful extraction they are enabled, and a failed
+        // re-run must not leave them pointing at the stale tempGnupOut.plt
+        // and .cur that DYNGRAPH may have truncated or half-written.
+        viewCurvesButton.setEnabled(false);
+        saveCurrentCurveButton.setEnabled(false);
+        runDyngraphButton.setEnabled(false);
+        try {
+            runner.plot(selCmd, outputBase, new DyngraphRunner.PlotListener() {
+                public void onFinished(final int exitCode, final String stderr) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            runDyngraphButton.setEnabled(true);
+                            if (exitCode == 0) {
+                                // Success is silent, exactly as today: the
+                                // result buttons light up and that is all.
+                                viewCurvesButton.setEnabled(true);
+                                saveCurrentCurveButton.setEnabled(true);
+                            } else {
+                                JOptionPane.showMessageDialog(RamsesUI.this,
+                                        "<html>Curve extraction failed (exit " + exitCode
+                                        + "):<br>" + escapeHtml(stderr) + "</html>",
+                                        "Extract Curves failed", JOptionPane.ERROR_MESSAGE);
+                            }
+                        }
+                    });
+                }
+            });
+        } catch (IOException ex) {
+            runDyngraphButton.setEnabled(true);
+            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this,
+                    "<html>Could not start <B>dyngraph</B>:<br>"
+                    + escapeHtml(String.valueOf(ex.getMessage())) + "</html>",
+                    "Extract Curves failed", JOptionPane.ERROR_MESSAGE);
+        }
+    }
 
     private void searchTextFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_searchTextFieldActionPerformed
         try {
