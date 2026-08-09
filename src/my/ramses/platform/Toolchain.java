@@ -82,15 +82,15 @@ public final class Toolchain {
 
         s.add(new ToolSpec(URAMSES)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "payload/uramses-kit-v3.55.zip", URAMSES_DIR,
+                "payload/uramses-kit-v3.55.1.zip", URAMSES_DIR,
                 java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
                                         "README.md", "LICENSE.rst", "modules_wg/")))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "payload/uramses-kit-v3.55.zip", URAMSES_DIR,
+                "payload/uramses-kit-v3.55.1.zip", URAMSES_DIR,
                 java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
                                         "README.md", "LICENSE.rst", "modules_l/")))
             .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
-                "payload/uramses-kit-v3.55.zip", URAMSES_DIR,
+                "payload/uramses-kit-v3.55.1.zip", URAMSES_DIR,
                 java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
                                         "README.md", "LICENSE.rst", "modules_m/"))));
 
