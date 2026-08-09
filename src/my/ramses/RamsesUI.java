@@ -2897,8 +2897,34 @@ public class RamsesUI extends javax.swing.JFrame {
         // notes composed by tools/ci/release.py are this repo's changelog, and
         // they embed each bumped component's upstream notes, so the RAMSES
         // history the old file carried is still reachable from here.
-        BareBonesBrowserLaunch.openURL("https://github.com/SPS-L/stepss-java-ui/releases");
+        BareBonesBrowserLaunch.openURL(RELEASES_URL);
     }//GEN-LAST:event_showChangeLogButtonActionPerformed
+
+    /**
+     * Reports an update-check result and offers to open the release it names.
+     *
+     * <p>A dialog is where the user is when they want the page, so the link
+     * belongs in it rather than in a "look under Help" instruction. It is a
+     * button and not an HTML anchor because JOptionPane renders its message
+     * through a JLabel, which draws anchors as blue underlined text that
+     * cannot be clicked - an invitation the dialog cannot honour.
+     *
+     * @param message     HTML message body
+     * @param releaseUrl  page to open, or null to offer no link at all
+     * @param messageType a JOptionPane message type, for the icon
+     */
+    private void showUpdateResult(String message, String releaseUrl, int messageType) {
+        if (releaseUrl == null) {
+            JOptionPane.showMessageDialog(this, message, "Update Manager", messageType);
+            return;
+        }
+        Object[] options = {"Open release page", "Close"};
+        int choice = JOptionPane.showOptionDialog(this, message, "Update Manager",
+                JOptionPane.DEFAULT_OPTION, messageType, null, options, options[0]);
+        if (choice == 0) {
+            BareBonesBrowserLaunch.openURL(releaseUrl);
+        }
+    }
 
     private void showUserGuideButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showUserGuideButtonActionPerformed
         BareBonesBrowserLaunch.openURL("https://stepss.sps-lab.org/");
@@ -2941,7 +2967,7 @@ public class RamsesUI extends javax.swing.JFrame {
             // the same string would be wasted work. Redirects are therefore
             // off and the Location header is read directly.
             HttpURLConnection connection =
-                    (HttpURLConnection) new URL("https://github.com/SPS-L/stepss-java-ui/releases/latest").openConnection();
+                    (HttpURLConnection) new URL(RELEASES_LATEST_URL).openConnection();
             String location;
             try {
                 connection.setInstanceFollowRedirects(false);
@@ -2968,17 +2994,22 @@ public class RamsesUI extends javax.swing.JFrame {
                 // how a stale install stays stale.
                 msg = "<html>Could not work out which version is the latest.<br />Installed: " + this_version
                         + "<br />Published: " + (current_version == null ? "not reported" : current_version)
-                        + "<br /><br />See Help-&gt;Changelog for the current version.</html>";
-                JOptionPane.showMessageDialog(this, msg, "Update Manager", JOptionPane.WARNING_MESSAGE);
+                        + "<br /><br />The releases page lists every published version.</html>";
+                // The index rather than `location`: whatever that header held,
+                // it did not name a release this code could read.
+                showUpdateResult(msg, RELEASES_URL, JOptionPane.WARNING_MESSAGE);
             } else if (Version.compare(published, running) > 0) {
-                msg = "<html>New version " + current_version + " is now available!<br />Current Version: " + this_version;
-                msg = msg + "<br />See Help->Changelog for more information on what has changed!</html>";
+                msg = "<html>New version " + current_version + " is now available!<br />Current version: " + this_version
+                        + "<br /><br />The release page lists what has changed and carries the download.</html>";
                 versionLabel.setText("<html><B><U>Version</U>:</B> " + this_version + " (latest version available: " + current_version + ")</html>");
-                JOptionPane.showMessageDialog(this, msg, "Update Manager", JOptionPane.INFORMATION_MESSAGE);
+                // `location` is the redirect target, so it is the page for this
+                // exact release rather than for whatever is newest whenever the
+                // link is followed.
+                showUpdateResult(msg, location, JOptionPane.INFORMATION_MESSAGE);
             } else {
-                msg = "<html>You already have the newest version";
-                msg = msg + "<br />See Help->Changelog for more information on version changes!</html>";
-                JOptionPane.showMessageDialog(this, msg, "Update Manager", JOptionPane.INFORMATION_MESSAGE);
+                msg = "<html>You already have the newest version (" + this_version + ").<br /><br />"
+                        + "The release page lists what changed in it.</html>";
+                showUpdateResult(msg, location, JOptionPane.INFORMATION_MESSAGE);
             }
         } catch (IOException ex) {
             // Logged and shown. Left silent, an unreachable network made the
@@ -5093,6 +5124,10 @@ public class RamsesUI extends javax.swing.JFrame {
     // "gnuplot not found" warning only needs to be told once per session.
     private boolean gnuplotMissingWarned = false;
     private String this_version = "0.0";
+    // This repository's releases: the changelog Help->Changelog opens, and the
+    // versions the update check compares against, are the same pages.
+    private static final String RELEASES_URL = "https://github.com/SPS-L/stepss-java-ui/releases";
+    private static final String RELEASES_LATEST_URL = RELEASES_URL + "/latest";
     private boolean ssa = false;
     private ProcessBuilder matlabProcessBuilder;
     private DefaultExecutor simulExecutor;
