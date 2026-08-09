@@ -14,6 +14,7 @@ import java.awt.Component;
 import java.awt.HeadlessException;
 import java.awt.Rectangle;
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -2929,41 +2930,65 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void checkUpdateButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkUpdateButtonActionPerformed
         try {
-            URL url;
-            url = new URL("https://stepss.sps-lab.org/version.txt");
-            BufferedReader in;
-            in = new BufferedReader(new InputStreamReader(url.openStream()));
-            String str;
-            if ((str = in.readLine()) != null) {
-                String current_version = str.trim();
-                int[] published = Version.key(current_version);
-                int[] running = Version.key(this_version);
-                String msg;
-
-                if (published == null || running == null) {
-                    // Version.key returning null means the number was never
-                    // understood, and neither answer this dialog otherwise
-                    // gives is then true. Saying so is the honest outcome:
-                    // reporting "you already have the newest version" off an
-                    // unreadable number is how a stale install stays stale.
-                    msg = "<html>Could not compare version numbers.<br />Installed: " + this_version
-                            + "<br />Published: " + current_version
-                            + "<br /><br />Please check the releases page (Help-&gt;Changelog) for the current version.</html>";
-                    JOptionPane.showMessageDialog(this, msg, "Update Manager", JOptionPane.WARNING_MESSAGE);
-                } else if (Version.compare(published, running) > 0) {
-                    msg = "<html>New version " + current_version + " is now available!<br />Current Version: " + this_version;
-                    msg = msg + "<br />See Help->Changelog for more information on what has changed!</html>";
-                    versionLabel.setText("<html><B><U>Version</U>:</B> " + this_version + " (latest version available: " + current_version + ")</html>");
-                    JOptionPane.showMessageDialog(this, msg, "Update Manager", JOptionPane.INFORMATION_MESSAGE);
-                } else {
-                    msg = "<html>You already have the newest version";
-                    msg = msg + "<br />See Help->Changelog for more information on version changes!</html>";
-                    JOptionPane.showMessageDialog(this, msg, "Update Manager", JOptionPane.INFORMATION_MESSAGE);
-                }
+            // stepss.sps-lab.org/version.txt carried the RAMSES version, so the
+            // check answered a question about the bundled engine rather than
+            // about this application. The releases page is the same source
+            // Help->Changelog now opens, so the version offered here and the
+            // notes describing it can no longer disagree.
+            //
+            // /releases/latest redirects to /releases/tag/<tag>: the redirect
+            // names the release, so following it only to scrape the page for
+            // the same string would be wasted work. Redirects are therefore
+            // off and the Location header is read directly.
+            HttpURLConnection connection =
+                    (HttpURLConnection) new URL("https://github.com/SPS-L/stepss-java-ui/releases/latest").openConnection();
+            String location;
+            try {
+                connection.setInstanceFollowRedirects(false);
+                // This runs on the EDT, as every action listener here does. An
+                // unreachable host with no timeout set freezes the window
+                // until the OS gives up, which is minutes on some networks.
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+                location = connection.getHeaderField("Location");
+            } finally {
+                connection.disconnect();
             }
-            in.close();
+            String current_version = Version.fromReleaseUrl(location);
+            int[] published = current_version == null ? null : Version.key(current_version);
+            int[] running = Version.key(this_version);
+            String msg;
+
+            if (published == null || running == null) {
+                // A null here means a number was never understood - no release
+                // has been published yet, or one of the two is not a dotted
+                // integer - and neither answer this dialog otherwise gives is
+                // then true. Saying so is the honest outcome: reporting "you
+                // already have the newest version" off a number nobody read is
+                // how a stale install stays stale.
+                msg = "<html>Could not work out which version is the latest.<br />Installed: " + this_version
+                        + "<br />Published: " + (current_version == null ? "not reported" : current_version)
+                        + "<br /><br />See Help-&gt;Changelog for the current version.</html>";
+                JOptionPane.showMessageDialog(this, msg, "Update Manager", JOptionPane.WARNING_MESSAGE);
+            } else if (Version.compare(published, running) > 0) {
+                msg = "<html>New version " + current_version + " is now available!<br />Current Version: " + this_version;
+                msg = msg + "<br />See Help->Changelog for more information on what has changed!</html>";
+                versionLabel.setText("<html><B><U>Version</U>:</B> " + this_version + " (latest version available: " + current_version + ")</html>");
+                JOptionPane.showMessageDialog(this, msg, "Update Manager", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                msg = "<html>You already have the newest version";
+                msg = msg + "<br />See Help->Changelog for more information on version changes!</html>";
+                JOptionPane.showMessageDialog(this, msg, "Update Manager", JOptionPane.INFORMATION_MESSAGE);
+            }
         } catch (IOException ex) {
+            // Logged and shown. Left silent, an unreachable network made the
+            // menu item look like it did nothing at all when the user pressed
+            // it, which is the one moment they are waiting for an answer.
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this,
+                    "<html>Could not reach the releases page to check for updates.<br />"
+                    + "If you are sure you have internet access, please report this.</html>",
+                    "Update Manager", JOptionPane.ERROR_MESSAGE);
         }
     }//GEN-LAST:event_checkUpdateButtonActionPerformed
 

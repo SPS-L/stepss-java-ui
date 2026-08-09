@@ -146,6 +146,24 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "previous=$previous" >> "$GITHUB_OUTPUT"
 
+      # The jar has to know which release it is. The update check compares the
+      # copy bundled here against the latest release tag, so a jar shipping the
+      # previous number would report itself out of date for the whole life of
+      # the release - and this file was hand-maintained until now, tracking the
+      # RAMSES version rather than the release, which no step ever wrote.
+      # Stamped before `ant jar` so the build picks it up, and committed below
+      # so the tree matches what was published.
+      - name: Stamp the bundled version
+        if: steps.bump.outputs.proceed == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Bare, without the tag's leading "v": my.ramses.Version.key parses
+          # dotted integers and rejects anything else, and RamsesUI shows this
+          # string to the user as it stands.
+          printf '%s\n' "${VERSION#v}" > src/my/ramses/version.txt
+
       # `ant` happens to be preinstalled on today's ubuntu-latest image, and
       # the build step assumes it silently. Runner images drop tools between
       # versions, so check for it here rather than meet a "command not found"
@@ -207,7 +225,7 @@ jobs:
           set -euo pipefail
           git config user.name "stepss-release-bot"
           git config user.email "actions@github.com"
-          git add versions.properties src/my/ramses/platform/Toolchain.java
+          git add versions.properties src/my/ramses/platform/Toolchain.java src/my/ramses/version.txt
           if git diff --cached --quiet; then
             echo "No pin changes to commit (manual release of unchanged sources)."
           else
