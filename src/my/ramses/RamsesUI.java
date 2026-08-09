@@ -71,7 +71,7 @@ public class RamsesUI extends javax.swing.JFrame {
                     "Could not " + description + ".\n\n" + cause.getMessage(),
                     "Launch failed", JOptionPane.ERROR_MESSAGE));
         });
-        this_version = Double.parseDouble(getVersion());
+        this_version = getVersion();
         String fullLimited = getRamsesType();
         versionLabel.setText("<html><B><U>Version</U>:</B> " + this_version + " (" + fullLimited + " Version)</html>");
         prefs = Preferences.userRoot().node(this.getClass().getName());
@@ -2890,32 +2890,13 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_loadExtSimButtonActionPerformed
 
     private void showChangeLogButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showChangeLogButtonActionPerformed
-        try {
-            URL url = new URL("https://stepss.sps-lab.org/changelog.txt");
-            BufferedReader in;
-            in = new BufferedReader(new InputStreamReader(url.openStream()));
-            String str;
-            File changeLogFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "ChangeLog.txt");
-            BufferedWriter out = new BufferedWriter(new FileWriter(changeLogFile));
-            out.write("");
-            out.flush();
-            while ((str = in.readLine()) != null) {
-                out.append(str);
-                out.newLine();
-            }
-            out.close();
-            in.close();
-            try {
-                PlatformLauncher.openInEditor(changeLogFile);
-            } catch (IOException ex) {
-                JOptionPane.showMessageDialog(this,
-                        "Could not open an editor for " + changeLogFile.getAbsolutePath()
-                        + "\n\n" + ex.getMessage(),
-                        "Editor error", JOptionPane.ERROR_MESSAGE);
-            }
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(null, "<html>The online Changelog file can not be accessed <br /> If you are sure you have internet connection, please report this.</html>", "Limited internet access", JOptionPane.ERROR_MESSAGE);
-        }
+        // The releases page rather than stepss.sps-lab.org/changelog.txt: that
+        // file is the RAMSES changelog (it mirrors SPS-L/stepss-ramses), so it
+        // described the bundled engine and never this application. The release
+        // notes composed by tools/ci/release.py are this repo's changelog, and
+        // they embed each bumped component's upstream notes, so the RAMSES
+        // history the old file carried is still reachable from here.
+        BareBonesBrowserLaunch.openURL("https://github.com/SPS-L/stepss-java-ui/releases");
     }//GEN-LAST:event_showChangeLogButtonActionPerformed
 
     private void showUserGuideButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showUserGuideButtonActionPerformed
@@ -2954,10 +2935,22 @@ public class RamsesUI extends javax.swing.JFrame {
             in = new BufferedReader(new InputStreamReader(url.openStream()));
             String str;
             if ((str = in.readLine()) != null) {
-                double current_version = Double.valueOf(str).doubleValue();
+                String current_version = str.trim();
+                int[] published = Version.key(current_version);
+                int[] running = Version.key(this_version);
                 String msg;
 
-                if (current_version > this_version) {
+                if (published == null || running == null) {
+                    // Version.key returning null means the number was never
+                    // understood, and neither answer this dialog otherwise
+                    // gives is then true. Saying so is the honest outcome:
+                    // reporting "you already have the newest version" off an
+                    // unreadable number is how a stale install stays stale.
+                    msg = "<html>Could not compare version numbers.<br />Installed: " + this_version
+                            + "<br />Published: " + current_version
+                            + "<br /><br />Please check the releases page (Help-&gt;Changelog) for the current version.</html>";
+                    JOptionPane.showMessageDialog(this, msg, "Update Manager", JOptionPane.WARNING_MESSAGE);
+                } else if (Version.compare(published, running) > 0) {
                     msg = "<html>New version " + current_version + " is now available!<br />Current Version: " + this_version;
                     msg = msg + "<br />See Help->Changelog for more information on what has changed!</html>";
                     versionLabel.setText("<html><B><U>Version</U>:</B> " + this_version + " (latest version available: " + current_version + ")</html>");
@@ -5074,7 +5067,7 @@ public class RamsesUI extends javax.swing.JFrame {
     // initRamses() re-runs on every working-directory change, but the
     // "gnuplot not found" warning only needs to be told once per session.
     private boolean gnuplotMissingWarned = false;
-    private double this_version = 0.0;
+    private String this_version = "0.0";
     private boolean ssa = false;
     private ProcessBuilder matlabProcessBuilder;
     private DefaultExecutor simulExecutor;

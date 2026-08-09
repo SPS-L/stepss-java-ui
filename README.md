@@ -15,7 +15,7 @@ STEPSS is the Java (Swing) desktop GUI for the RAMSES dynamic power system simul
 - **User models**: the Codegen tab generates user-written model source with CODEGEN and compiles it into a custom simulator with gfortran
 - **Observable wizard**: dialog for selecting buses, machines, shunts, branches, and injectors to record
 - **Integrated editing**: opens data and disturbance files in the operating system's default editor
-- **Built-in help**: online user guide, changelog viewer, and update checker
+- **Built-in help**: online user guide, release notes, and update checker
 - **Cross-platform**: Windows, Linux, and macOS (Apple Silicon)
 
 ## Installation
@@ -96,7 +96,7 @@ In addition, the application distributes the following third-party Java librarie
 - [Installation guide](https://stepss.sps-lab.org/getting-started/installation/): GUI and Java setup
 - [Quick start](https://stepss.sps-lab.org/getting-started/quickstart/): running simulations from the GUI
 - [STEPSS documentation site](https://stepss.sps-lab.org/): user guide, file formats, model reference
-- In-app: **Help → User Guide** (opens [stepss.sps-lab.org](https://stepss.sps-lab.org/)) and **Help → Changelog**
+- In-app: **Help → User Guide** (opens [stepss.sps-lab.org](https://stepss.sps-lab.org/)) and **Help → Changelog** (opens [this repository's releases](https://github.com/SPS-L/stepss-java-ui/releases))
 
 ## License
 
