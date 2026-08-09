@@ -22,7 +22,7 @@
 - Replay grammar, pinned by `stepss-dyngraph/tests/smoke.cmd` and `tests/nested.cmd`: trajectory path on line 1, then keyword, name, and a third sub-observable line when the keyword is `SOE`, `SOT`, `I`, `T` or `D` and for no other keyword; terminated by a blank line and `S`.
 - `Selection.label()` reproduces the `desc_obs` formats verbatim (`selec_observ.f90:92,123,157,203,299,316,322,355,388,432`); `SOE`/`SOT` render as `excit control:` / `torque control:`, not their `TYPES` labels.
 - `RamsesUI.form` is **not edited**. The picker is a hand-written `JDialog`; `runDyngraphButton` keeps its initial state, and its tooltip (form line reflected at `RamsesUI.java:1817`) already promises a selection dialog.
-- The plot run passes **no `-eps`** (it would export an EPS instead of leaving a `.plt` for `viewCurvesButton`) and gets **no terminal window**. There is no fallback to the old `-a<trj>` terminal path; `PlatformLauncher.runInTerminal` keeps its other callers and is not touched.
+- The plot run passes **no `-eps`** (it would export an EPS instead of leaving a `.plt` for `viewCurvesButton`) and gets **no terminal window**. There is no fallback to the old `-a<trj>` terminal path. `PlatformLauncher.runInTerminal` is **not touched, and becomes unused**: `RamsesUI.java:3278` is its only call site in the repo, and Task 7 deletes it. Leave the method in place — it is one of a family of platform helpers (`openTerminal`, `openInEditor`, `openFileManager`, `findOnPath`, `killByName`) and removing it is out of scope here. Do not "fix" the resulting unused-method warning.
 - **Never use compound git commands** (`&&`, `||`, `;`). Run each git command separately, and `cd` in its own command first. This repo is a submodule of the stepss umbrella: commit here; pushing and the umbrella pointer bump are the user's call.
 - Build commands: `ant jar` is the full build (its `fetch-payloads` needs network and an authenticated `gh` the first time; later builds hit `payload-cache/`). `ant compile` exists (`nbproject/build-impl.xml:1137`) and produces `build/classes`, which is all the harness needs — use it for the red/green loops. Do not invent other targets.
 
@@ -278,10 +278,11 @@ public final class PickerHarness {
 # deliberately depends on nothing that launches a process or references
 # commons-exec types, so build/classes alone is enough to load it.
 #
-# 'ant compile' still needs staged payloads to finish green - it depends on
-# -post-compile, which runs PayloadManifestCheck against the gitignored
-# src/my/ramses/payload/. On a checkout without them that target fails, but it
-# runs after -do-compile, so build/classes exists anyway and this script works.
+# 'ant compile' still needs the payloads: build.xml makes -pre-compile depend on
+# stage-payloads, so fetching and staging happen BEFORE javac. On a checkout with
+# neither a warm payload-cache/ nor network plus authenticated gh, the build dies
+# before build/classes is created and this script has nothing to run. A warm
+# payload-cache/ is enough - it does not need the network again.
 set -eu
 cd "$(dirname "$0")/.."
 if [ ! -d build/classes ]; then
@@ -2450,7 +2451,7 @@ java -cp build/classes:/tmp/claude/picker-probe PickerProbe
 Walk this checklist in the dialog that opens (needs a display):
 
 1. The Category box lists `BUS SHUNT LOAD BRANCH SYNC INJECTOR LINK DCTL` — all eight, since every fixture category is non-empty.
-2. BUS shows four names including ` LEADBUS` (with its leading blank visible) and `END`; typing `bus` in Filter narrows to `BUS1`/`BUS2` (case-insensitive), clearing it restores all four.
+2. BUS shows four names including ` LEADBUS` (with its leading blank visible) and `END`; typing `bus` in Filter narrows to **three** rows — `BUS1`, `BUS2` **and ` LEADBUS`**, because the filter is a case-insensitive `contains` and ` leadbus` contains `bus`; only `END` drops out. Clearing it restores all four. (Typing `bus1` narrows to one.)
 3. With no name selected, Add is disabled; selecting `BUS1` enables it (the Observable box preselects `voltage magnitude (pu)`).
 4. SYNC → `GEN1`: choosing `observable of excitation controller` (SOE) makes the second dropdown appear holding `VF`; Add produces `sync mach GEN1: excit control: VF` in Selected.
 5. SYNC → `GEN2`: the SOE entry is greyed and cannot be chosen (the selection snaps back); SOT works and offers `Pm`.
@@ -2750,9 +2751,9 @@ git diff --stat src/my/ramses/RamsesUI.form
 ```
 Expected: **no output** — the form is untouched (its tooltip "Click to initiate dialog for selecting the observables you want to plot" simply became true again).
 ```bash
-git diff src/my/ramses/RamsesUI.java | grep -c "GEN-BEGIN\|GEN-END"
+git diff src/my/ramses/RamsesUI.java | grep -c "GEN-BEGIN\|GEN-END" || true
 ```
-Expected: `0` — no edit landed inside a NetBeans-generated block. (The handler body between `GEN-FIRST`/`GEN-LAST` is user code, as with every other handler in the file.)
+Expected: prints `0` — no edit landed inside a NetBeans-generated block. (The handler body between `GEN-FIRST`/`GEN-LAST` is user code, as with every other handler in the file.) The `|| true` is needed because `grep -c` exits 1 when the count is zero, which is the passing case here.
 
 - [ ] **Step 7: Commit**
 
@@ -2819,6 +2820,8 @@ On a case with an exciter-carrying machine and (if available) injectors: pick `S
 - [ ] **Step 3: Linux — failure paths**
 
 1. Delete `<temp>/output.trj` (the fingerprinted temp directory the GUI reports; or use a fresh launch without a simulation, if the button is enabled from a loaded trajectory only, load then delete). Press **Extract Curves**. Expected: an error dialog carrying DYNGRAPH's own stderr (`File ... does not exist`); the picker never opens; **Preview Curve**/**Save Current Curve** unchanged.
+
+   **The headline will read "The bundled DYNGRAPH does not support `--list`". That is expected — do not file it as a bug.** `--list` on a missing file exits non-zero with *empty stdout* and the complaint on stderr (`stepss-dyngraph/src/main.f90:160-170`), which is byte-for-byte how an old binary fails; DYNGRAPH's own gate documents the two as indistinguishable (`tools/smoke_gate.sh:144-151`). The spec's failure table knowingly accepts stderr as the disambiguator. Record the row as PASS if the stderr text is present and correct.
 2. After a successful extraction (buttons enabled), force a failing re-run the same way. Expected: the failure dialog, and both result buttons **stay disabled** — they were disabled before the run started.
 3. Cancel the picker. Expected: nothing changes, no files written.
 

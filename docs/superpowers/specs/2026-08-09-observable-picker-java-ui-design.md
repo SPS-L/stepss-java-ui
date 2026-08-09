@@ -367,7 +367,10 @@ must not leave them pointing at the stale `tempGnupOut.plt`/`.cur` that DYNGRAPH
 may have truncated or half-written. On success they are re-enabled with no
 dialog, exactly as today.
 
-`PlatformLauncher.runInTerminal` keeps its other callers and is not touched.
+`PlatformLauncher.runInTerminal` is not touched, but it does become unused —
+`RamsesUI.java:3278` is its only call site in the repo. It stays in place as one
+of the platform helper family (`openTerminal`, `openInEditor`,
+`openFileManager`, `findOnPath`, `killByName`); removing it is out of scope.
 
 ### Failure behaviour
 
