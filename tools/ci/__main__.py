@@ -7,7 +7,6 @@ from . import bump, notify, release
 COMMANDS = {
     "bump": bump.main,
     "next-version": release.next_version_main,
-    "update-readme": release.update_readme_main,
     "notes": release.notes_main,
     "notify": notify.main,
 }

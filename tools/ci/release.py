@@ -1,4 +1,4 @@
-"""Assemble the release: version number, README line, notes.
+"""Assemble the release: version number and notes.
 
 Pure. Everything here is derived from what the bump already produced.
 """
@@ -8,8 +8,6 @@ import re
 import sys
 
 from . import pins
-
-README_ANCHOR = re.compile(r"^Current release: \*\*.+\*\*\.$", re.MULTILINE)
 
 
 def next_version(ramses_version, existing_tags):
@@ -34,32 +32,6 @@ def next_version(ramses_version, existing_tags):
     return "v%s.%d" % (base, max(counters) + 1 if counters else 1)
 
 
-def update_readme(path, version):
-    """Rewrites the 'Current release' line, and only that line.
-
-    Anchored to the whole line so it cannot match the version number where it
-    appears in prose. The known-limitation paragraph names a pinned URAMSES
-    version as part of a claim about that version, and substituting a new
-    number there would keep the claim alive while making it look freshly
-    checked - so it is left for a human, flagged by tools/ci/notify.py.
-    """
-    bare = pins.version_of(version)
-    with open(path, "r", encoding="utf-8") as handle:
-        text = handle.read()
-
-    if not README_ANCHOR.search(text):
-        raise ValueError("%s has no 'Current release: **...**.' line" % path)
-
-    replacement = "Current release: **%s**." % bare
-    updated = README_ANCHOR.sub(replacement, text)
-    if updated == text:
-        return False
-
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(updated)
-    return True
-
-
 def next_version_main(argv):
     if argv:
         sys.stderr.write("Usage: python3 -m tools.ci next-version\n")
@@ -72,14 +44,6 @@ def next_version_main(argv):
         ["git", "tag", "--list"], check=True, capture_output=True, text=True
     ).stdout.split()
     print(next_version(props["ramses.version"], tags))
-    return 0
-
-
-def update_readme_main(argv, path="README.md"):
-    version = _required_option(argv, "--version")
-    if version is None:
-        return 2
-    update_readme(path, version)
     return 0
 
 
@@ -109,7 +73,7 @@ def _option_value(argv, name):
     return True, argv[index + 1]
 
 
-def _required_option(argv, name, usage=None):
+def _required_option(argv, name, usage):
     """Returns the value following `name` in argv, or None on misuse.
 
     Never raises: a missing option and a present-but-valueless option (the
@@ -120,13 +84,10 @@ def _required_option(argv, name, usage=None):
     a SystemExit carrying a string, which exits 1 rather than 2) ever
     reaching the caller.
 
-    `usage` defaults to update-readme's own usage line, so the one existing
-    caller is unaffected; notes_main (which has three required options, not
-    one) passes its own so the message printed actually names the command
-    and option the caller got wrong instead of an unrelated one.
+    `usage` is mandatory rather than defaulted: every caller has a different
+    command name and option set, and a shared default would print a usage
+    line naming a command the caller never ran.
     """
-    if usage is None:
-        usage = "Usage: python3 -m tools.ci update-readme --version <tag>\n"
     present, value = _option_value(argv, name)
     if not present or value is None:
         sys.stderr.write(usage)

@@ -146,12 +146,6 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "previous=$previous" >> "$GITHUB_OUTPUT"
 
-      - name: Update the README's release line
-        if: steps.bump.outputs.proceed == 'true'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: python3 -m tools.ci update-readme --version "$VERSION"
-
       # `ant` happens to be preinstalled on today's ubuntu-latest image, and
       # the build step assumes it silently. Runner images drop tools between
       # versions, so check for it here rather than meet a "command not found"
@@ -213,7 +207,7 @@ jobs:
           set -euo pipefail
           git config user.name "stepss-release-bot"
           git config user.email "actions@github.com"
-          git add versions.properties src/my/ramses/platform/Toolchain.java README.md
+          git add versions.properties src/my/ramses/platform/Toolchain.java
           if git diff --cached --quiet; then
             echo "No pin changes to commit (manual release of unchanged sources)."
           else

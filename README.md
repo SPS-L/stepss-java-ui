@@ -4,8 +4,6 @@
 
 STEPSS is the Java (Swing) desktop GUI for the RAMSES dynamic power system simulator, part of the [STEPSS](https://stepss.sps-lab.org/) power system simulation platform. It bundles the complete simulation toolchain (RAMSES, Helios, CODEGEN, DYNGRAPH, gnuplot) into a single application, so users can load a network, run static and dynamic simulations, and analyse the results without touching the command line.
 
-Current release: **3.55**.
-
 ## Features
 
 - **Complete workflow in tabs**: System Data, Observables, Initialization, Dynamic Simulation, Analysis, and Codegen
