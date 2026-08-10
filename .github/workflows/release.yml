@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           # Full history so the next version can be derived from the existing
           # tags, and STEPSS_TOKEN so the push at the end is authorised.
