@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Full history so the next version can be derived from the existing
           # tags, and STEPSS_TOKEN so the push at the end is authorised.
@@ -43,7 +43,7 @@ jobs:
       # and runs UramsesKitPack to compute the content-manifest digest, so the
       # bump step needs a JDK too, not only `ant jar`.
       - name: Set up Java 11
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "11"
