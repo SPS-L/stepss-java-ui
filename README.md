@@ -97,8 +97,8 @@ In addition, the application distributes the following third-party Java librarie
 
 ## Related Projects
 
-- [PyRAMSES](https://stepss.sps-lab.org/pyramses/): Python interface for RAMSES
-- [URAMSES](https://github.com/SPS-L/stepss-uramses): user models for PyRAMSES
+- [STEPSS for Python](https://stepss.sps-lab.org/python/): the `stepss` package, Python interface for RAMSES
+- [URAMSES](https://github.com/SPS-L/stepss-uramses): user models for stepss
 
 ## Documentation
 

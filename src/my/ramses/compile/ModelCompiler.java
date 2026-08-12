@@ -26,7 +26,7 @@ import my.ramses.platform.Toolchain;
  *
  * <p>The build definition lives upstream and is CI-tested on the same runner
  * images that produce the module kits, so the STEPSS route and the documented
- * PyRAMSES route are the same build. This class only stages inputs and runs
+ * stepss route are the same build. This class only stages inputs and runs
  * {@code make}.
  */
 public final class ModelCompiler {
