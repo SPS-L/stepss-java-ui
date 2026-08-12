@@ -1,8 +1,17 @@
-# STEPSS
+# STEPSS for Java
 
 **Static and Transient Electric Power Systems Simulation**
 
-STEPSS is the Java (Swing) desktop GUI for the RAMSES dynamic power system simulator, part of the [STEPSS](https://stepss.sps-lab.org/) power system simulation platform. It bundles the complete simulation toolchain (RAMSES, Helios, CODEGEN, DYNGRAPH, gnuplot) into a single application, so users can load a network, run static and dynamic simulations, and analyse the results without touching the command line.
+[STEPSS](https://stepss.sps-lab.org/) is a power system simulation platform for dynamic studies of electrical grids. It is delivered in [two editions](https://stepss.sps-lab.org/getting-started/overview/#two-editions), which drive the same engines and read the same data files:
+
+| Edition | Distributed as | Use it for |
+|---|---|---|
+| **STEPSS for Java**, this repository | `stepss.jar`, a desktop application | Interactive work: load a network, run it, plot curves, build models |
+| **STEPSS for Python** | the `stepss` package, `pip install stepss` | Scripting, parameter sweeps, and the scientific Python stack |
+
+Neither edition wraps the other, and a case built in one runs unchanged in the other.
+
+This one is a Java (Swing) desktop application. It bundles the complete simulation toolchain (RAMSES, Helios, CODEGEN, DYNGRAPH, gnuplot) into a single jar, so a network can be loaded, simulated statically and dynamically, and analysed without touching the command line. **CODEGEN makes this the edition for building your own models**: it is the one component the Python edition does not carry.
 
 ## Features
 
@@ -22,7 +31,7 @@ STEPSS is the Java (Swing) desktop GUI for the RAMSES dynamic power system simul
 
 **Requirements:** 64-bit Java 11 or later (JRE to run, JDK to build), [Apache Ant](https://ant.apache.org/) to build. Windows and Linux are x86_64; macOS is Apple Silicon (arm64) only, Intel Macs are not supported.
 
-The prebuilt jar is published as a **release artifact** on the [releases page](https://github.com/SPS-L/stepss-java-ui/releases), not committed to this repository — `build/` and `dist/` are untracked. Download it there if you just want to run STEPSS.
+The prebuilt jar is published as a **release artifact** on the [releases page](https://github.com/SPS-L/stepss-java-ui/releases), not committed to this repository: `build/` and `dist/` are untracked. Download it there if you just want to run STEPSS.
 
 ### Build from source
 
@@ -34,7 +43,7 @@ ant jar
 
 The build (a NetBeans/Ant project) produces `dist/stepss.jar`, a self-contained jar with the Commons Exec and Commons IO libraries merged in.
 
-Building fetches the pinned RAMSES, Helios, DYNGRAPH, and CODEGEN binaries for all three platforms (`ant fetch-payloads`, run automatically as part of `ant jar`) from their releases in the SPS-L GitHub organisation. Those component repositories are private, so the first build needs network access and the [`gh` CLI](https://cli.github.com/) authenticated with SPS-L access (`gh auth login`); downloaded archives are checksum-verified against `versions.properties` and cached in `payload-cache/`, so later builds only need network again when a pinned version changes. CI authenticates the same way, through this repository's `STEPSS_TOKEN` secret — Actions' default `GITHUB_TOKEN` is scoped to this repo alone and cannot reach the component repos.
+Building fetches the pinned RAMSES, Helios, DYNGRAPH, and CODEGEN binaries for all three platforms (`ant fetch-payloads`, run automatically as part of `ant jar`) from their releases in the SPS-L GitHub organisation. Those component repositories are private, so the first build needs network access and the [`gh` CLI](https://cli.github.com/) authenticated with SPS-L access (`gh auth login`); downloaded archives are checksum-verified against `versions.properties` and cached in `payload-cache/`, so later builds only need network again when a pinned version changes. CI authenticates the same way, through this repository's `STEPSS_TOKEN` secret, because Actions' default `GITHUB_TOKEN` is scoped to this repo alone and cannot reach the component repos.
 
 On macOS, the current RAMSES, DYNGRAPH, and CODEGEN builds are dynamically linked against gfortran and OpenBLAS; install them first with `brew install gcc openblas`. Statically linked builds that drop this requirement are expected from those projects.
 
@@ -42,13 +51,13 @@ Compiling custom models is optional and needs a Fortran toolchain on your machin
 
 ### Releases
 
-Releases are cut automatically. A daily GitHub Actions run checks the five pinned components — RAMSES, Helios, DYNGRAPH, CODEGEN, and URAMSES — for new releases; when one has moved, it re-pins `versions.properties` and the matching resource names in `Toolchain.java`, rebuilds, verifies that the bundled toolchain extracts correctly, and publishes a release with `stepss.jar` attached. The notes list every component's pinned version, and embed the upstream release notes of the components that actually moved, since four of the five component repos are private and cannot be linked to usefully.
+Releases are cut automatically. A daily GitHub Actions run checks the five pinned components (RAMSES, Helios, DYNGRAPH, CODEGEN and URAMSES) for new releases; when one has moved, it re-pins `versions.properties` and the matching resource names in `Toolchain.java`, rebuilds, verifies that the bundled toolchain extracts correctly, and publishes a release with `stepss.jar` attached. The notes list every component's pinned version, and embed the upstream release notes of the components that actually moved, since four of the five component repos are private and cannot be linked to usefully.
 
-Nothing is published until the build and the toolchain check have both passed. The commit that re-pins the build is pushed immediately before the release is created, and the tag is created by the same API call that creates the release — so a run that fails leaves no tag and no release behind, and re-running it publishes under the same version number. Any failure opens an issue.
+Nothing is published until the build and the toolchain check have both passed. The commit that re-pins the build is pushed immediately before the release is created, and the tag is created by the same API call that creates the release, so a run that fails leaves no tag and no release behind, and re-running it publishes under the same version number. Any failure opens an issue.
 
 Release numbers follow the pinned RAMSES version, with a counter for releases driven by the other components: `v3.55`, then `v3.55.1`, `v3.55.2`, and so on until RAMSES itself moves.
 
-Running the workflow by hand (Actions → Release → Run workflow) also picks up any new component releases first, then publishes regardless — that is how a change to the Java sources alone reaches a release.
+Running the workflow by hand (Actions → Release → Run workflow) also picks up any new component releases first, then publishes regardless: that is how a change to the Java sources alone reaches a release.
 
 To re-pin locally instead, run `python3 -m tools.ci bump` from the repository root (add `--dry-run` to see what would change without downloading or writing anything). It rewrites `versions.properties` and `Toolchain.java` together; editing only the former leaves the build naming the old asset, which `ant jar` catches.
 
