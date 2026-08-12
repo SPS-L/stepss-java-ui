@@ -1,15 +1,18 @@
-ACADEMIC PUBLIC LICENSE
-Copyright (c) Dr Petros Aristidou (stepss) and Dr Thierry Van Cutsem (RAMSES). All rights reserved.
+RAMSES LICENSE
+Copyright (c) University of Liège, Belgium. All rights reserved.
 
-The following license governs the use of stepss in academic and educational environments. For uses outside this scope, or if you are unsure, contact the copyright owners.
+RAMSES, the solver of differential-algebraic equations bundled with STEPSS, is NOT covered by the Apache License 2.0 that governs the STEPSS user interfaces. It is the property of the University of Liège, Belgium, which has granted Dr Petros Aristidou and Dr Thierry Van Cutsem (the Authors) a personal, royalty-free, limited, non-exclusive, non-transferable and non-assignable license to distribute an executable version of RAMSES free of charge. The following terms govern its use. For uses outside this scope, or if you are unsure, contact the Authors.
 
 1. Definitions
-“Software” means a copy of stepss, which is distributed under this Academic Public License. “Work based on the Software” means either the Software or any derivative work under copyright law: that is to say, a work containing the Software or a portion of it, either verbatim or with modifications. “Using the Software” means any act of creating executables that contain or directly use libraries that are part of the Software, running any of the tools that are part of the Software, or creating works based on the Software. “You” refers to each licensee.
+“Software” means a copy of RAMSES, which is distributed under this License. “Work based on the Software” means either the Software or any derivative work under copyright law: that is to say, a work containing the Software or a portion of it, either verbatim or with modifications. “Using the Software” means any act of creating executables that contain or directly use libraries that are part of the Software, running any of the tools that are part of the Software, or creating works based on the Software. “You” refers to each licensee.
 
 2. License terms
 Permission is hereby granted to use the Software free of charge for any non-commercial purpose, including teaching and research at universities, colleges and other educational institutions, research at non-profit research institutions, and personal non-profit purposes. For using the Software for commercial purposes, including but not restricted to consulting activities, design of commercial hardware or software products, and a commercial entity participating in research projects, you have to contact the Authors for an appropriate license.
 
+3. Limits of the free-of-charge version
+The free-of-charge version of the Software is limited to power system models of up to 1000 buses (or nodes), and to execution with parallelization using no more than 2 cores. For extensions to larger models or execution using more than two cores, contact the Authors.
+
 You are not required to accept this License. Nothing else grants you permission to use the Software; law prohibits this action if you do not accept this License. Therefore, by using the Software (or any work based on the Software), you indicate your acceptance of this License and all its terms and conditions.
 
-3. No warranty
+4. No warranty
 THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

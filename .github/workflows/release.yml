@@ -98,7 +98,7 @@ jobs:
       # GITHUB_TOKEN is enough here, as with the URAMSES caveat below.
       - name: Flag components that were not re-pinned
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           body=$(python3 - <<'PY'
@@ -267,7 +267,7 @@ jobs:
       - name: Flag the README's URAMSES caveat for review
         if: steps.bump.outputs.proceed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
@@ -282,7 +282,7 @@ jobs:
       - name: Report failure
         if: failure()
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
