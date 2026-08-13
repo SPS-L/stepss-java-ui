@@ -18,20 +18,27 @@ import javax.swing.JPanel;
  * basis-dependent: it would come out differently on another machine while
  * looking exactly as authoritative. Refusing is the honest option.
  *
- * <p>A simple mode with no entries is a second, different case: the engine
- * writes &lt;base&gt;_ms.dat only for modes that passed real_limit, the same
- * guard it applies to the participation file, so an empty entry list there
- * means "filtered out", not "nothing to show". That case says so instead of
- * drawing an empty dial. The no-selection state, reached through
- * {@link #clear()}, is a third case again: no mode has been chosen yet, so
- * it draws the plain dial with neither arrows nor a message.
+ * <p>A simple mode with no entries is a second case, and which explanation is
+ * honest there depends on the engine's own dom flag, never on the emptiness
+ * alone. When dom is 0 the engine filtered the mode by real_limit and wrote
+ * no mode shape for it, so saying so is correct. When dom is 1 the engine
+ * marked the mode dominant and should have written rows, so the file is
+ * missing or incomplete: naming real_limit there would invent a reason.
+ * &lt;base&gt;_ms.dat is optional to {@link SsaResults#load}, and the copy-out
+ * in RamsesUI copies only the files that exist, so that state is reachable.
+ * The no-selection state, reached through {@link #clear()}, is a third case
+ * again: no mode has been chosen yet, so it draws the plain dial with
+ * neither arrows nor a message.
  */
 public final class ModeShapePanel extends JPanel {
 
     private static final double R_MAX = 1.3;
+    /** Below this the dial has no room left once the margin is taken. */
+    private static final double MIN_RADIUS = 1.0;
 
     private List<ModeShapeEntry> entries = new ArrayList<ModeShapeEntry>();
     private boolean simple = true;
+    private boolean dominant = true;
     private int modeIndex;
     private boolean noSelection = true;
 
@@ -49,14 +56,22 @@ public final class ModeShapePanel extends JPanel {
         this.entries = new ArrayList<ModeShapeEntry>();
         this.modeIndex = 0;
         this.simple = true;
+        this.dominant = true;
         this.noSelection = true;
         repaint();
     }
 
-    public void show(List<ModeShapeEntry> entries, int modeIndex, boolean simple) {
+    /**
+     * @param simple the mode's smp flag, false for a degenerate eigenvalue
+     * @param dominant the mode's dom flag, which is what distinguishes a mode
+     *     the engine filtered from one it kept but wrote no rows for
+     */
+    public void show(List<ModeShapeEntry> entries, int modeIndex, boolean simple,
+            boolean dominant) {
         this.entries = new ArrayList<ModeShapeEntry>(entries);
         this.modeIndex = modeIndex;
         this.simple = simple;
+        this.dominant = dominant;
         this.noSelection = false;
         repaint();
     }
@@ -70,7 +85,7 @@ public final class ModeShapePanel extends JPanel {
         if (noSelection) {
             renderBlank(sink, width, height);
         } else {
-            render(sink, entries, simple, width, height);
+            render(sink, entries, simple, dominant, width, height);
         }
         return sink.toSvg();
     }
@@ -84,7 +99,8 @@ public final class ModeShapePanel extends JPanel {
         if (noSelection) {
             renderBlank(new SwingSink(g), getWidth(), getHeight());
         } else {
-            render(new SwingSink(g), entries, simple, getWidth(), getHeight());
+            render(new SwingSink(g), entries, simple, dominant,
+                    getWidth(), getHeight());
         }
         g.dispose();
     }
@@ -93,15 +109,23 @@ public final class ModeShapePanel extends JPanel {
     private static void renderBlank(PlotSink sink, int width, int height) {
         double cx = width / 2.0;
         double cy = height / 2.0;
-        double radius = Math.min(width, height) / 2.0 - 30.0;
-        drawRingsAndSpokes(sink, cx, cy, radius);
+        drawRingsAndSpokes(sink, cx, cy, radius(width, height));
+    }
+
+    /**
+     * The dial radius, never negative. Below 60 px the margin exceeds the
+     * half-extent, and a negative r is an error in SVG rather than an empty
+     * circle, so the whole exported file would be rejected.
+     */
+    private static double radius(int width, int height) {
+        return Math.max(Math.min(width, height) / 2.0 - 30.0, MIN_RADIUS);
     }
 
     static void render(PlotSink sink, List<ModeShapeEntry> entries, boolean simple,
-            int width, int height) {
+            boolean dominant, int width, int height) {
         double cx = width / 2.0;
         double cy = height / 2.0;
-        double radius = Math.min(width, height) / 2.0 - 30.0;
+        double radius = radius(width, height);
 
         if (!simple) {
             sink.group("refusal");
@@ -118,15 +142,28 @@ public final class ModeShapePanel extends JPanel {
         }
 
         if (entries.isEmpty()) {
-            // Same absence the participation panel reports: the engine
-            // writes _ms.dat rows only for modes that passed real_limit, so
-            // no entries means filtered out, not a mode with nothing to show.
-            sink.group("filtered");
-            sink.text(cx, cy - 8.0, "This mode was filtered out by real_limit.",
-                    "middle", "title");
-            sink.text(cx, cy + 12.0,
-                    "No mode shape was written for it, so none is shown here.",
-                    "middle", "label");
+            // Same absence the participation panel reports, and split the same
+            // way. The engine's own dom flag is the authority on which of the
+            // two reasons applies; the empty list on its own cannot tell them
+            // apart, and guessing real_limit for a dominant mode states a
+            // cause that did not happen.
+            if (dominant) {
+                sink.group("no-rows");
+                sink.text(cx, cy - 8.0,
+                        "The engine marked this mode dominant, but no mode"
+                        + " shape rows were written for it.",
+                        "middle", "title");
+                sink.text(cx, cy + 12.0,
+                        "The mode-shape file may be missing from this directory.",
+                        "middle", "label");
+            } else {
+                sink.group("filtered");
+                sink.text(cx, cy - 8.0, "This mode was filtered out by real_limit.",
+                        "middle", "title");
+                sink.text(cx, cy + 12.0,
+                        "No mode shape was written for it, so none is shown here.",
+                        "middle", "label");
+            }
             sink.endGroup();
             return;
         }
@@ -145,8 +182,12 @@ public final class ModeShapePanel extends JPanel {
         for (ModeShapeEntry entry : entries) {
             double th = Math.toRadians(entry.angleDeg);
             double rr = radius * entry.magnitude * 1.12 / R_MAX;
+            // Not trimmed: Columns.slice already removed the a20 padding, and
+            // a LEADING blank is part of the device name as the engine stored
+            // it. Trimming here is what makes two similarly named machines
+            // indistinguishable against the network data file.
             sink.text(cx + rr * Math.cos(th), cy - rr * Math.sin(th),
-                    entry.device.trim(), "middle", "label");
+                    entry.device, "middle", "label");
         }
         sink.endGroup();
     }

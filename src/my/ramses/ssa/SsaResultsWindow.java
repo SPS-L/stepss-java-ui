@@ -210,7 +210,18 @@ public final class SsaResultsWindow extends JFrame {
                     + " machine. Not shown."));
         } else {
             List<Participation> rows = results.participation().forMode(mode.index);
-            if (rows.isEmpty()) {
+            if (rows.isEmpty() && mode.dominant) {
+                // The engine's dom flag says this mode passed real_limit, so
+                // real_limit is not why the rows are absent. _pf.dat is
+                // optional to SsaResults.load and the copy-out in RamsesUI
+                // copies only files that exist, so the honest report is that
+                // the rows are missing, not a filter that did not fire.
+                participation.add(new JLabel("  Mode " + mode.index
+                        + " was marked dominant by the engine, but no"
+                        + " participation rows were written for it."));
+                participation.add(new JLabel("  The participation file may be"
+                        + " missing from this directory."));
+            } else if (rows.isEmpty()) {
                 participation.add(new JLabel("  Mode " + mode.index
                         + " was filtered out by real_limit ("
                         + show(results.modes().realLimit())
@@ -219,9 +230,13 @@ public final class SsaResultsWindow extends JFrame {
                 participation.add(new JLabel("  Mode " + mode.index + ", "
                         + String.format(java.util.Locale.ROOT, "%.4f Hz", mode.freqHz)));
                 for (Participation p : rows) {
+                    // p.device is shown as parsed. Columns.slice already
+                    // removed the a20 padding, and a LEADING blank is part of
+                    // the name the engine stored: trimming it here is what
+                    // makes " G2" and "G2" look like the same machine.
                     participation.add(new JLabel(String.format(java.util.Locale.ROOT,
                             "   %-8s %-20s %-10s %.3f",
-                            p.family, p.device.trim(), p.variable, p.pf)));
+                            p.family, p.device, p.variable, p.pf)));
                 }
                 participation.add(new JLabel("  Entries below pf_threshold "
                         + show(results.modes().pfThreshold())
@@ -234,7 +249,7 @@ public final class SsaResultsWindow extends JFrame {
         shape.show(mode.simple
                 ? results.shapes().forMode(mode.index)
                 : new java.util.ArrayList<ModeShapeEntry>(),
-                mode.index, mode.simple);
+                mode.index, mode.simple, mode.dominant);
     }
 
     /** The modes table. */

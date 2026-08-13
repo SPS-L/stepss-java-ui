@@ -149,7 +149,7 @@ public final class SsaHarness {
 
     private static void checkModeShapeRendersArrows() {
         SvgSink sink = new SvgSink(360, 360);
-        ModeShapePanel.render(sink, shapeFixture(), true, 360, 360);
+        ModeShapePanel.render(sink, shapeFixture(), true, true, 360, 360);
         String svg = sink.toSvg();
         // One arrow is three lines: the shaft and two head strokes.
         expect("two machines give six arrow strokes", 6,
@@ -157,15 +157,63 @@ public final class SsaHarness {
         expect("machines are labelled", true, svg.contains("AREA 1 G1"));
         expect("magnitude rings are drawn", 2, countOf(svg, "class=\"grid\""));
         expect("the dial group is present", true, svg.contains("<g id=\"arrows\""));
+        // The parsers work to keep a leading blank; the drawn label is the
+        // only place a human sees it, so trimming there undoes all of that.
+        expect("a leading blank reaches the drawn label", true,
+                svg.contains("> G2</text>"));
     }
 
     private static void checkModeShapeRefusesDegenerate() {
         SvgSink sink = new SvgSink(360, 360);
-        ModeShapePanel.render(sink, shapeFixture(), false, 360, 360);
+        // dominant true on purpose: degeneracy is a refusal that outranks the
+        // dom flag, so the dial must not fall through to a dominant message.
+        ModeShapePanel.render(sink, shapeFixture(), false, true, 360, 360);
         String svg = sink.toSvg();
         expect("a degenerate mode draws no arrows", 0,
                 countOf(svg, "class=\"shape\""));
         expect("and says why", true, svg.contains("degenerate"));
+        expect("degeneracy outranks the dominant flag", false,
+                svg.contains("dominant"));
+    }
+
+    /** dom == 0 with no rows: real_limit really is the reason. */
+    private static void checkModeShapeReportsFilteredMode() {
+        SvgSink sink = new SvgSink(360, 360);
+        ModeShapePanel.render(sink, new java.util.ArrayList<ModeShapeEntry>(),
+                true, false, 360, 360);
+        String svg = sink.toSvg();
+        expect("a filtered mode draws no arrows", 0, countOf(svg, "class=\"shape\""));
+        expect("a filtered mode names real_limit", true,
+                svg.contains("real_limit"));
+    }
+
+    /**
+     * dom == 1 with no rows: the engine kept this mode, so real_limit did not
+     * filter it and saying so would invent a cause. _ms.dat is optional to
+     * SsaResults.load, which is how this state is reached.
+     */
+    private static void checkModeShapeReportsMissingRowsForDominantMode() {
+        SvgSink sink = new SvgSink(360, 360);
+        ModeShapePanel.render(sink, new java.util.ArrayList<ModeShapeEntry>(),
+                true, true, 360, 360);
+        String svg = sink.toSvg();
+        expect("a dominant mode with no rows draws no arrows", 0,
+                countOf(svg, "class=\"shape\""));
+        expect("a dominant mode with no rows does not blame real_limit", false,
+                svg.contains("real_limit"));
+        expect("a dominant mode with no rows says the engine kept it", true,
+                svg.contains("dominant"));
+        expect("and points at the missing file", true,
+                svg.contains("missing from this directory"));
+    }
+
+    /** Below 60 px the margin exceeds the half-extent, and r must not go negative. */
+    private static void checkModeShapeClampsTinyRadius() {
+        SvgSink sink = new SvgSink(40, 40);
+        ModeShapePanel.render(sink, shapeFixture(), true, true, 40, 40);
+        String svg = sink.toSvg();
+        expect("a tiny dial emits no negative radius", false,
+                svg.contains("r=\"-"));
     }
 
     public static void main(String[] args) throws java.io.IOException {
@@ -191,6 +239,9 @@ public final class SsaHarness {
         checkSplaneMarksSelection();
         checkModeShapeRendersArrows();
         checkModeShapeRefusesDegenerate();
+        checkModeShapeReportsFilteredMode();
+        checkModeShapeReportsMissingRowsForDominantMode();
+        checkModeShapeClampsTinyRadius();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
