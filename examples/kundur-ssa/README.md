@@ -4,11 +4,11 @@ A ready-to-run case that computes the eigenvalues, damping ratios,
 participation factors and mode shapes of the Kundur two-area benchmark, with
 and without its power system stabilisers. No MATLAB is involved.
 
-## Requires a RAMSES newer than 3.59
+## Requires a RAMSES newer than 3.60
 
-The `EIG` disturbance this example uses was added to the engine after the 3.59
+The `EIG` disturbance this example uses was added to the engine after the v3.60
 release, and `versions.properties` in this repository currently pins
-**ramses.version=3.59**. Until that pin moves to a release carrying `EIG`, the
+**ramses.version=3.60**. Until that pin moves to a release carrying `EIG`, the
 bundled engine accepts the disturbance and writes no results files.
 
 Check which engine you have from the STEPSS window: **Help, About**, or run the
