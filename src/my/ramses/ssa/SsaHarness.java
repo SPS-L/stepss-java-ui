@@ -158,6 +158,7 @@ public final class SsaHarness {
         checkUnclosedGroupsAutoClose();
         checkSplaneRendersExpectedElements();
         checkSplaneMinimumExtentExpands();
+        checkSplaneDownwardExpansion();
         checkSplaneMarksSelection();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
@@ -347,6 +348,37 @@ public final class SsaHarness {
         return SsaResults.electromechanical(m.modes());
     }
 
+    private static double extractAttribute(String svg, String elementType,
+            int elementIndex, String attrName) {
+        int count = 0;
+        int at = 0;
+        while (count <= elementIndex) {
+            at = svg.indexOf("<" + elementType, at);
+            if (at < 0) {
+                return Double.NaN;
+            }
+            if (count == elementIndex) {
+                int attrStart = svg.indexOf(attrName + "=\"", at);
+                if (attrStart < 0) {
+                    return Double.NaN;
+                }
+                attrStart += attrName.length() + 2;
+                int attrEnd = svg.indexOf("\"", attrStart);
+                if (attrEnd < 0) {
+                    return Double.NaN;
+                }
+                try {
+                    return Double.parseDouble(svg.substring(attrStart, attrEnd));
+                } catch (NumberFormatException ex) {
+                    return Double.NaN;
+                }
+            }
+            count++;
+            at++;
+        }
+        return Double.NaN;
+    }
+
     private static void checkSplaneRendersExpectedElements() {
         SvgSink sink = new SvgSink(500, 400);
         SplanePanel.render(sink, emFixture(), null, 500, 400);
@@ -361,6 +393,17 @@ public final class SsaHarness {
         expect("frequencies are labelled", true, svg.contains("0.62 Hz"));
         expect("axes are labelled", true, svg.contains("Re"));
         expect("the pole group is present", true, svg.contains("<g id=\"poles\""));
+
+        // Verify all poles are within the plot area
+        int poleCount = countOf(svg, "class=\"pole\"");
+        for (int i = 0; i < poleCount; i++) {
+            double cx = extractAttribute(svg, "circle", i, "cx");
+            double cy = extractAttribute(svg, "circle", i, "cy");
+            expect("pole " + i + " cx is inside plot area", true,
+                    cx >= 60 && cx <= 480);
+            expect("pole " + i + " cy is inside plot area", true,
+                    cy >= 20 && cy <= 355);
+        }
     }
 
     private static void checkSplaneMinimumExtentExpands() {
@@ -372,6 +415,40 @@ public final class SsaHarness {
         String svg = sink.toSvg();
         expect("a mode beyond the default window still draws one pole", 1,
                 countOf(svg, "class=\"pole\""));
+
+        // Verify the pole is actually inside the plot area, not just rendered
+        double cx = extractAttribute(svg, "circle", 0, "cx");
+        double cy = extractAttribute(svg, "circle", 0, "cy");
+        expect("the wide-bounds mode's pole cx is inside plot area", true,
+                cx >= 60 && cx <= 480);
+        expect("the wide-bounds mode's pole cy is inside plot area", true,
+                cy >= 20 && cy <= 355);
+    }
+
+    private static void checkSplaneDownwardExpansion() {
+        // A conjugate pair with both positive and negative imaginary parts must
+        // fit inside the expanded window without clipping.
+        java.util.List<Mode> pair = new java.util.ArrayList<Mode>();
+        pair.add(new Mode(1, -0.43, 3.92, 0.11, 0.62, true, true));
+        pair.add(new Mode(2, -0.43, -3.92, 0.11, 0.62, true, true));
+        SvgSink sink = new SvgSink(500, 400);
+        SplanePanel.render(sink, pair, null, 500, 400);
+        String svg = sink.toSvg();
+
+        // Verify both poles are inside the plot area
+        double cx0 = extractAttribute(svg, "circle", 0, "cx");
+        double cy0 = extractAttribute(svg, "circle", 0, "cy");
+        double cx1 = extractAttribute(svg, "circle", 1, "cx");
+        double cy1 = extractAttribute(svg, "circle", 1, "cy");
+
+        expect("conjugate pair: positive im pole cx in plot area", true,
+                cx0 >= 60 && cx0 <= 480);
+        expect("conjugate pair: positive im pole cy in plot area", true,
+                cy0 >= 20 && cy0 <= 355);
+        expect("conjugate pair: negative im pole cx in plot area", true,
+                cx1 >= 60 && cx1 <= 480);
+        expect("conjugate pair: negative im pole cy in plot area", true,
+                cy1 >= 20 && cy1 <= 355);
     }
 
     private static void checkSplaneMarksSelection() {

@@ -122,12 +122,14 @@ public final class SplanePanel extends JPanel {
         double lo = MIN_RE;
         double hi = MAX_RE;
         double top = MAX_IM;
+        double bot = MIN_IM;
         for (Mode mode : shown) {
             lo = Math.min(lo, mode.re * 1.1);
             hi = Math.max(hi, mode.re * 1.1);
             top = Math.max(top, mode.im * 1.1);
+            bot = Math.min(bot, mode.im * 1.1);
         }
-        return new Bounds(lo, hi, MIN_IM, top, width, height);
+        return new Bounds(lo, hi, bot, top, width, height);
     }
 
     static void render(PlotSink sink, List<Mode> shown, Mode selected,
@@ -143,8 +145,8 @@ public final class SplanePanel extends JPanel {
         }
         sink.text((b.x(b.reLo) + b.x(b.reHi)) / 2.0, height - 12.0,
                 "Re(lambda)  [1/s]", "middle", "label");
-        sink.text(14.0, (b.y(b.imLo) + b.y(b.imHi)) / 2.0,
-                "Im(lambda)  [rad/s]", "middle", "label");
+        sink.text(5.0, (b.y(b.imLo) + b.y(b.imHi)) / 2.0,
+                "Im(lambda)  [rad/s]", "start", "label");
         sink.endGroup();
 
         // The stability boundary. Everything strictly left of this is stable.
