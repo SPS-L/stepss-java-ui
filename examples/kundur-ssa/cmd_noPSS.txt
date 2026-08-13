@@ -1,0 +1,14 @@
+lf.dat
+dyn_noPSS.dat
+solveroptions.dat
+
+init.trace
+eig.dst
+obs.trj
+obs.dat
+cont.trace
+disc.trace
+
+
+
+
