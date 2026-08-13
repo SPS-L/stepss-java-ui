@@ -39,8 +39,29 @@ public final class SsaHarness {
             + "    0.000000000000000E+00    0.000000000000000E+00  0  0",
     };
 
+    /**
+     * A minimal modes fixture with only nstates and nalg in the header, to
+     * test that absent keys parse as null rather than throwing.
+     */
+    private static final String[] PARTIAL_HEADER_LINES = {
+        "# STEPSS SSA modes v1",
+        "# nstates 3 nalg 4",
+        "#   index                       re                       im"
+            + "                     zeta                  freq_hz dom smp",
+        "       1  -10.000000000000000E+00    0.000000000000000E+00"
+            + "    1.000000000000000E+00    0.000000000000000E+00  1  1",
+        "       2 -428.700000000000000E-03    3.919040000000000E+00"
+            + "  108.740000000000000E-03  623.700000000000000E-03  1  1",
+        "       3    0.000000000000000E+00    0.000000000000000E+00"
+            + "    0.000000000000000E+00    0.000000000000000E+00  0  0",
+    };
+
     static String modesFixture() {
         return join(MODES_LINES);
+    }
+
+    static String partialHeaderFixture() {
+        return join(PARTIAL_HEADER_LINES);
     }
 
     private static String join(String[] lines) {
@@ -54,6 +75,8 @@ public final class SsaHarness {
     public static void main(String[] args) {
         checkModesParse();
         checkModesHeader();
+        checkModesTime();
+        checkModesPartialHeader();
         checkModesOriginZeta();
         checkModesCrlf();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
@@ -99,6 +122,29 @@ public final class SsaHarness {
         expect("real_limit", -1.0, m.realLimit());
         expect("pf_threshold", 0.05, round(m.pfThreshold(), 6));
         expect("gap_tol", 1.0e-6, m.gapTol());
+    }
+
+    private static void checkModesTime() {
+        SsaModes m = parsedModes();
+        if (m == null) {
+            fail("time is read from a complete header");
+            return;
+        }
+        expect("time is read from a complete header", 0.0, m.time());
+    }
+
+    private static void checkModesPartialHeader() {
+        try {
+            SsaModes m = SsaModes.parse(partialHeaderFixture());
+            expect("partial header nstates", 3, m.nstates());
+            expect("partial header nalg", 4, m.nalg());
+            expect("partial header time is null", null, m.time());
+            expect("partial header real_limit is null", null, m.realLimit());
+            expect("partial header pf_threshold is null", null, m.pfThreshold());
+            expect("partial header gap_tol is null", null, m.gapTol());
+        } catch (java.io.IOException ex) {
+            fail("partial header parses: threw " + ex);
+        }
     }
 
     private static void checkModesOriginZeta() {
