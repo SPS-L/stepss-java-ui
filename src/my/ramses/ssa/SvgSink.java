@@ -7,17 +7,6 @@ package my.ramses.ssa;
  */
 final class SvgSink implements PlotSink {
 
-    private static final String STYLE =
-            "    .axis   { stroke: #333333; stroke-width: 1; fill: none; }\n"
-            + "    .grid    { stroke: #cccccc; stroke-width: 0.5; fill: none; }\n"
-            + "    .bound   { stroke: #dc143c; stroke-width: 1.5; fill: none; }\n"
-            + "    .ray     { stroke: #999999; stroke-width: 1; fill: none; }\n"
-            + "    .pole    { stroke: #1f77b4; stroke-width: 1.5; fill: none; }\n"
-            + "    .unstable{ stroke: #dc143c; stroke-width: 2; fill: none; }\n"
-            + "    .shape   { stroke: #1f77b4; stroke-width: 2; fill: none; }\n"
-            + "    .label   { fill: #333333; font-size: 11px; stroke: none; }\n"
-            + "    .title   { fill: #333333; font-size: 13px; stroke: none; }\n";
-
     private final StringBuilder body = new StringBuilder();
     private final int width;
     private final int height;
@@ -112,11 +101,41 @@ final class SvgSink implements PlotSink {
                 .append("viewBox=\"0 0 ").append(width).append(' ')
                 .append(height).append("\" ")
                 .append("font-family=\"sans-serif\">\n");
-        out.append("  <style>\n").append(STYLE).append("  </style>\n");
+        out.append("  <style>\n").append(buildStyleBlock()).append("  </style>\n");
         out.append("  <rect width=\"100%\" height=\"100%\" fill=\"#ffffff\"/>\n");
         out.append(body);
         out.append("</svg>\n");
         return out.toString();
+    }
+
+    private static String buildStyleBlock() {
+        StringBuilder sb = new StringBuilder();
+        for (PlotStyle.Entry entry : PlotStyle.ENTRIES) {
+            sb.append("    .");
+            // Pad class name to 8 characters for alignment
+            sb.append(String.format("%-8s", entry.cls));
+            sb.append("{ ");
+
+            if (entry.fontPx != null) {
+                // Text class: use fill and font-size
+                sb.append("fill: ").append(entry.hex).append("; ");
+                sb.append("font-size: ").append(entry.fontPx).append("px; ");
+                sb.append("stroke: none; ");
+            } else {
+                // Stroke class: use stroke, stroke-width, and fill
+                sb.append("stroke: ").append(entry.hex).append("; ");
+                sb.append("stroke-width: ");
+                if (entry.width == (int) entry.width) {
+                    sb.append((int) entry.width);
+                } else {
+                    sb.append(entry.width);
+                }
+                sb.append("; fill: none; ");
+            }
+
+            sb.append("}\n");
+        }
+        return sb.toString();
     }
 
     private static String fmt(double value) {

@@ -153,6 +153,9 @@ public final class SsaHarness {
         checkBasenameDiscoveryOnEmptyDir();
         checkSvgSinkEmitsEditableElements();
         checkSvgSinkEscapes();
+        checkPlotStyleCoverageInSvg();
+        checkTextFontSizesDiffer();
+        checkUnclosedGroupsAutoClose();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -306,6 +309,34 @@ public final class SsaHarness {
         expect("ampersand is escaped", true, svg.contains("G1 &amp; G2"));
         expect("angle brackets are escaped", true, svg.contains("&lt;tie&gt;"));
         expect("no raw bracket leaks into the markup", false, svg.contains("<tie>"));
+    }
+
+    private static void checkPlotStyleCoverageInSvg() {
+        SvgSink sink = new SvgSink(100, 100);
+        String svg = sink.toSvg();
+        for (PlotStyle.Entry entry : PlotStyle.ENTRIES) {
+            expect("SVG has style rule for " + entry.cls, true,
+                    svg.contains("." + entry.cls));
+        }
+    }
+
+    private static void checkTextFontSizesDiffer() {
+        PlotStyle.Entry label = PlotStyle.of("label");
+        PlotStyle.Entry title = PlotStyle.of("title");
+        expect("label font size is not null", true, label.fontPx != null);
+        expect("title font size is not null", true, title.fontPx != null);
+        expect("label and title have different font sizes", true,
+                !label.fontPx.equals(title.fontPx));
+    }
+
+    private static void checkUnclosedGroupsAutoClose() {
+        SvgSink sink = new SvgSink(100, 100);
+        sink.group("a");
+        sink.group("b");
+        String svg = sink.toSvg();
+        int openCount = countOf(svg, "<g ");
+        int closeCount = countOf(svg, "</g>");
+        expect("unclosed groups are auto-closed", openCount, closeCount);
     }
 
     private static int countOf(String haystack, String needle) {

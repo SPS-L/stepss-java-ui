@@ -2,6 +2,7 @@ package my.ramses.ssa;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
@@ -19,31 +20,19 @@ final class SwingSink implements PlotSink {
     }
 
     private void style(String cls, boolean dashed) {
-        float w = 1.0f;
-        Color c = new Color(0x33, 0x33, 0x33);
-        if ("grid".equals(cls)) {
-            c = new Color(0xcc, 0xcc, 0xcc);
-            w = 0.5f;
-        } else if ("bound".equals(cls)) {
-            c = new Color(0xdc, 0x14, 0x3c);
-            w = 1.5f;
-        } else if ("ray".equals(cls)) {
-            c = new Color(0x99, 0x99, 0x99);
-        } else if ("pole".equals(cls)) {
-            c = new Color(0x1f, 0x77, 0xb4);
-            w = 1.5f;
-        } else if ("unstable".equals(cls)) {
-            c = new Color(0xdc, 0x14, 0x3c);
-            w = 2.0f;
-        } else if ("shape".equals(cls)) {
-            c = new Color(0x1f, 0x77, 0xb4);
-            w = 2.0f;
-        }
+        PlotStyle.Entry entry = PlotStyle.of(cls);
+        Color c = parseHex(entry.hex);
         g.setColor(c);
         g.setStroke(dashed
-                ? new BasicStroke(w, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
+                ? new BasicStroke(entry.width, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
                         10.0f, new float[] {4.0f, 3.0f}, 0.0f)
-                : new BasicStroke(w));
+                : new BasicStroke(entry.width));
+    }
+
+    private static Color parseHex(String hex) {
+        // hex is like "#333333"
+        int rgb = Integer.parseInt(hex.substring(1), 16);
+        return new Color(rgb);
     }
 
     @Override
@@ -94,8 +83,17 @@ final class SwingSink implements PlotSink {
 
     @Override
     public void text(double x, double y, String s, String anchor, String cls) {
-        style(cls, false);
-        g.setColor(new Color(0x33, 0x33, 0x33));
+        PlotStyle.Entry entry = PlotStyle.of(cls);
+        Color c = parseHex(entry.hex);
+        g.setColor(c);
+
+        if (entry.fontPx != null) {
+            Font font = g.getFont();
+            if (font != null) {
+                g.setFont(font.deriveFont((float) entry.fontPx.intValue()));
+            }
+        }
+
         int w = g.getFontMetrics().stringWidth(s);
         double dx = "middle".equals(anchor) ? -w / 2.0 : "end".equals(anchor) ? -w : 0.0;
         g.drawString(s, (float) (x + dx), (float) y);
