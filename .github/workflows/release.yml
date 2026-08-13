@@ -1,10 +1,21 @@
 name: Release
 
-# Watches the five pinned component repos daily. When any of them has a new
-# release, re-pins the build to it, verifies the jar, and publishes a STEPSS
-# release carrying the upstream notes. A manual run always publishes, which is
-# how a GUI-only change reaches a release - the schedule alone never would,
-# since only component bumps drive it.
+# Re-pins the build when a component publishes a release, verifies the jar, and
+# publishes a STEPSS release carrying the upstream notes. A manual run always
+# publishes, which is how a GUI-only change reaches a release - a dispatch
+# alone never would, since only component bumps drive it.
+#
+# Four of the five pinned components dispatch here on release: ramses, helios,
+# dyngraph and codegen. The fifth, uramses, does not, because it only ever
+# releases in response to a ramses release under the same tag; the ramses
+# dispatch covers both, and the wait step below is what makes that safe.
+#
+# This replaced a daily schedule. The bump re-pins EVERY component whatever
+# woke it, so which one dispatched matters only to that wait step - but the
+# self-healing the schedule provided is gone with it. A dispatch that 401s or
+# is dropped now means this repo silently stops tracking upstream until someone
+# runs it by hand, so a red dispatch job in a component repo is a real failure,
+# not noise.
 #
 # No `${{ }}` expression is ever interpolated into the text of a `run:` script.
 # Everything a script needs arrives through `env:` and is read as a quoted
@@ -15,10 +26,15 @@ name: Release
 # "v" - so this is the only thing standing between an upstream repo and this
 # job's credentials. Keep it that way when adding steps.
 on:
-  schedule:
-    - cron: "0 3 * * *"
+  repository_dispatch:
+    types: [ramses-release, helios-release, dyngraph-release, codegen-release]
   workflow_dispatch:
 
+# Load-bearing now that four repos can wake this workflow: two components
+# releasing close together would otherwise race each other through the bump,
+# the version derivation and the push. Serialised rather than cancelled,
+# because the loser of a cancel would be a component release that never gets
+# pinned.
 concurrency:
   group: stepss-release
   cancel-in-progress: false
@@ -51,9 +67,51 @@ jobs:
       # Deliberately ungated: tools/ci decides what gets pinned, built and
       # published, so an edit that breaks it has to fail here rather than
       # halfway through an unattended release. Runs on every invocation,
-      # scheduled or manual, before anything is fetched or written.
+      # dispatched or manual, before anything is fetched or written.
       - name: Test the release tooling
         run: python3 -m unittest discover -s tools/ci/tests -t .
+
+      # stepss-ramses dispatches here from the same publish job that dispatches
+      # to stepss-uramses, so this workflow starts while URAMSES is still
+      # refreshing its kits, build-testing three routes and publishing its own
+      # release under the SAME tag. Bumping before that lands pins ramses at
+      # the new version against uramses at the old one, and cuts a STEPSS
+      # release carrying a mismatched pair - with, since the schedule is gone,
+      # nothing that would later correct it.
+      #
+      # Only stepss-uramses is public, so this is the one component lookup that
+      # needs no STEPSS_TOKEN; the built-in token is enough and is the smaller
+      # credential to expose to a loop over an upstream-supplied tag.
+      #
+      # Failing here is the intended outcome when URAMSES does not arrive: the
+      # Report failure step opens an issue and nothing is published. Do not
+      # soften it into a warning, and do not let the bump proceed regardless -
+      # a half-pinned release is worse than a loud absent one.
+      - name: Wait for the matching URAMSES release
+        if: github.event_name == 'repository_dispatch' && github.event.action == 'ramses-release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RAMSES_TAG: ${{ github.event.client_payload.tag }}
+        run: |
+          set -euo pipefail
+          # Read from env and quoted, never interpolated into this script: see
+          # the note at the top of the file. gh receives the tag as one argv
+          # entry, so a hostile tag name cannot become a second argument.
+          if [ -z "$RAMSES_TAG" ]; then
+            echo "The ramses-release dispatch carried no tag."
+            exit 1
+          fi
+          deadline=$((SECONDS + 900))
+          until gh release view "$RAMSES_TAG" --repo SPS-L/stepss-uramses > /dev/null 2>&1; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "stepss-uramses has not published $RAMSES_TAG within 15 minutes."
+              echo "Its sync workflow either failed or is still running; nothing is pinned."
+              exit 1
+            fi
+            echo "waiting for stepss-uramses $RAMSES_TAG ..."
+            sleep 30
+          done
+          echo "stepss-uramses $RAMSES_TAG is published; both pins can move together."
 
       - name: Re-pin to the latest component releases
         id: bump
@@ -88,11 +146,11 @@ jobs:
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           else
             echo "proceed=false" >> "$GITHUB_OUTPUT"
-            echo "No component moved and this is a scheduled run; nothing to publish."
+            echo "No component moved and this is a dispatch-driven run; nothing to publish."
           fi
 
       # Deliberately NOT gated on `proceed`: a tick whose only movement is a
-      # refused downgrade leaves `changed` empty, so a scheduled run stops
+      # refused downgrade leaves `changed` empty, so a dispatch-driven run stops
       # right after the bump - and that is exactly the case somebody has to
       # hear about. Issues live in this repository, so the default
       # GITHUB_TOKEN is enough here, as with the URAMSES caveat below.
@@ -169,8 +227,8 @@ jobs:
       # versions, so check for it here rather than meet a "command not found"
       # in the middle of a release run. No `|| true`: if ant is neither
       # present nor installable there is no jar to publish and the job must
-      # stop. Gated like the build it exists to protect - a scheduled tick
-      # with nothing to publish has no reason to touch apt.
+      # stop. Gated like the build it exists to protect - a run with nothing
+      # to publish has no reason to touch apt.
       - name: Ensure ant is available
         if: steps.bump.outputs.proceed == 'true'
         run: |
