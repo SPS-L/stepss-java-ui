@@ -139,6 +139,35 @@ public final class SsaHarness {
         }
     }
 
+    private static java.util.List<ModeShapeEntry> shapeFixture() {
+        try {
+            return SsaModeShapes.parse(join(MS_LINES)).forMode(2);
+        } catch (java.io.IOException ex) {
+            return new java.util.ArrayList<ModeShapeEntry>();
+        }
+    }
+
+    private static void checkModeShapeRendersArrows() {
+        SvgSink sink = new SvgSink(360, 360);
+        ModeShapePanel.render(sink, shapeFixture(), true, 360, 360);
+        String svg = sink.toSvg();
+        // One arrow is three lines: the shaft and two head strokes.
+        expect("two machines give six arrow strokes", 6,
+                countOf(svg, "class=\"shape\""));
+        expect("machines are labelled", true, svg.contains("AREA 1 G1"));
+        expect("magnitude rings are drawn", 2, countOf(svg, "class=\"grid\""));
+        expect("the dial group is present", true, svg.contains("<g id=\"arrows\""));
+    }
+
+    private static void checkModeShapeRefusesDegenerate() {
+        SvgSink sink = new SvgSink(360, 360);
+        ModeShapePanel.render(sink, shapeFixture(), false, 360, 360);
+        String svg = sink.toSvg();
+        expect("a degenerate mode draws no arrows", 0,
+                countOf(svg, "class=\"shape\""));
+        expect("and says why", true, svg.contains("degenerate"));
+    }
+
     public static void main(String[] args) throws java.io.IOException {
         checkModesParse();
         checkModesHeader();
@@ -160,6 +189,8 @@ public final class SsaHarness {
         checkSplaneMinimumExtentExpands();
         checkSplaneDownwardExpansion();
         checkSplaneMarksSelection();
+        checkModeShapeRendersArrows();
+        checkModeShapeRefusesDegenerate();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
