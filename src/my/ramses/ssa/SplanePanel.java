@@ -145,7 +145,7 @@ public final class SplanePanel extends JPanel {
         }
         sink.text((b.x(b.reLo) + b.x(b.reHi)) / 2.0, height - 12.0,
                 "Re(lambda)  [1/s]", "middle", "label");
-        sink.text(5.0, (b.y(b.imLo) + b.y(b.imHi)) / 2.0,
+        sink.text(b.x(b.reLo), PAD_TOP - 6.0,
                 "Im(lambda)  [rad/s]", "start", "label");
         sink.endGroup();
 
