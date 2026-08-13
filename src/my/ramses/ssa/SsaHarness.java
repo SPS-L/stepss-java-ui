@@ -156,6 +156,9 @@ public final class SsaHarness {
         checkPlotStyleCoverageInSvg();
         checkTextFontSizesDiffer();
         checkUnclosedGroupsAutoClose();
+        checkSplaneRendersExpectedElements();
+        checkSplaneMinimumExtentExpands();
+        checkSplaneMarksSelection();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -337,6 +340,46 @@ public final class SsaHarness {
         int openCount = countOf(svg, "<g ");
         int closeCount = countOf(svg, "</g>");
         expect("unclosed groups are auto-closed", openCount, closeCount);
+    }
+
+    private static java.util.List<Mode> emFixture() {
+        SsaModes m = parsedModes();
+        return SsaResults.electromechanical(m.modes());
+    }
+
+    private static void checkSplaneRendersExpectedElements() {
+        SvgSink sink = new SvgSink(500, 400);
+        SplanePanel.render(sink, emFixture(), null, 500, 400);
+        String svg = sink.toSvg();
+        expect("the stability boundary is drawn", true, svg.contains("class=\"bound\""));
+        expect("constant-damping rays are dashed", true,
+                svg.contains("stroke-dasharray"));
+        expect("both rays are drawn", 2, countOf(svg, "class=\"ray\""));
+        expect("one circle per mode shown", 2, countOf(svg, "class=\"pole\""));
+        expect("the unstable mode gets a cross, which is two lines", 2,
+                countOf(svg, "class=\"unstable\""));
+        expect("frequencies are labelled", true, svg.contains("0.62 Hz"));
+        expect("axes are labelled", true, svg.contains("Re"));
+        expect("the pole group is present", true, svg.contains("<g id=\"poles\""));
+    }
+
+    private static void checkSplaneMinimumExtentExpands() {
+        // A mode outside the notebook's window must still be inside the axes.
+        java.util.List<Mode> wide = new java.util.ArrayList<Mode>();
+        wide.add(new Mode(1, -12.0, 40.0, 0.29, 6.37, true, true));
+        SvgSink sink = new SvgSink(500, 400);
+        SplanePanel.render(sink, wide, null, 500, 400);
+        String svg = sink.toSvg();
+        expect("a mode beyond the default window still draws one pole", 1,
+                countOf(svg, "class=\"pole\""));
+    }
+
+    private static void checkSplaneMarksSelection() {
+        java.util.List<Mode> em = emFixture();
+        SvgSink sink = new SvgSink(500, 400);
+        SplanePanel.render(sink, em, em.get(0), 500, 400);
+        String svg = sink.toSvg();
+        expect("the selected pole is ringed", true, svg.contains("<g id=\"selected\""));
     }
 
     private static int countOf(String haystack, String needle) {
