@@ -139,7 +139,7 @@ public final class SsaHarness {
         }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws java.io.IOException {
         checkModesParse();
         checkModesHeader();
         checkModesTime();
@@ -149,6 +149,8 @@ public final class SsaHarness {
         checkParticipationNames();
         checkParticipationFilteredMode();
         checkModeShapes();
+        checkElectromechanicalFilter();
+        checkBasenameDiscoveryOnEmptyDir();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -237,6 +239,41 @@ public final class SsaHarness {
         } catch (java.io.IOException ex) {
             fail("CRLF input parses: threw " + ex);
         }
+    }
+
+    private static void checkElectromechanicalFilter() {
+        SsaModes m = parsedModes();
+        if (m == null) {
+            fail("electromechanical filter");
+            return;
+        }
+        java.util.List<Mode> em = SsaResults.electromechanical(m.modes());
+        // Of the fixture: mode 1 is real (im 0), modes 2 and 3 are a conjugate
+        // pair at 0.6237 Hz of which only the im > 0 member survives, mode 4 is
+        // at 0.6246 Hz with im > 0, mode 5 sits at the origin.
+        expect("conjugate pairs collapse to one member", 2, em.size());
+        expect("the kept pair member has positive im", true, em.get(0).im > 0);
+        expect("sorted by frequency", 0.6237, round(em.get(0).freqHz, 4));
+        expect("the unstable mode is kept", -0.0233, round(em.get(1).zeta, 4));
+    }
+
+    private static void checkBasenameDiscoveryOnEmptyDir() throws java.io.IOException {
+        String tmpdir = System.getenv("TMPDIR");
+        if (tmpdir == null) {
+            tmpdir = System.getProperty("java.io.tmpdir");
+        }
+        java.nio.file.Path dirPath = java.nio.file.Files.createTempDirectory(
+                java.nio.file.Paths.get(tmpdir), "ssaharness");
+        java.io.File dir = dirPath.toFile();
+        dir.deleteOnExit();
+        expect("an empty directory yields no basenames", 0,
+                SsaResults.basenames(dir).size());
+        java.io.File modes = new java.io.File(dir, "run1_modes.dat");
+        java.nio.file.Files.write(modes.toPath(), modesFixture().getBytes("UTF-8"));
+        modes.deleteOnExit();
+        expect("one basename is discovered", 1, SsaResults.basenames(dir).size());
+        expect("the basename drops the _modes.dat suffix", "run1",
+                SsaResults.basenames(dir).get(0));
     }
 
     private static double round(double value, int places) {
