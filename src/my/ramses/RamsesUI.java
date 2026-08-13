@@ -376,6 +376,8 @@ public class RamsesUI extends javax.swing.JFrame {
         viewSsaResults = new javax.swing.JButton();
         ssaBasenameLabel = new javax.swing.JLabel();
         ssaBasename = new javax.swing.JTextField();
+        ssaTimeLabel = new javax.swing.JLabel();
+        ssaTime = new javax.swing.JTextField();
         ssaRealLimitLabel = new javax.swing.JLabel();
         ssaRealLimit = new javax.swing.JTextField();
         ssaPfThresholdLabel = new javax.swing.JLabel();
@@ -1936,6 +1938,13 @@ public class RamsesUI extends javax.swing.JFrame {
         ssaBasename.setToolTipText("Names the three results files, so several runs can share one directory");
         ssaBasename.setName("ssaBasename"); // NOI18N
 
+        ssaTimeLabel.setText("Analysis time t [s]");
+        ssaTimeLabel.setName("ssaTimeLabel"); // NOI18N
+
+        ssaTime.setText("0.001");
+        ssaTime.setToolTipText("When to linearise. The default analyses the initial operating point; a later time runs an event-free simulation to that point first.");
+        ssaTime.setName("ssaTime"); // NOI18N
+
         ssaRealLimitLabel.setText("Real part limit");
         ssaRealLimitLabel.setEnabled(false);
         ssaRealLimitLabel.setName("ssaRealLimitLabel"); // NOI18N
@@ -1994,6 +2003,10 @@ public class RamsesUI extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(ssaBasename, javax.swing.GroupLayout.PREFERRED_SIZE, 120, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(ssaTimeLabel)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(ssaTime, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(ssaRealLimitLabel)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(ssaRealLimit, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -2031,6 +2044,8 @@ public class RamsesUI extends javax.swing.JFrame {
                 .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(ssaBasenameLabel)
                     .addComponent(ssaBasename, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(ssaTimeLabel)
+                    .addComponent(ssaTime, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(ssaRealLimitLabel)
                     .addComponent(ssaRealLimit, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(ssaPfThresholdLabel)
@@ -3183,7 +3198,7 @@ public class RamsesUI extends javax.swing.JFrame {
             // surface as the "No results were produced" dialog below, naming
             // solver settings that were never the problem. A path separator
             // writes the files somewhere the loader will not look.
-            if (!base.matches("[A-Za-z0-9._-]+")) {
+            if (!my.ramses.ssa.SsaDisturbance.validBasename(base)) {
                 JOptionPane.showMessageDialog(this,
                         "The results basename \"" + base + "\" cannot be used.\n\n"
                         + "It names the three results files and is written into the\n"
@@ -3192,6 +3207,22 @@ public class RamsesUI extends javax.swing.JFrame {
                         "Small-signal analysis", JOptionPane.WARNING_MESSAGE);
                 return;
             }
+
+            // When to linearise. The default analyses the initial operating
+            // point. A later time runs the simulation to that point with no
+            // events first, which is why the generated file below carries none:
+            // the engine linearises about whatever state it is in when EIG
+            // fires, so an event in between would describe that instant rather
+            // than an operating point.
+            double analysisTime;
+            try {
+                analysisTime = my.ramses.ssa.SsaDisturbance.parseTime(ssaTime.getText());
+            } catch (IllegalArgumentException ex) {
+                JOptionPane.showMessageDialog(this, ex.getMessage(),
+                        "Small-signal analysis", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             File dstFile = new File(myTempDir.getAbsolutePath()
                     + System.getProperty("file.separator") + base + "Eig.dst");
             // This one-argument EIG record is what makes the ssaEngineNote
@@ -3207,9 +3238,7 @@ public class RamsesUI extends javax.swing.JFrame {
             // NetBeans generated block, which carries no hand-written
             // comments and is regenerated from RamsesUI.form.
             FileUtils.writeStringToFile(dstFile,
-                    "0.000 CONTINUE SOLVER TR 0.010 0.001 0. ALL\n"
-                    + "0.000 EIG '" + base + "'\n"
-                    + "0.010 STOP\n", "UTF-8");
+                    my.ramses.ssa.SsaDisturbance.text(base, analysisTime), "UTF-8");
 
             String tmpString = fileDist.getText();
             fileDist.setText(dstFile.getName());
@@ -5481,6 +5510,8 @@ public class RamsesUI extends javax.swing.JFrame {
     private javax.swing.JLabel ssaPfThresholdLabel;
     private javax.swing.JTextField ssaRealLimit;
     private javax.swing.JLabel ssaRealLimitLabel;
+    private javax.swing.JTextField ssaTime;
+    private javax.swing.JLabel ssaTimeLabel;
     private javax.swing.JButton stopSimulationButton;
     private javax.swing.JTextField syncObsField;
     private javax.swing.JComboBox syncObsList;

@@ -273,6 +273,10 @@ public final class SsaHarness {
         checkModeShapeReportsFilteredMode();
         checkModeShapeReportsMissingRowsForDominantMode();
         checkModeShapeClampsTinyRadius();
+        checkDisturbanceDefaultTime();
+        checkDisturbanceLaterTime();
+        checkDisturbanceRejectsBadBasename();
+        checkDisturbanceRejectsEarlyOrUnreadableTime();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -699,6 +703,71 @@ public final class SsaHarness {
             at = haystack.indexOf(needle, at + needle.length());
         }
         return count;
+    }
+
+    private static void checkDisturbanceDefaultTime() {
+        String dst = SsaDisturbance.text("ssa", SsaDisturbance.MIN_TIME);
+        expect("default analysis time fires EIG at 0.001", true,
+                dst.contains("0.001000 EIG 'ssa'"));
+        expect("STOP follows the analysis", true, dst.contains("0.011000 STOP"));
+        expect("the solver record is unchanged", true,
+                dst.startsWith("0.000 CONTINUE SOLVER TR 0.010 0.001 0. ALL\n"));
+        expect("exactly three records", 3, dst.split("\n").length);
+        // A disturbance would linearise about a point mid-swing rather than
+        // about the operating point, so the generated file must carry none.
+        expect("no event other than the analysis", 1, countOf(dst, "EIG"));
+    }
+
+    private static void checkDisturbanceLaterTime() {
+        String dst = SsaDisturbance.text("run2", 5.0);
+        expect("a later analysis time reaches the EIG record", true,
+                dst.contains("5.000000 EIG 'run2'"));
+        expect("and moves STOP after it", true, dst.contains("5.010000 STOP"));
+        expect("still no other event", 1, countOf(dst, "EIG"));
+        expect("the basename reaches the record", true, dst.contains("'run2'"));
+        // Fixed point, not scientific notation, so the file reads like every
+        // other disturbance file in the project.
+        expect("no scientific notation in the times", false, dst.contains("E-"));
+    }
+
+    private static void checkDisturbanceRejectsBadBasename() {
+        expect("an apostrophe is rejected, it would end the quoted argument",
+                false, SsaDisturbance.validBasename("it's"));
+        expect("a path separator is rejected", false,
+                SsaDisturbance.validBasename("a/b"));
+        expect("a space is rejected", false, SsaDisturbance.validBasename("two words"));
+        expect("an empty basename is rejected", false, SsaDisturbance.validBasename(""));
+        expect("a null basename is rejected", false, SsaDisturbance.validBasename(null));
+        expect("the default basename is accepted", true,
+                SsaDisturbance.validBasename("ssa"));
+        expect("dots, dashes and underscores are accepted", true,
+                SsaDisturbance.validBasename("run-2_a.1"));
+        try {
+            SsaDisturbance.text("it's", 1.0);
+            fail("text() rejects a bad basename");
+        } catch (IllegalArgumentException expected) {
+            pass("text() rejects a bad basename");
+        }
+    }
+
+    private static void checkDisturbanceRejectsEarlyOrUnreadableTime() {
+        expect("the default parses", SsaDisturbance.MIN_TIME,
+                SsaDisturbance.parseTime(" 0.001 "));
+        expect("a later time parses", 12.5, SsaDisturbance.parseTime("12.5"));
+        expectTimeRejected("a time before the minimum is rejected", "0.0005");
+        expectTimeRejected("zero is rejected", "0");
+        expectTimeRejected("a negative time is rejected", "-1");
+        expectTimeRejected("text is rejected", "soon");
+        expectTimeRejected("an empty field is rejected", "");
+    }
+
+    private static void expectTimeRejected(String what, String text) {
+        try {
+            SsaDisturbance.parseTime(text);
+            fail(what + ": no exception");
+        } catch (IllegalArgumentException expected) {
+            pass(what);
+        }
     }
 
     private static double round(double value, int places) {

@@ -2268,6 +2268,10 @@
                                           <EmptySpace max="-2" attributes="0"/>
                                           <Component id="ssaBasename" min="-2" pref="120" max="-2" attributes="0"/>
                                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                                          <Component id="ssaTimeLabel" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace max="-2" attributes="0"/>
+                                          <Component id="ssaTime" min="-2" pref="70" max="-2" attributes="0"/>
+                                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
                                           <Component id="ssaRealLimitLabel" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace max="-2" attributes="0"/>
                                           <Component id="ssaRealLimit" min="-2" pref="70" max="-2" attributes="0"/>
@@ -2314,6 +2318,8 @@
                           <Group type="103" groupAlignment="3" attributes="0">
                               <Component id="ssaBasenameLabel" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="ssaBasename" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="ssaTimeLabel" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="ssaTime" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="ssaRealLimitLabel" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="ssaRealLimit" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="ssaPfThresholdLabel" alignment="3" min="-2" max="-2" attributes="0"/>
@@ -2465,6 +2471,19 @@
                     <Property name="text" type="java.lang.String" value="ssa"/>
                     <Property name="toolTipText" type="java.lang.String" value="Names the three results files, so several runs can share one directory"/>
                     <Property name="name" type="java.lang.String" value="ssaBasename" noResource="true"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JLabel" name="ssaTimeLabel">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Analysis time t [s]"/>
+                    <Property name="name" type="java.lang.String" value="ssaTimeLabel" noResource="true"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JTextField" name="ssaTime">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="0.001"/>
+                    <Property name="toolTipText" type="java.lang.String" value="When to linearise. The default analyses the initial operating point; a later time runs an event-free simulation to that point first."/>
+                    <Property name="name" type="java.lang.String" value="ssaTime" noResource="true"/>
                   </Properties>
                 </Component>
                 <Component class="javax.swing.JLabel" name="ssaRealLimitLabel">

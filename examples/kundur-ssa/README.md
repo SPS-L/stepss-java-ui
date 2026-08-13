@@ -44,8 +44,13 @@ an aborted run can make the next run fail in a way that looks unrelated.
 2. Optionally press **Select results directory** on the Analysis tab and point
    it where you want the three results files copied. Leave it unset and they
    stay in the tool's working directory.
-3. Press **Perform small signal stability analysis**.
-4. A results window opens on the run. It lists the modes with their damping
+3. Leave **Analysis time t [s]** at its default to linearise about the initial
+   operating point, which is what this example is about. A larger value runs
+   the simulation to that time with no events first and linearises there
+   instead, which is useful when the initialisation has a slow transient to
+   settle. With no disturbance in between, both give the same spectrum.
+4. Press **Perform small signal stability analysis**.
+5. A results window opens on the run. It lists the modes with their damping
    ratios and frequencies, and for the mode you select shows the participation
    factors, a mode-shape dial and an s-plane. Its header names the directory
    the files were read from. Both plots save as SVG.
