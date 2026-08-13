@@ -151,6 +151,8 @@ public final class SsaHarness {
         checkModeShapes();
         checkElectromechanicalFilter();
         checkBasenameDiscoveryOnEmptyDir();
+        checkSvgSinkEmitsEditableElements();
+        checkSvgSinkEscapes();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -274,6 +276,46 @@ public final class SsaHarness {
         expect("one basename is discovered", 1, SsaResults.basenames(dir).size());
         expect("the basename drops the _modes.dat suffix", "run1",
                 SsaResults.basenames(dir).get(0));
+    }
+
+    private static void checkSvgSinkEmitsEditableElements() {
+        SvgSink sink = new SvgSink(400, 300);
+        sink.group("poles");
+        sink.circle(100, 100, 5, "pole");
+        sink.endGroup();
+        sink.group("labels");
+        sink.text(110, 100, "0.62 Hz", "start", "label");
+        sink.endGroup();
+        String svg = sink.toSvg();
+        expect("declares an svg root", true, svg.contains("<svg "));
+        expect("carries the viewport", true, svg.contains("viewBox=\"0 0 400 300\""));
+        expect("groups are semantic", true, svg.contains("<g id=\"poles\""));
+        expect("labels are real text, not paths", true,
+                svg.contains(">0.62 Hz</text>"));
+        expect("text is restylable by class", true, svg.contains("class=\"label\""));
+        expect("a style block exists so one edit restyles a kind", true,
+                svg.contains("<style>"));
+        expect("no font is embedded", true, svg.contains("sans-serif"));
+        expect("groups are closed", 2, countOf(svg, "</g>"));
+    }
+
+    private static void checkSvgSinkEscapes() {
+        SvgSink sink = new SvgSink(10, 10);
+        sink.text(0, 0, "G1 & G2 <tie>", "middle", "label");
+        String svg = sink.toSvg();
+        expect("ampersand is escaped", true, svg.contains("G1 &amp; G2"));
+        expect("angle brackets are escaped", true, svg.contains("&lt;tie&gt;"));
+        expect("no raw bracket leaks into the markup", false, svg.contains("<tie>"));
+    }
+
+    private static int countOf(String haystack, String needle) {
+        int count = 0;
+        int at = haystack.indexOf(needle);
+        while (at >= 0) {
+            count++;
+            at = haystack.indexOf(needle, at + needle.length());
+        }
+        return count;
     }
 
     private static double round(double value, int places) {
