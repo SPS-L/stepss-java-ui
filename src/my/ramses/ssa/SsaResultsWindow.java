@@ -10,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
 import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JFileChooser;
@@ -21,6 +20,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
@@ -40,7 +40,7 @@ public final class SsaResultsWindow extends JFrame {
     private final JTable table;
     private final SplanePanel splane = new SplanePanel();
     private final ModeShapePanel shape = new ModeShapePanel();
-    private final JPanel participation = new JPanel();
+    private final JTextArea participation = new JTextArea();
     private final JCheckBox emOnly =
             new JCheckBox("electromechanical only (0.1 to 2.5 Hz)", true);
 
@@ -100,7 +100,18 @@ public final class SsaResultsWindow extends JFrame {
                         Math.max(splane.getHeight(), 400))));
         top.setResizeWeight(0.45);
 
-        participation.setLayout(new BoxLayout(participation, BoxLayout.Y_AXIS));
+        // A wrapped text area rather than a column of labels. The two sentences
+        // a reader most needs here, the degenerate refusal and the note that an
+        // absent device is below pf_threshold rather than zero, are long, and
+        // in non-wrapping labels they ran off the panel edge and were clipped.
+        // Monospaced so the family, device and variable columns line up, and
+        // read-only rather than disabled so the numbers stay selectable.
+        participation.setEditable(false);
+        participation.setLineWrap(true);
+        participation.setWrapStyleWord(true);
+        participation.setFont(new java.awt.Font(java.awt.Font.MONOSPACED,
+                java.awt.Font.PLAIN, participation.getFont().getSize()));
+        participation.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
         JScrollPane participationScroll = new JScrollPane(participation);
         participationScroll.setBorder(BorderFactory.createTitledBorder("Participation"));
 
@@ -183,10 +194,8 @@ public final class SsaResultsWindow extends JFrame {
     }
 
     private void clearDetail() {
-        participation.removeAll();
-        participation.add(new JLabel("  Select a mode."));
-        participation.revalidate();
-        participation.repaint();
+        participation.setText("Select a mode.");
+        participation.setCaretPosition(0);
         shape.clear();
     }
 
@@ -198,16 +207,15 @@ public final class SsaResultsWindow extends JFrame {
         }
         Mode mode = model.rows().get(table.convertRowIndexToModel(row));
         splane.setSelected(mode);
-        participation.removeAll();
+        StringBuilder text = new StringBuilder();
 
         if (!mode.simple) {
             // Same refusal the dial makes, for the same reason.
-            participation.add(new JLabel("  Mode " + mode.index
-                    + " is degenerate (simple = 0)."));
-            participation.add(new JLabel("  Its eigenvectors are not unique, so its"
-                    + " participation factors are basis-dependent"));
-            participation.add(new JLabel("  and would come out differently on another"
-                    + " machine. Not shown."));
+            text.append("Mode ").append(mode.index)
+                    .append(" is degenerate (simple = 0).\n\n")
+                    .append("Its eigenvectors are not unique, so its participation")
+                    .append(" factors are basis-dependent and would come out")
+                    .append(" differently on another machine. Not shown.\n");
         } else {
             List<Participation> rows = results.participation().forMode(mode.index);
             if (rows.isEmpty() && mode.dominant) {
@@ -216,36 +224,36 @@ public final class SsaResultsWindow extends JFrame {
                 // optional to SsaResults.load and the copy-out in RamsesUI
                 // copies only files that exist, so the honest report is that
                 // the rows are missing, not a filter that did not fire.
-                participation.add(new JLabel("  Mode " + mode.index
-                        + " was marked dominant by the engine, but no"
-                        + " participation rows were written for it."));
-                participation.add(new JLabel("  The participation file may be"
-                        + " missing from this directory."));
+                text.append("Mode ").append(mode.index)
+                        .append(" was marked dominant by the engine, but no")
+                        .append(" participation rows were written for it.\n\n")
+                        .append("The participation file may be missing from this")
+                        .append(" directory.\n");
             } else if (rows.isEmpty()) {
-                participation.add(new JLabel("  Mode " + mode.index
-                        + " was filtered out by real_limit ("
-                        + show(results.modes().realLimit())
-                        + "), so no participation factors were written."));
+                text.append("Mode ").append(mode.index)
+                        .append(" was filtered out by real_limit (")
+                        .append(show(results.modes().realLimit()))
+                        .append("), so no participation factors were written.\n");
             } else {
-                participation.add(new JLabel("  Mode " + mode.index + ", "
-                        + String.format(java.util.Locale.ROOT, "%.4f Hz", mode.freqHz)));
+                text.append(String.format(java.util.Locale.ROOT, "Mode %d, %.4f Hz%n%n",
+                        mode.index, mode.freqHz));
                 for (Participation p : rows) {
-                    // p.device is shown as parsed. Columns.slice already
+                    // p.device is written as parsed. Columns.slice already
                     // removed the a20 padding, and a LEADING blank is part of
                     // the name the engine stored: trimming it here is what
-                    // makes " G2" and "G2" look like the same machine.
-                    participation.add(new JLabel(String.format(java.util.Locale.ROOT,
-                            "   %-8s %-20s %-10s %.3f",
-                            p.family, p.device, p.variable, p.pf)));
+                    // would make " G2" and "G2" look like the same machine.
+                    text.append(String.format(java.util.Locale.ROOT,
+                            "  %-8s %-20s %-10s %.3f%n",
+                            p.family, p.device, p.variable, p.pf));
                 }
-                participation.add(new JLabel("  Entries below pf_threshold "
-                        + show(results.modes().pfThreshold())
-                        + " are not written, so an absent device is below it,"
-                        + " not zero."));
+                text.append("\nEntries below pf_threshold ")
+                        .append(show(results.modes().pfThreshold()))
+                        .append(" are not written, so an absent device is below")
+                        .append(" it, not zero.\n");
             }
         }
-        participation.revalidate();
-        participation.repaint();
+        participation.setText(text.toString());
+        participation.setCaretPosition(0);
         shape.show(mode.simple
                 ? results.shapes().forMode(mode.index)
                 : new java.util.ArrayList<ModeShapeEntry>(),
