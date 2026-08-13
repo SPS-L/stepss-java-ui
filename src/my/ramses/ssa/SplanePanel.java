@@ -36,6 +36,13 @@ public final class SplanePanel extends JPanel {
     private static final int PAD_TOP = 20;
     private static final int PAD_BOTTOM = 45;
     private static final double POLE_R = 5.0;
+    /** Im ticks, one per horizontal grid line, so the two cannot disagree. */
+    static final int IM_TICKS = 4;
+    /** Re ticks along the bottom axis, both ends included. */
+    static final int RE_TICKS = 5;
+    private static final double TICK_LEN = 4.0;
+    /** Room reserved at the right for the legend sample and its caption. */
+    private static final double LEGEND_W = 130.0;
 
     private List<Mode> shown = new ArrayList<Mode>();
     private Mode selected;
@@ -149,6 +156,27 @@ public final class SplanePanel extends JPanel {
                 "Im(lambda)  [rad/s]", "start", "label");
         sink.endGroup();
 
+        // The axis titles name the units; without tick labels there is still
+        // nothing to measure against, which matters most in the exported SVG
+        // because a report reader cannot hover for a tooltip. The left margin
+        // has been free since the Im title moved above the plot area, and
+        // PAD_BOTTOM already reserves the room under the Re axis.
+        sink.group("ticks");
+        for (int step = 1; step <= IM_TICKS; step++) {
+            double im = b.imLo + (b.imHi - b.imLo) * step / (double) IM_TICKS;
+            double y = b.y(im);
+            sink.line(b.x(b.reLo) - TICK_LEN, y, b.x(b.reLo), y, "axis");
+            sink.text(b.x(b.reLo) - TICK_LEN - 3.0, y + 4.0, tick(im), "end", "label");
+        }
+        for (int step = 0; step < RE_TICKS; step++) {
+            double re = b.reLo + (b.reHi - b.reLo) * step / (double) (RE_TICKS - 1);
+            double x = b.x(re);
+            double y = b.y(b.imLo);
+            sink.line(x, y, x, y + TICK_LEN, "axis");
+            sink.text(x, y + TICK_LEN + 13.0, tick(re), "middle", "label");
+        }
+        sink.endGroup();
+
         // The stability boundary. Everything strictly left of this is stable.
         sink.group("boundary");
         sink.line(b.x(0.0), b.y(b.imLo), b.x(0.0), b.y(b.imHi), "bound");
@@ -170,13 +198,30 @@ public final class SplanePanel extends JPanel {
         }
         sink.endGroup();
 
+        boolean anyUnstable = false;
         sink.group("unstable");
         for (Mode mode : shown) {
             if (mode.zeta < 0.0) {
                 sink.cross(b.x(mode.re), b.y(mode.im), POLE_R + 2.0, "unstable");
+                anyUnstable = true;
             }
         }
         sink.endGroup();
+
+        // The crimson cross and the crimson Re = 0 boundary are two different
+        // meanings in one colour, so the marker that flags data is named. Only
+        // drawn when there is something to name: a legend entry for a marker
+        // that is not on the figure is its own small untruth. It carries the
+        // same class as the crosses, so one hex edit restyles both.
+        if (anyUnstable) {
+            double lx = width - PAD_RIGHT - LEGEND_W;
+            double ly = PAD_TOP + 10.0;
+            sink.group("legend");
+            sink.cross(lx, ly, POLE_R + 2.0, "unstable");
+            sink.text(lx + POLE_R + 9.0, ly + 4.0, "unstable (zeta < 0)",
+                    "start", "label");
+            sink.endGroup();
+        }
 
         if (selected != null) {
             sink.group("selected");
@@ -191,6 +236,20 @@ public final class SplanePanel extends JPanel {
                     "start", "label");
         }
         sink.endGroup();
+    }
+
+    /**
+     * A tick value, kept short enough that neighbouring ticks do not run into
+     * each other: two decimals close to the origin, fewer as the magnitude
+     * grows. A value that rounds to zero prints without a sign, since "-0.00"
+     * on an axis reads as a defect.
+     */
+    private static String tick(double value) {
+        double abs = Math.abs(value);
+        String text = String.format(java.util.Locale.ROOT,
+                abs >= 100.0 ? "%.0f" : abs >= 10.0 ? "%.1f" : "%.2f", value);
+        return text.startsWith("-") && text.matches("-0(\\.0+)?")
+                ? text.substring(1) : text;
     }
 
     /** Data-to-device mapping for one render. */

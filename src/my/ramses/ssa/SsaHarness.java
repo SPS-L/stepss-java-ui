@@ -234,6 +234,8 @@ public final class SsaHarness {
         checkTextFontSizesDiffer();
         checkUnclosedGroupsAutoClose();
         checkSplaneRendersExpectedElements();
+        checkSplaneLabelsItsScale();
+        checkSplaneLegendFollowsTheData();
         checkSplaneMinimumExtentExpands();
         checkSplaneDownwardExpansion();
         checkSplaneMarksSelection();
@@ -470,8 +472,12 @@ public final class SsaHarness {
                 svg.contains("stroke-dasharray"));
         expect("both rays are drawn", 2, countOf(svg, "class=\"ray\""));
         expect("one circle per mode shown", 2, countOf(svg, "class=\"pole\""));
-        expect("the unstable mode gets a cross, which is two lines", 2,
+        // Two lines for the mode's cross and two for the legend sample, which
+        // shares the class so one hex edit restyles both.
+        expect("the unstable cross and its legend sample are two lines each", 4,
                 countOf(svg, "class=\"unstable\""));
+        expect("exactly one cross sits on the plot", 2,
+                countOf(groupBody(svg, "unstable"), "class=\"unstable\""));
         expect("frequencies are labelled", true, svg.contains("0.62 Hz"));
         expect("axes are labelled", true, svg.contains("Re"));
         expect("the pole group is present", true, svg.contains("<g id=\"poles\""));
@@ -486,6 +492,57 @@ public final class SsaHarness {
             expect("pole " + i + " cy is inside plot area", true,
                     cy >= 20 && cy <= 355);
         }
+    }
+
+    /**
+     * The exported SVG goes into reports, where an axis captioned [1/s] with
+     * nothing to measure against is not a scale.
+     */
+    private static void checkSplaneLabelsItsScale() {
+        SvgSink sink = new SvgSink(500, 400);
+        SplanePanel.render(sink, emFixture(), null, 500, 400);
+        String svg = sink.toSvg();
+        String ticks = groupBody(svg, "ticks");
+        expect("the ticks are their own group", true, svg.contains("<g id=\"ticks\">"));
+        expect("every tick drawn carries a label",
+                SplanePanel.IM_TICKS + SplanePanel.RE_TICKS, countOf(ticks, "<text"));
+        expect("four Im ticks and five Re ticks", 9, countOf(ticks, "<text"));
+        expect("every tick label has a tick mark",
+                SplanePanel.IM_TICKS + SplanePanel.RE_TICKS, countOf(ticks, "<line"));
+        expect("tick labels use the existing label class",
+                SplanePanel.IM_TICKS + SplanePanel.RE_TICKS,
+                countOf(ticks, "class=\"label\""));
+        // The fixture keeps the notebook's window: Im 0 to 9, Re -3.0 to 0.5.
+        expect("the top Im grid line is labelled", true, ticks.contains(">9.00<"));
+        expect("the Re axis is labelled at its left end", true,
+                ticks.contains(">-3.00<"));
+        expect("and at its right end", true, ticks.contains(">0.50<"));
+    }
+
+    /**
+     * The crimson cross and the crimson Re = 0 boundary are the same colour
+     * and different meanings, which the design answers with a legend.
+     */
+    private static void checkSplaneLegendFollowsTheData() {
+        SvgSink withUnstable = new SvgSink(500, 400);
+        SplanePanel.render(withUnstable, emFixture(), null, 500, 400);
+        String svg = withUnstable.toSvg();
+        expect("an unstable mode brings a legend", true,
+                svg.contains("<g id=\"legend\">"));
+        expect("the legend names the marker", true,
+                groupBody(svg, "legend").contains("unstable"));
+        expect("the legend sample is a cross", 2,
+                countOf(groupBody(svg, "legend"), "<line"));
+
+        java.util.List<Mode> stable = new java.util.ArrayList<Mode>();
+        stable.add(new Mode(1, -0.43, 3.92, 0.11, 0.62, true, true));
+        SvgSink none = new SvgSink(500, 400);
+        SplanePanel.render(none, stable, null, 500, 400);
+        String stableSvg = none.toSvg();
+        expect("with nothing unstable there is no legend", false,
+                stableSvg.contains("<g id=\"legend\">"));
+        expect("and no cross either", 0,
+                countOf(stableSvg, "class=\"unstable\""));
     }
 
     private static void checkSplaneMinimumExtentExpands() {
@@ -539,6 +596,19 @@ public final class SsaHarness {
         SplanePanel.render(sink, em, em.get(0), 500, 400);
         String svg = sink.toSvg();
         expect("the selected pole is ringed", true, svg.contains("<g id=\"selected\""));
+    }
+
+    /**
+     * The body of one group. The plots never nest groups, so the first
+     * &lt;/g&gt; after the opening tag is this group's own.
+     */
+    private static String groupBody(String svg, String id) {
+        int at = svg.indexOf("<g id=\"" + id + "\">");
+        if (at < 0) {
+            return "";
+        }
+        int end = svg.indexOf("</g>", at);
+        return end < 0 ? svg.substring(at) : svg.substring(at, end);
     }
 
     private static int countOf(String haystack, String needle) {
