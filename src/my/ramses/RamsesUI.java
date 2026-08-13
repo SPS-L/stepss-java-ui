@@ -380,6 +380,7 @@ public class RamsesUI extends javax.swing.JFrame {
         ssaRealLimit = new javax.swing.JTextField();
         ssaPfThresholdLabel = new javax.swing.JLabel();
         ssaPfThreshold = new javax.swing.JTextField();
+        ssaEngineNote = new javax.swing.JLabel();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane2 = new javax.swing.JScrollPane();
         codegenPane = new javax.swing.JTextArea();
@@ -1953,6 +1954,9 @@ public class RamsesUI extends javax.swing.JFrame {
         ssaPfThreshold.setEnabled(false);
         ssaPfThreshold.setName("ssaPfThreshold"); // NOI18N
 
+        ssaEngineNote.setText("Real part limit and PF threshold need a newer RAMSES; the running engine ignores them.");
+        ssaEngineNote.setName("ssaEngineNote"); // NOI18N
+
         javax.swing.GroupLayout jPanel8Layout = new javax.swing.GroupLayout(jPanel8);
         jPanel8.setLayout(jPanel8Layout);
         jPanel8Layout.setHorizontalGroup(
@@ -1996,7 +2000,8 @@ public class RamsesUI extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(ssaPfThresholdLabel)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(ssaPfThreshold, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                                .addComponent(ssaPfThreshold, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addComponent(ssaEngineNote))
                         .addGap(0, 1492, Short.MAX_VALUE)))
                 .addContainerGap())
         );
@@ -2031,6 +2036,8 @@ public class RamsesUI extends javax.swing.JFrame {
                     .addComponent(ssaPfThresholdLabel)
                     .addComponent(ssaPfThreshold, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(ssaEngineNote)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(ssaButton1)
                     .addComponent(ssaButton)
@@ -5442,6 +5449,7 @@ public class RamsesUI extends javax.swing.JFrame {
     private javax.swing.JButton ssaButton;
     private javax.swing.JButton ssaButton1;
     private javax.swing.JTextField ssaDirectory;
+    private javax.swing.JLabel ssaEngineNote;
     private javax.swing.JTextField ssaPfThreshold;
     private javax.swing.JLabel ssaPfThresholdLabel;
     private javax.swing.JTextField ssaRealLimit;

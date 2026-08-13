@@ -2276,6 +2276,7 @@
                                           <EmptySpace max="-2" attributes="0"/>
                                           <Component id="ssaPfThreshold" min="-2" pref="70" max="-2" attributes="0"/>
                                       </Group>
+                                      <Component id="ssaEngineNote" alignment="0" min="-2" max="-2" attributes="0"/>
                                   </Group>
                                   <EmptySpace min="0" pref="1492" max="32767" attributes="0"/>
                               </Group>
@@ -2319,6 +2320,8 @@
                               <Component id="ssaPfThreshold" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace max="-2" attributes="0"/>
+                          <Component id="ssaEngineNote" min="-2" max="-2" attributes="0"/>
+                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
                           <Group type="103" groupAlignment="3" attributes="0">
                               <Component id="ssaButton1" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="ssaButton" alignment="3" min="-2" max="-2" attributes="0"/>
@@ -2492,6 +2495,12 @@
                     <Property name="toolTipText" type="java.lang.String" value="Needs a RAMSES release whose EIG disturbance accepts these values. The running engine does not, and would ignore them silently, so they are disabled rather than misleading."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="ssaPfThreshold" noResource="true"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JLabel" name="ssaEngineNote">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Real part limit and PF threshold need a newer RAMSES; the running engine ignores them."/>
+                    <Property name="name" type="java.lang.String" value="ssaEngineNote" noResource="true"/>
                   </Properties>
                 </Component>
               </SubComponents>
