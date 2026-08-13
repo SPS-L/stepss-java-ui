@@ -2257,10 +2257,30 @@
                                       <Component id="jLabel4" alignment="0" min="-2" max="-2" attributes="0"/>
                                       <Component id="jLabel8" alignment="0" min="-2" max="-2" attributes="0"/>
                                       <Group type="102" alignment="0" attributes="0">
-                                          <Component id="ssaButton" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace max="-2" attributes="0"/>
                                           <Component id="ssaButton1" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace max="-2" attributes="0"/>
+                                          <Component id="viewSsaResults" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                                          <Component id="saveDynJac" min="-2" max="-2" attributes="0"/>
                                       </Group>
+                                      <Group type="102" alignment="0" attributes="0">
+                                          <Component id="ssaBasenameLabel" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace max="-2" attributes="0"/>
+                                          <Component id="ssaBasename" min="-2" pref="120" max="-2" attributes="0"/>
+                                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                                          <Component id="ssaTimeLabel" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace max="-2" attributes="0"/>
+                                          <Component id="ssaTime" min="-2" pref="70" max="-2" attributes="0"/>
+                                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                                          <Component id="ssaRealLimitLabel" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace max="-2" attributes="0"/>
+                                          <Component id="ssaRealLimit" min="-2" pref="70" max="-2" attributes="0"/>
+                                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                                          <Component id="ssaPfThresholdLabel" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace max="-2" attributes="0"/>
+                                          <Component id="ssaPfThreshold" min="-2" pref="70" max="-2" attributes="0"/>
+                                      </Group>
+                                      <Component id="ssaEngineNote" alignment="0" min="-2" max="-2" attributes="0"/>
                                   </Group>
                                   <EmptySpace min="0" pref="1492" max="32767" attributes="0"/>
                               </Group>
@@ -2296,8 +2316,22 @@
                           </Group>
                           <EmptySpace min="-2" pref="14" max="-2" attributes="0"/>
                           <Group type="103" groupAlignment="3" attributes="0">
+                              <Component id="ssaBasenameLabel" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="ssaBasename" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="ssaTimeLabel" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="ssaTime" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="ssaRealLimitLabel" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="ssaRealLimit" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="ssaPfThresholdLabel" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="ssaPfThreshold" alignment="3" min="-2" max="-2" attributes="0"/>
+                          </Group>
+                          <EmptySpace max="-2" attributes="0"/>
+                          <Component id="ssaEngineNote" min="-2" max="-2" attributes="0"/>
+                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                          <Group type="103" groupAlignment="3" attributes="0">
                               <Component id="ssaButton1" alignment="3" min="-2" max="-2" attributes="0"/>
-                              <Component id="ssaButton" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="viewSsaResults" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="saveDynJac" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace pref="657" max="32767" attributes="0"/>
                       </Group>
@@ -2369,14 +2403,15 @@
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loadTrajToFileButtonActionPerformed"/>
                   </Events>
                 </Component>
-                <Component class="javax.swing.JButton" name="ssaButton">
+                <Component class="javax.swing.JButton" name="saveDynJac">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Extract Jacobian matrix"/>
-                    <Property name="toolTipText" type="java.lang.String" value="Extract Jacobian matrix"/>
-                    <Property name="name" type="java.lang.String" value="ssaButton" noResource="true"/>
+                    <Property name="text" type="java.lang.String" value="Save dynamic Jacobian..."/>
+                    <Property name="toolTipText" type="java.lang.String" value="Saves the Jacobian the last analysis reduced, taken at the same instant as the eigenvalues"/>
+                    <Property name="enabled" type="boolean" value="false"/>
+                    <Property name="name" type="java.lang.String" value="saveDynJac" noResource="true"/>
                   </Properties>
                   <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="ssaButtonActionPerformed"/>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="saveDynJacActionPerformed"/>
                   </Events>
                 </Component>
                 <Component class="javax.swing.JLabel" name="jLabel4">
@@ -2394,7 +2429,6 @@
                 <Component class="javax.swing.JButton" name="ssaButton1">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Perform small signal stability analysis"/>
-                    <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="ssaButton1" noResource="true"/>
                   </Properties>
                   <Events>
@@ -2409,13 +2443,85 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadSSADir">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Select Working Directory"/>
-                    <Property name="toolTipText" type="java.lang.String" value="Select directory to extract Jacobian matrix"/>
+                    <Property name="text" type="java.lang.String" value="Select results directory"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Directory the Jacobian and small-signal results are copied to"/>
                     <Property name="name" type="java.lang.String" value="loadSSADir" noResource="true"/>
                   </Properties>
                   <Events>
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loadSSADirActionPerformed"/>
                   </Events>
+                </Component>
+                <Component class="javax.swing.JButton" name="viewSsaResults">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="View results..."/>
+                    <Property name="toolTipText" type="java.lang.String" value="Open small-signal results already on disk, without re-running the analysis"/>
+                    <Property name="name" type="java.lang.String" value="viewSsaResults" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="viewSsaResultsActionPerformed"/>
+                  </Events>
+                </Component>
+                <Component class="javax.swing.JLabel" name="ssaBasenameLabel">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Results basename"/>
+                    <Property name="name" type="java.lang.String" value="ssaBasenameLabel" noResource="true"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JTextField" name="ssaBasename">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="ssa"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Names the three results files, so several runs can share one directory"/>
+                    <Property name="name" type="java.lang.String" value="ssaBasename" noResource="true"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JLabel" name="ssaTimeLabel">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Analysis time t [s]"/>
+                    <Property name="name" type="java.lang.String" value="ssaTimeLabel" noResource="true"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JTextField" name="ssaTime">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="0.001"/>
+                    <Property name="toolTipText" type="java.lang.String" value="When to linearise. The default analyses the initial operating point; a later time runs an event-free simulation to that point first."/>
+                    <Property name="name" type="java.lang.String" value="ssaTime" noResource="true"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JLabel" name="ssaRealLimitLabel">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Real part limit"/>
+                    <Property name="enabled" type="boolean" value="false"/>
+                    <Property name="name" type="java.lang.String" value="ssaRealLimitLabel" noResource="true"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JTextField" name="ssaRealLimit">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="-1.0"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Needs a RAMSES release whose EIG disturbance accepts these values. The running engine does not, and would ignore them silently, so they are disabled rather than misleading."/>
+                    <Property name="enabled" type="boolean" value="false"/>
+                    <Property name="name" type="java.lang.String" value="ssaRealLimit" noResource="true"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JLabel" name="ssaPfThresholdLabel">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="PF threshold"/>
+                    <Property name="enabled" type="boolean" value="false"/>
+                    <Property name="name" type="java.lang.String" value="ssaPfThresholdLabel" noResource="true"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JTextField" name="ssaPfThreshold">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="0.05"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Needs a RAMSES release whose EIG disturbance accepts these values. The running engine does not, and would ignore them silently, so they are disabled rather than misleading."/>
+                    <Property name="enabled" type="boolean" value="false"/>
+                    <Property name="name" type="java.lang.String" value="ssaPfThreshold" noResource="true"/>
+                  </Properties>
+                </Component>
+                <Component class="javax.swing.JLabel" name="ssaEngineNote">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Real part limit and PF threshold need a newer RAMSES; the running engine ignores them."/>
+                    <Property name="name" type="java.lang.String" value="ssaEngineNote" noResource="true"/>
+                  </Properties>
                 </Component>
               </SubComponents>
             </Container>
