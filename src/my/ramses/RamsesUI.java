@@ -373,6 +373,13 @@ public class RamsesUI extends javax.swing.JFrame {
         ssaButton1 = new javax.swing.JButton();
         ssaDirectory = new javax.swing.JTextField();
         loadSSADir = new javax.swing.JButton();
+        viewSsaResults = new javax.swing.JButton();
+        ssaBasenameLabel = new javax.swing.JLabel();
+        ssaBasename = new javax.swing.JTextField();
+        ssaRealLimitLabel = new javax.swing.JLabel();
+        ssaRealLimit = new javax.swing.JTextField();
+        ssaPfThresholdLabel = new javax.swing.JLabel();
+        ssaPfThreshold = new javax.swing.JTextField();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane2 = new javax.swing.JScrollPane();
         codegenPane = new javax.swing.JTextArea();
@@ -1893,7 +1900,6 @@ public class RamsesUI extends javax.swing.JFrame {
         jLabel8.setName("jLabel8"); // NOI18N
 
         ssaButton1.setText("Perform small signal stability analysis");
-        ssaButton1.setEnabled(false);
         ssaButton1.setName("ssaButton1"); // NOI18N
         ssaButton1.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1904,14 +1910,48 @@ public class RamsesUI extends javax.swing.JFrame {
         ssaDirectory.setEditable(false);
         ssaDirectory.setName("ssaDirectory"); // NOI18N
 
-        loadSSADir.setText("Select Working Directory");
-        loadSSADir.setToolTipText("Select directory to extract Jacobian matrix");
+        loadSSADir.setText("Select results directory");
+        loadSSADir.setToolTipText("Directory the Jacobian and small-signal results are copied to");
         loadSSADir.setName("loadSSADir"); // NOI18N
         loadSSADir.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 loadSSADirActionPerformed(evt);
             }
         });
+
+        viewSsaResults.setText("View results...");
+        viewSsaResults.setToolTipText("Open small-signal results already on disk, without re-running the analysis");
+        viewSsaResults.setName("viewSsaResults"); // NOI18N
+        viewSsaResults.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                viewSsaResultsActionPerformed(evt);
+            }
+        });
+
+        ssaBasenameLabel.setText("Results basename");
+        ssaBasenameLabel.setName("ssaBasenameLabel"); // NOI18N
+
+        ssaBasename.setText("ssa");
+        ssaBasename.setToolTipText("Names the three results files, so several runs can share one directory");
+        ssaBasename.setName("ssaBasename"); // NOI18N
+
+        ssaRealLimitLabel.setText("Real part limit");
+        ssaRealLimitLabel.setEnabled(false);
+        ssaRealLimitLabel.setName("ssaRealLimitLabel"); // NOI18N
+
+        ssaRealLimit.setText("-1.0");
+        ssaRealLimit.setToolTipText("Needs a RAMSES release whose EIG disturbance accepts these values. The running engine does not, and would ignore them silently, so they are disabled rather than misleading.");
+        ssaRealLimit.setEnabled(false);
+        ssaRealLimit.setName("ssaRealLimit"); // NOI18N
+
+        ssaPfThresholdLabel.setText("PF threshold");
+        ssaPfThresholdLabel.setEnabled(false);
+        ssaPfThresholdLabel.setName("ssaPfThresholdLabel"); // NOI18N
+
+        ssaPfThreshold.setText("0.05");
+        ssaPfThreshold.setToolTipText("Needs a RAMSES release whose EIG disturbance accepts these values. The running engine does not, and would ignore them silently, so they are disabled rather than misleading.");
+        ssaPfThreshold.setEnabled(false);
+        ssaPfThreshold.setName("ssaPfThreshold"); // NOI18N
 
         javax.swing.GroupLayout jPanel8Layout = new javax.swing.GroupLayout(jPanel8);
         jPanel8.setLayout(jPanel8Layout);
@@ -1942,7 +1982,21 @@ public class RamsesUI extends javax.swing.JFrame {
                             .addGroup(jPanel8Layout.createSequentialGroup()
                                 .addComponent(ssaButton)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(ssaButton1)))
+                                .addComponent(ssaButton1)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(viewSsaResults))
+                            .addGroup(jPanel8Layout.createSequentialGroup()
+                                .addComponent(ssaBasenameLabel)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(ssaBasename, javax.swing.GroupLayout.PREFERRED_SIZE, 120, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(ssaRealLimitLabel)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(ssaRealLimit, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(ssaPfThresholdLabel)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(ssaPfThreshold, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)))
                         .addGap(0, 1492, Short.MAX_VALUE)))
                 .addContainerGap())
         );
@@ -1970,8 +2024,17 @@ public class RamsesUI extends javax.swing.JFrame {
                     .addComponent(loadSSADir))
                 .addGap(14, 14, 14)
                 .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(ssaBasenameLabel)
+                    .addComponent(ssaBasename, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(ssaRealLimitLabel)
+                    .addComponent(ssaRealLimit, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(ssaPfThresholdLabel)
+                    .addComponent(ssaPfThreshold, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(ssaButton1)
-                    .addComponent(ssaButton))
+                    .addComponent(ssaButton)
+                    .addComponent(viewSsaResults))
                 .addContainerGap(657, Short.MAX_VALUE))
         );
 
@@ -3096,16 +3159,26 @@ public class RamsesUI extends javax.swing.JFrame {
         // Runs the analysis in the engine. RAMSES reduces the linearised model
         // to a state matrix, solves the eigenproblem and writes the three
         // results files itself, so nothing external is invoked.
+        //
+        // The .dst is generated rather than copied from a bundled resource,
+        // because the basename is now the user's to choose: the EIG argument
+        // names all three output files, so a per-run basename is what lets
+        // several runs share one directory.
         try {
-            InputStream in = RamsesUI.class.getResourceAsStream("ssaEig.dst");
-            File tmpFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "ssaEig.dst");
-            OutputStream streamOut = FileUtils.openOutputStream(tmpFile);
-            IOUtils.copy(in, streamOut);
-            in.close();
-            streamOut.close();
+            String base = ssaBasename.getText().trim();
+            if (base.isEmpty()) {
+                base = "ssa";
+                ssaBasename.setText(base);
+            }
+            File dstFile = new File(myTempDir.getAbsolutePath()
+                    + System.getProperty("file.separator") + base + "Eig.dst");
+            FileUtils.writeStringToFile(dstFile,
+                    "0.000 CONTINUE SOLVER TR 0.010 0.001 0. ALL\n"
+                    + "0.000 EIG '" + base + "'\n"
+                    + "0.010 STOP\n", "UTF-8");
 
             String tmpString = fileDist.getText();
-            fileDist.setText("ssaEig.dst");
+            fileDist.setText(dstFile.getName());
             ssa = true;
             runSimulationActionPerformed(evt);
             simulExecutorResultHandler.waitFor();
@@ -3114,7 +3187,8 @@ public class RamsesUI extends javax.swing.JFrame {
             // The analysis refuses rather than guessing when it cannot produce a
             // result it can justify, and says so through the exit code, so a
             // missing modes file is reported instead of failing silently later.
-            File modes = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "ssa_modes.dat");
+            File modes = new File(myTempDir.getAbsolutePath()
+                    + System.getProperty("file.separator") + base + "_modes.dat");
             if (!modes.exists()) {
                 JOptionPane.showMessageDialog(this,
                         "No results were produced. Small-signal analysis needs $OMEGA_REF SYN and\n"
@@ -3124,20 +3198,72 @@ public class RamsesUI extends javax.swing.JFrame {
                 return;
             }
 
+            String[] produced = {base + "_modes.dat", base + "_pf.dat", base + "_ms.dat"};
+            File resultsDir = new File(myTempDir.getAbsolutePath());
             if (!"".equals(ssaDirectory.getText())) {
-                String[] produced = {"ssa_modes.dat", "ssa_pf.dat", "ssa_ms.dat"};
                 for (String name : produced) {
-                    File srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + name);
-                    File dstFile = new File(ssaDirectory.getText() + System.getProperty("file.separator") + name);
+                    File srcFile = new File(myTempDir.getAbsolutePath()
+                            + System.getProperty("file.separator") + name);
+                    File dstCopy = new File(ssaDirectory.getText()
+                            + System.getProperty("file.separator") + name);
                     if (srcFile.exists()) {
-                        fileOps.copyFiletoFile(srcFile, dstFile);
+                        fileOps.copyFiletoFile(srcFile, dstCopy);
                     }
                 }
+                resultsDir = new File(ssaDirectory.getText());
             }
+
+            // Opened from wherever the files actually are. With no results
+            // directory set they stay in the tool directory, and the window
+            // header names that path, so a successful run can no longer look
+            // identical to a no-op.
+            showSsaResults(resultsDir, base);
         } catch (InterruptedException | IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
     }//GEN-LAST:event_ssaButton1ActionPerformed
+
+    /** Loads one run and shows it, reporting a parse failure rather than swallowing it. */
+    private void showSsaResults(File dir, String basename) {
+        try {
+            my.ramses.ssa.SsaResultsWindow.open(this,
+                    my.ramses.ssa.SsaResults.load(dir, basename));
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Could not read the results in " + dir + "\n\n" + ex.getMessage(),
+                    "Small-signal results", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void viewSsaResultsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_viewSsaResultsActionPerformed
+        fileChooser.setSelectedFile(new File(""));
+        fileChooser.setDialogTitle("Choose a directory containing small-signal results");
+        fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        if (fileChooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        File dir = fileChooser.getSelectedFile();
+        java.util.List<String> found = my.ramses.ssa.SsaResults.basenames(dir);
+        if (found.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "No small-signal results in " + dir + "\n\n"
+                    + "Looking for a file named <basename>_modes.dat.",
+                    "Small-signal results", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        String chosen = found.get(0);
+        if (found.size() > 1) {
+            Object picked = JOptionPane.showInputDialog(this,
+                    "That directory holds more than one run. Which one?",
+                    "Small-signal results", JOptionPane.QUESTION_MESSAGE, null,
+                    found.toArray(), found.get(0));
+            if (picked == null) {
+                return;
+            }
+            chosen = (String) picked;
+        }
+        showSsaResults(dir, chosen);
+    }//GEN-LAST:event_viewSsaResultsActionPerformed
 
     private void ssaButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_ssaButtonActionPerformed
         try {
@@ -3164,7 +3290,6 @@ public class RamsesUI extends javax.swing.JFrame {
                     }
                 }
             }
-            ssaButton1.setEnabled(true);
 
         } catch (InterruptedException | IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
@@ -5312,9 +5437,15 @@ public class RamsesUI extends javax.swing.JFrame {
     private javax.swing.JTextField shuntObsField;
     private javax.swing.JComboBox shuntObsList;
     private javax.swing.JTextArea simulationOutput;
+    private javax.swing.JTextField ssaBasename;
+    private javax.swing.JLabel ssaBasenameLabel;
     private javax.swing.JButton ssaButton;
     private javax.swing.JButton ssaButton1;
     private javax.swing.JTextField ssaDirectory;
+    private javax.swing.JTextField ssaPfThreshold;
+    private javax.swing.JLabel ssaPfThresholdLabel;
+    private javax.swing.JTextField ssaRealLimit;
+    private javax.swing.JLabel ssaRealLimitLabel;
     private javax.swing.JButton stopSimulationButton;
     private javax.swing.JTextField syncObsField;
     private javax.swing.JComboBox syncObsList;
@@ -5323,6 +5454,7 @@ public class RamsesUI extends javax.swing.JFrame {
     private javax.swing.JLabel versionLabel1;
     private javax.swing.JLabel versionLabel2;
     private javax.swing.JButton viewCurvesButton;
+    private javax.swing.JButton viewSsaResults;
     private javax.swing.JLabel webpageLabel;
     // End of variables declaration//GEN-END:variables
 

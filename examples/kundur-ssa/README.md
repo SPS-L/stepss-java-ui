@@ -5,21 +5,10 @@ participation factors and mode shapes of the Kundur two-area benchmark, with
 and without its power system stabilisers. The engine does the analysis itself;
 nothing external is invoked.
 
-## Requires a RAMSES newer than 3.60
-
-The `EIG` disturbance this example uses was added to the engine after the v3.60
-release, and `versions.properties` in this repository currently pins
-**ramses.version=3.60**. Until that pin moves to a release carrying `EIG`, the
-bundled engine accepts the disturbance and writes no results files.
-
-Check which engine you have from the STEPSS window: **Help, About**, or run the
-extracted `dynsim` binary with no arguments and read the banner.
-
 The Analysis tab's **Perform small signal stability analysis** button runs the
 same thing this example runs from a terminal: it writes the disturbance below,
-runs the bundled engine, and copies the three results files into the working
-directory you selected. It reports rather than failing silently if the analysis
-refused.
+runs the bundled engine, and then opens the results. It reports rather than
+failing silently if the analysis refused.
 
 ## What to do
 
@@ -50,13 +39,23 @@ an aborted run can make the next run fail in a way that looks unrelated.
 
 1. Load `lf.dat`, `dyn.dat` and `solveroptions.dat` as system data, and
    `obs.dat` as the observables. You do not need to supply `eig.dst`: the
-   button uses its own bundled disturbance.
-2. **Select Working Directory** on the Analysis tab, and point it where you want
-   the results.
+   button writes its own disturbance, naming the output files after the
+   **Results basename** field on the Analysis tab.
+2. Optionally press **Select results directory** on the Analysis tab and point
+   it where you want the three results files copied. Leave it unset and they
+   stay in the tool's working directory.
 3. Press **Perform small signal stability analysis**.
-4. The three results files appear in that directory.
+4. A results window opens on the run. It lists the modes with their damping
+   ratios and frequencies, and for the mode you select shows the participation
+   factors, a mode-shape dial and an s-plane. Its header names the directory
+   the files were read from. Both plots save as SVG.
 
 Swap `dyn.dat` for `dyn_noPSS.dat` and repeat to get the unstable variant.
+Change the basename between runs and both sets can live in one directory.
+
+**View results...** on the same tab reopens any directory holding a
+`<basename>_modes.dat` without re-running the analysis, which also reaches runs
+made from a terminal or in an earlier session.
 
 ## What to expect
 
@@ -115,8 +114,12 @@ first:
 - **`$SCHEME DE`.** The integrated scheme is not supported.
 
 Both refusals exit with code **78** and state the reason in the log, so a run
-that produced nothing and exited 0 is a different problem, most likely an old
-engine (see the version note above).
+that produced nothing and exited 0 is a different problem, most likely an engine
+predating the `EIG` disturbance. The bundled engine is pinned by
+`ramses.version` in `versions.properties` and carries it; an engine you supplied
+yourself may not, and one that lacks `EIG` accepts the disturbance and writes no
+results files. Read the banner of `dynsim` run with no arguments to see which
+you have.
 
 Systems above `$EIG_MAX_STATES` states (default 5000) are also refused, with a
 message naming the limit. That is a deliberate ceiling: the reduced state matrix
