@@ -25,10 +25,15 @@ public final class SsaParticipation {
         this.byMode = byMode;
     }
 
-    /** Rows for one mode, largest participation first. Empty when filtered out. */
+    /**
+     * Rows for one mode, largest participation first. Empty when filtered out.
+     * Unmodifiable, as SsaModes.modes() is: these are parsed engine output and
+     * one promise about it is easier to rely on than two.
+     */
     public List<Participation> forMode(int mode) {
         List<Participation> rows = byMode.get(Integer.valueOf(mode));
-        return rows == null ? Collections.<Participation>emptyList() : rows;
+        return rows == null ? Collections.<Participation>emptyList()
+                : Collections.unmodifiableList(rows);
     }
 
     public static SsaParticipation parse(String text) throws IOException {

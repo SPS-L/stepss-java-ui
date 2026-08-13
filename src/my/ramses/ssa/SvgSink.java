@@ -142,7 +142,14 @@ final class SvgSink implements PlotSink {
         return String.format(java.util.Locale.ROOT, "%.2f", value);
     }
 
+    /**
+     * Escapes for both text content and attribute values. The double quote
+     * matters only for attributes, and every attribute value reaching here is
+     * an internal constant today, but group(id) and every cls do reach one,
+     * so the general escaper is kept general.
+     */
     private static String escape(String s) {
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 }

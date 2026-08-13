@@ -124,6 +124,32 @@ public final class SsaHarness {
         }
     }
 
+    /**
+     * SsaModes.modes() is unmodifiable, so these are too. Two different
+     * promises about the same kind of parsed engine output is one promise
+     * too many.
+     */
+    private static void checkParsedRowsAreUnmodifiable() {
+        try {
+            SsaParticipation pf = SsaParticipation.parse(join(PF_LINES));
+            try {
+                pf.forMode(2).clear();
+                fail("participation rows are unmodifiable");
+            } catch (UnsupportedOperationException ex) {
+                pass("participation rows are unmodifiable");
+            }
+            SsaModeShapes ms = SsaModeShapes.parse(join(MS_LINES));
+            try {
+                ms.forMode(2).clear();
+                fail("mode shape rows are unmodifiable");
+            } catch (UnsupportedOperationException ex) {
+                pass("mode shape rows are unmodifiable");
+            }
+        } catch (java.io.IOException ex) {
+            fail("unmodifiable check: threw " + ex);
+        }
+    }
+
     private static void checkModeShapes() {
         try {
             SsaModeShapes ms = SsaModeShapes.parse(join(MS_LINES));
@@ -222,9 +248,12 @@ public final class SsaHarness {
         checkModesTime();
         checkModesPartialHeader();
         checkModesOriginZeta();
+        checkModesRejectsAMangledNumber();
+        checkModesRejectsEmptyInput();
         checkModesCrlf();
         checkParticipationNames();
         checkParticipationFilteredMode();
+        checkParsedRowsAreUnmodifiable();
         checkModeShapes();
         checkElectromechanicalFilter();
         checkBasenameDiscoveryOnEmptyDir();
@@ -323,6 +352,43 @@ public final class SsaHarness {
         expect("a mode at the origin is not NaN in re", 0.0, origin.re);
     }
 
+    /**
+     * The design promises a line that fails to parse is reported with its
+     * line number and the file rejected, rather than yielding a
+     * half-populated table. Every other check here is a success or a
+     * legitimate-absence case, so this is the only one that exercises it.
+     *
+     * <p>The mangled field is mode 3's im, on the sixth line of the fixture:
+     * three comment lines then five rows. The replacement is the same width
+     * as what it replaces, so the column offsets still land on it.
+     */
+    private static void checkModesRejectsAMangledNumber() {
+        String bad = modesFixture().replace(
+                "-3.919040000000000E+00", "-3.919040000000000EXX0");
+        expect("the fixture was actually mangled", true,
+                bad.contains("EXX0"));
+        try {
+            SsaModes.parse(bad);
+            fail("a mangled numeric column is rejected, not half-parsed");
+        } catch (java.io.IOException ex) {
+            expect("the rejection names the offending line", true,
+                    ex.getMessage().startsWith("line 6:"));
+            expect("and quotes what it could not read", true,
+                    ex.getMessage().contains("-3.919040000000000EXX0"));
+        }
+    }
+
+    /** An empty or wrong file is rejected by name, not returned empty. */
+    private static void checkModesRejectsEmptyInput() {
+        try {
+            SsaModes.parse("");
+            fail("an empty modes file is rejected");
+        } catch (java.io.IOException ex) {
+            expect("an empty modes file says it found no rows", true,
+                    ex.getMessage().contains("no mode rows found"));
+        }
+    }
+
     private static void checkModesCrlf() {
         try {
             SsaModes m = SsaModes.parse(modesFixture().replace("\n", "\r\n"));
@@ -367,6 +433,15 @@ public final class SsaHarness {
         expect("one basename is discovered", 1, SsaResults.basenames(dir).size());
         expect("the basename drops the _modes.dat suffix", "run1",
                 SsaResults.basenames(dir).get(0));
+
+        // A directory can carry the suffix too. Offering it as a run means
+        // load() then reports "no notarun_modes.dat in ...", about a name
+        // that plainly does exist.
+        java.io.File decoy = new java.io.File(dir, "notarun_modes.dat");
+        decoy.mkdir();
+        decoy.deleteOnExit();
+        expect("a directory named like a modes file is not offered as a run", 1,
+                SsaResults.basenames(dir).size());
     }
 
     private static void checkSvgSinkEmitsEditableElements() {
@@ -392,11 +467,16 @@ public final class SsaHarness {
 
     private static void checkSvgSinkEscapes() {
         SvgSink sink = new SvgSink(10, 10);
-        sink.text(0, 0, "G1 & G2 <tie>", "middle", "label");
+        sink.text(0, 0, "G1 & G2 <tie> \"north\"", "middle", "label");
         String svg = sink.toSvg();
         expect("ampersand is escaped", true, svg.contains("G1 &amp; G2"));
         expect("angle brackets are escaped", true, svg.contains("&lt;tie&gt;"));
         expect("no raw bracket leaks into the markup", false, svg.contains("<tie>"));
+        // Only attribute values can be broken by a quote, and today every
+        // attribute value is an internal constant. The escaper is general, so
+        // it is pinned as general.
+        expect("the double quote is escaped too", true,
+                svg.contains("&quot;north&quot;"));
     }
 
     private static void checkPlotStyleCoverageInSvg() {

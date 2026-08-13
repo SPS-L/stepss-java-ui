@@ -64,7 +64,11 @@ public final class SsaResults {
             return found;
         }
         for (String name : names) {
-            if (name.endsWith(MODES_SUFFIX) && name.length() > MODES_SUFFIX.length()) {
+            // isFile(), not just the suffix: a directory named X_modes.dat
+            // would otherwise be offered as a run and then fail in load()
+            // with "no X_modes.dat in ...", about a name that plainly exists.
+            if (name.endsWith(MODES_SUFFIX) && name.length() > MODES_SUFFIX.length()
+                    && new File(dir, name).isFile()) {
                 found.add(name.substring(0, name.length() - MODES_SUFFIX.length()));
             }
         }

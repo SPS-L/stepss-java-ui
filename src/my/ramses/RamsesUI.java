@@ -3177,8 +3177,35 @@ public class RamsesUI extends javax.swing.JFrame {
                 base = "ssa";
                 ssaBasename.setText(base);
             }
+            // The basename becomes both a filename and a Fortran record, so it
+            // is checked before either is written. An apostrophe closes the EIG
+            // argument early and the engine then writes nothing, which would
+            // surface as the "No results were produced" dialog below, naming
+            // solver settings that were never the problem. A path separator
+            // writes the files somewhere the loader will not look.
+            if (!base.matches("[A-Za-z0-9._-]+")) {
+                JOptionPane.showMessageDialog(this,
+                        "The results basename \"" + base + "\" cannot be used.\n\n"
+                        + "It names the three results files and is written into the\n"
+                        + "EIG disturbance record, so it may contain only letters,\n"
+                        + "digits, dot, underscore and hyphen.",
+                        "Small-signal analysis", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
             File dstFile = new File(myTempDir.getAbsolutePath()
                     + System.getProperty("file.separator") + base + "Eig.dst");
+            // This one-argument EIG record is what makes the ssaEngineNote
+            // label, and the disabled ssaRealLimit and ssaPfThreshold fields,
+            // true. The day a RAMSES whose EIG accepts real_limit and
+            // pf_threshold is bundled, all four change together: this record
+            // grows the two values, the two fields and their labels are
+            // enabled, and ssaEngineNote goes. Nothing detects the mismatch,
+            // because disturb.f90's list-directed read silently ignores extra
+            // fields rather than erroring, so the label would simply become
+            // false in a way no run reports. This comment lives here rather
+            // than beside ssaEngineNote because that label is inside the
+            // NetBeans generated block, which carries no hand-written
+            // comments and is regenerated from RamsesUI.form.
             FileUtils.writeStringToFile(dstFile,
                     "0.000 CONTINUE SOLVER TR 0.010 0.001 0. ALL\n"
                     + "0.000 EIG '" + base + "'\n"

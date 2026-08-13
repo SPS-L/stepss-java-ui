@@ -325,10 +325,14 @@ public final class SsaResultsWindow extends JFrame {
             Component c = super.getTableCellRendererComponent(t, value, selected,
                     focused, row, column);
             Mode mode = model.rows().get(owner.convertRowIndexToModel(row));
+            // Set unconditionally. One renderer instance serves the Integer,
+            // Double and String columns and DefaultTableCellRenderer does not
+            // reset alignment per cell, so setting it only in the Double
+            // branch leaves a column showing whatever the last cell painted.
+            setHorizontalAlignment(value instanceof Double ? RIGHT : LEFT);
             if (value instanceof Double) {
                 setText(String.format(java.util.Locale.ROOT, "%+.4f",
                         ((Double) value).doubleValue()));
-                setHorizontalAlignment(RIGHT);
             }
             if (!selected) {
                 c.setForeground(mode.zeta < 0.0 ? new java.awt.Color(0xdc, 0x14, 0x3c)

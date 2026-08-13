@@ -20,9 +20,11 @@ public final class SsaModeShapes {
         this.byMode = byMode;
     }
 
+    /** Unmodifiable, as SsaModes.modes() and SsaParticipation.forMode() are. */
     public List<ModeShapeEntry> forMode(int mode) {
         List<ModeShapeEntry> rows = byMode.get(Integer.valueOf(mode));
-        return rows == null ? Collections.<ModeShapeEntry>emptyList() : rows;
+        return rows == null ? Collections.<ModeShapeEntry>emptyList()
+                : Collections.unmodifiableList(rows);
     }
 
     public static SsaModeShapes parse(String text) throws IOException {
