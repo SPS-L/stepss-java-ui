@@ -5,7 +5,23 @@ sortable modes table, participation factors, an s-plane and a mode-shape dial,
 and export the plots as editable SVG. Fix the three defects that make the
 existing SSA buttons look broken.
 
-Status: approved 2026-08-13.
+Status: approved 2026-08-13, and implemented with three changes made after
+approval. They are recorded here rather than edited into the body, so this
+stays a record of what was approved:
+
+- **An analysis time is exposed.** The `EIG` record fires at a time the user
+  sets, defaulting to the 0.001 s this document assumed throughout. A later
+  value runs the simulation to that point with no events and linearises there.
+- **The Jacobian is a by-product of the analysis, not a separate action.**
+  "Extract Jacobian matrix" and `dampJac.dst` are deleted, contradicting the
+  statement below that `dampJac.dst` stays. The generated disturbance now
+  carries a `JAC` record at the same instant as the `EIG` record, and a
+  *Save dynamic Jacobian* button, enabled only by a successful analysis, saves
+  what that run dumped. This guarantees the saved matrix is the one behind the
+  eigenvalues displayed, which a separate run could not promise.
+- **The two style tables were consolidated** into one `PlotStyle`, because two
+  hand-maintained tables cannot deliver the no-drift guarantee the sink
+  abstraction exists for.
 
 ## Why
 
