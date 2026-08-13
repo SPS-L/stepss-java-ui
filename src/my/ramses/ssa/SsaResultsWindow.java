@@ -64,7 +64,12 @@ public final class SsaResultsWindow extends JFrame {
 
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setRowSorter(new TableRowSorter<ModesTableModel>(model));
-        table.setDefaultRenderer(Object.class, new ModeCellRenderer(model, table));
+        ModeCellRenderer renderer = new ModeCellRenderer(model, table);
+        // JTable pre-registers renderers for Number/Double ahead of Object, so
+        // registering only against Object.class never reaches columns 0 to 4.
+        table.setDefaultRenderer(Integer.class, renderer);
+        table.setDefaultRenderer(Double.class, renderer);
+        table.setDefaultRenderer(String.class, renderer);
         table.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent event) {
@@ -182,7 +187,7 @@ public final class SsaResultsWindow extends JFrame {
         participation.add(new JLabel("  Select a mode."));
         participation.revalidate();
         participation.repaint();
-        shape.show(new java.util.ArrayList<ModeShapeEntry>(), 0, true);
+        shape.clear();
     }
 
     private void showSelected() {
