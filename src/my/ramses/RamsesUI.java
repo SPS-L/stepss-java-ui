@@ -3093,9 +3093,48 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_loadSSADirActionPerformed
 
     private void ssaButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_ssaButton1ActionPerformed
+        // Runs the analysis in the engine. RAMSES reduces the linearised model
+        // to a state matrix, solves the eigenproblem and writes the three
+        // results files itself, so nothing external is invoked.
         try {
-            matlabProcessBuilder.start();
-        } catch (IOException ex) {
+            InputStream in = RamsesUI.class.getResourceAsStream("ssaEig.dst");
+            File tmpFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "ssaEig.dst");
+            OutputStream streamOut = FileUtils.openOutputStream(tmpFile);
+            IOUtils.copy(in, streamOut);
+            in.close();
+            streamOut.close();
+
+            String tmpString = fileDist.getText();
+            fileDist.setText("ssaEig.dst");
+            ssa = true;
+            runSimulationActionPerformed(evt);
+            simulExecutorResultHandler.waitFor();
+            fileDist.setText(tmpString);
+
+            // The analysis refuses rather than guessing when it cannot produce a
+            // result it can justify, and says so through the exit code, so a
+            // missing modes file is reported instead of failing silently later.
+            File modes = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "ssa_modes.dat");
+            if (!modes.exists()) {
+                JOptionPane.showMessageDialog(this,
+                        "No results were produced. Small-signal analysis needs $OMEGA_REF SYN and\n"
+                        + "$SCHEME DE in the solver settings, and a system within $EIG_MAX_STATES.\n"
+                        + "See the log for the reason.",
+                        "Small-signal analysis", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            if (!"".equals(ssaDirectory.getText())) {
+                String[] produced = {"ssa_modes.dat", "ssa_pf.dat", "ssa_ms.dat"};
+                for (String name : produced) {
+                    File srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + name);
+                    File dstFile = new File(ssaDirectory.getText() + System.getProperty("file.separator") + name);
+                    if (srcFile.exists()) {
+                        fileOps.copyFiletoFile(srcFile, dstFile);
+                    }
+                }
+            }
+        } catch (InterruptedException | IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
     }//GEN-LAST:event_ssaButton1ActionPerformed
@@ -3114,48 +3153,17 @@ public class RamsesUI extends javax.swing.JFrame {
             runSimulationActionPerformed(evt);
             simulExecutorResultHandler.waitFor();
             fileDist.setText(tmpString);
-            if (platform == Platform.WINDOWS_X86_64) {
-                matlabProcessBuilder = new ProcessBuilder("matlab.exe", "-desktop", "-r", "ssa");
-            } else {
-                matlabProcessBuilder = new ProcessBuilder("matlab", "-desktop", "-r", "ssa");
-            }
 
-            if ("".equals(ssaDirectory.getText())) {
-                matlabProcessBuilder.directory(myTempDir);
-                in = RamsesUI.class.getResourceAsStream("ssa.p");
-                tmpFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "ssa.p");
-                streamOut = FileUtils.openOutputStream(tmpFile);
-                IOUtils.copy(in, streamOut);
-                in.close();
-                streamOut.close();
-            } else {
-                File srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "jac_eqs.dat");
-                File dstFile = new File(ssaDirectory.getText() + System.getProperty("file.separator") + "jac_eqs.dat");
-                if (srcFile.exists()) {
-                    fileOps.copyFiletoFile(srcFile, dstFile);
+            if (!"".equals(ssaDirectory.getText())) {
+                String[] produced = {"jac_eqs.dat", "jac_var.dat", "jac_val.dat", "jac_struc.dat"};
+                for (String name : produced) {
+                    File srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + name);
+                    File dstFile = new File(ssaDirectory.getText() + System.getProperty("file.separator") + name);
+                    if (srcFile.exists()) {
+                        fileOps.copyFiletoFile(srcFile, dstFile);
+                    }
                 }
-                srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "jac_var.dat");
-                dstFile = new File(ssaDirectory.getText() + System.getProperty("file.separator") + "jac_var.dat");
-                if (srcFile.exists()) {
-                    fileOps.copyFiletoFile(srcFile, dstFile);
-                }
-                srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "jac_val.dat");
-                dstFile = new File(ssaDirectory.getText() + System.getProperty("file.separator") + "jac_val.dat");
-                if (srcFile.exists()) {
-                    fileOps.copyFiletoFile(srcFile, dstFile);
-                }
-                in = RamsesUI.class.getResourceAsStream("ssa.p");
-                tmpFile = new File(ssaDirectory.getText() + System.getProperty("file.separator") + "ssa.p");
-                if (tmpFile.exists()) {
-                    tmpFile.delete();
-                }
-                streamOut = FileUtils.openOutputStream(tmpFile);
-                IOUtils.copy(in, streamOut);
-                in.close();
-                streamOut.close();
-                matlabProcessBuilder.directory(new File(ssaDirectory.getText()));
             }
-            matlabProcessBuilder.redirectErrorStream(true);
             ssaButton1.setEnabled(true);
 
         } catch (InterruptedException | IOException ex) {
@@ -5129,7 +5137,6 @@ public class RamsesUI extends javax.swing.JFrame {
     private static final String RELEASES_URL = "https://github.com/SPS-L/stepss-java-ui/releases";
     private static final String RELEASES_LATEST_URL = RELEASES_URL + "/latest";
     private boolean ssa = false;
-    private ProcessBuilder matlabProcessBuilder;
     private DefaultExecutor simulExecutor;
     private DefaultExecuteResultHandler simulExecutorResultHandler;
     private int highlighterIndex;

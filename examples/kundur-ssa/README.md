@@ -2,7 +2,8 @@
 
 A ready-to-run case that computes the eigenvalues, damping ratios,
 participation factors and mode shapes of the Kundur two-area benchmark, with
-and without its power system stabilisers. No MATLAB is involved.
+and without its power system stabilisers. The engine does the analysis itself;
+nothing external is invoked.
 
 ## Requires a RAMSES newer than 3.60
 
@@ -14,9 +15,11 @@ bundled engine accepts the disturbance and writes no results files.
 Check which engine you have from the STEPSS window: **Help, About**, or run the
 extracted `dynsim` binary with no arguments and read the banner.
 
-Note also that the **Analysis tab's small-signal button still launches MATLAB**.
-That path is unchanged and is being replaced separately. This example does not
-use it; it drives the engine directly, which is why it needs no MATLAB.
+The Analysis tab's **Perform small signal stability analysis** button runs the
+same thing this example runs from a terminal: it writes the disturbance below,
+runs the bundled engine, and copies the three results files into the working
+directory you selected. It reports rather than failing silently if the analysis
+refused.
 
 ## What to do
 
@@ -45,12 +48,15 @@ an aborted run can make the next run fail in a way that looks unrelated.
 
 ### From the STEPSS window
 
-1. **Select Working Directory** on the Analysis tab, and point it at a copy of
-   this folder.
-2. Load `lf.dat`, `dyn.dat` and `solveroptions.dat` as system data, `eig.dst` as
-   the disturbance file and `obs.dat` as the observables.
-3. Run the simulation. It stops at t = 0.010 s, immediately after the analysis.
-4. The three results files appear in the working directory.
+1. Load `lf.dat`, `dyn.dat` and `solveroptions.dat` as system data, and
+   `obs.dat` as the observables. You do not need to supply `eig.dst`: the
+   button uses its own bundled disturbance.
+2. **Select Working Directory** on the Analysis tab, and point it where you want
+   the results.
+3. Press **Perform small signal stability analysis**.
+4. The three results files appear in that directory.
+
+Swap `dyn.dat` for `dyn_noPSS.dat` and repeat to get the unstable variant.
 
 ## What to expect
 

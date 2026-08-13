@@ -20,7 +20,7 @@ This one is a Java (Swing) desktop application. It bundles the complete simulati
 - **Power flow**: drives the bundled Helios power-flow engine
 - **Real-time plotting**: live curves during simulation via gnuplot (bus voltages, machine speeds, branch flows, wall time, and more)
 - **Result extraction**: "Extract Curves" launches the bundled DYNGRAPH viewer on saved output trajectories
-- **Analysis tools**: Jacobian matrix extraction and small-signal stability analysis
+- **Analysis tools**: Jacobian matrix extraction, and small-signal stability analysis computed by the engine itself (see `examples/kundur-ssa/`)
 - **User models**: the Codegen tab generates user-written model source with CODEGEN and compiles it into a custom simulator with gfortran
 - **Observable wizard**: dialog for selecting buses, machines, shunts, branches, and injectors to record
 - **Integrated editing**: opens data and disturbance files in the operating system's default editor
