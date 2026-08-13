@@ -56,6 +56,30 @@ public final class SsaHarness {
             + "    0.000000000000000E+00    0.000000000000000E+00  0  0",
     };
 
+    /**
+     * A participation fixture. Traps, in order: a device name with an
+     * embedded blank ("AREA 1 G1"), which whitespace splitting merges into
+     * the wrong column; a device name with a LEADING blank (" G2"), which
+     * over-eager trimming destroys; and mode 4, which appears in _modes.dat
+     * but has no rows here because real_limit filtered it.
+     */
+    private static final String[] PF_LINES = {
+        "# STEPSS SSA participation factors v1",
+        "#    mode    state                       pf family device               variable",
+        "       2        1  812.943204050653012E-03 SYN      AREA 1 G1            delta               ",
+        "       2        2  852.937065403949757E-03 SYN      AREA 1 G1            omega               ",
+        "       2        3  499.078992565508639E-03 SYN       G2                  delta               ",
+        "       1        1  100.000000000000000E-03 TOR      G1                   x05                 ",
+    };
+
+    /** Mode shapes for mode 2, with the same leading-blank device trap. */
+    private static final String[] MS_LINES = {
+        "# STEPSS SSA mode shapes v1",
+        "#    mode    state                magnitude                angle_deg device",
+        "       2        2  830.724078309408420E-03  162.398720936339885E+00 AREA 1 G1           ",
+        "       2        4    1.000000000000000E+00    0.000000000000000E+00  G2                 ",
+    };
+
     static String modesFixture() {
         return join(MODES_LINES);
     }
@@ -72,6 +96,49 @@ public final class SsaHarness {
         return out.toString();
     }
 
+    private static void checkParticipationNames() {
+        try {
+            SsaParticipation pf = SsaParticipation.parse(join(PF_LINES));
+            java.util.List<Participation> rows = pf.forMode(2);
+            expect("participation row count for mode 2", 3, rows.size());
+            expect("rows are sorted descending by pf", "omega", rows.get(0).variable);
+            expect("an embedded blank survives in a device name", "AREA 1 G1",
+                    rows.get(0).device);
+            expect("a leading blank is part of the device name", " G2",
+                    rows.get(2).device);
+            expect("family is trimmed of its a8 padding", "SYN", rows.get(0).family);
+            expect("variable is trimmed of its a20 padding", "delta", rows.get(2).variable);
+            expect("pf value", 0.852937, round(rows.get(0).pf, 6));
+        } catch (java.io.IOException ex) {
+            fail("participation fixture parses: threw " + ex);
+        }
+    }
+
+    private static void checkParticipationFilteredMode() {
+        try {
+            SsaParticipation pf = SsaParticipation.parse(join(PF_LINES));
+            expect("a mode filtered by real_limit has no rows, not an error",
+                    0, pf.forMode(4).size());
+        } catch (java.io.IOException ex) {
+            fail("filtered mode lookup: threw " + ex);
+        }
+    }
+
+    private static void checkModeShapes() {
+        try {
+            SsaModeShapes ms = SsaModeShapes.parse(join(MS_LINES));
+            java.util.List<ModeShapeEntry> rows = ms.forMode(2);
+            expect("mode shape row count", 2, rows.size());
+            expect("an embedded blank survives here too", "AREA 1 G1", rows.get(0).device);
+            expect("a leading blank survives here too", " G2", rows.get(1).device);
+            expect("magnitude", 0.830724, round(rows.get(0).magnitude, 6));
+            expect("angle in degrees", 162.3987, round(rows.get(0).angleDeg, 4));
+            expect("the reference entry is at angle zero", 0.0, rows.get(1).angleDeg);
+        } catch (java.io.IOException ex) {
+            fail("mode shape fixture parses: threw " + ex);
+        }
+    }
+
     public static void main(String[] args) {
         checkModesParse();
         checkModesHeader();
@@ -79,6 +146,9 @@ public final class SsaHarness {
         checkModesPartialHeader();
         checkModesOriginZeta();
         checkModesCrlf();
+        checkParticipationNames();
+        checkParticipationFilteredMode();
+        checkModeShapes();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
