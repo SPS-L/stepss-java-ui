@@ -367,7 +367,7 @@ public class RamsesUI extends javax.swing.JFrame {
         clearGnuplotButton = new javax.swing.JButton();
         saveCurrentCurveButton = new javax.swing.JButton();
         loadTrajToFileButton = new javax.swing.JButton();
-        ssaButton = new javax.swing.JButton();
+        saveDynJac = new javax.swing.JButton();
         jLabel4 = new javax.swing.JLabel();
         jLabel8 = new javax.swing.JLabel();
         ssaButton1 = new javax.swing.JButton();
@@ -1887,12 +1887,13 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        ssaButton.setText("Extract Jacobian matrix");
-        ssaButton.setToolTipText("Extract Jacobian matrix");
-        ssaButton.setName("ssaButton"); // NOI18N
-        ssaButton.addActionListener(new java.awt.event.ActionListener() {
+        saveDynJac.setText("Save dynamic Jacobian...");
+        saveDynJac.setToolTipText("Saves the Jacobian the last analysis reduced, taken at the same instant as the eigenvalues");
+        saveDynJac.setEnabled(false);
+        saveDynJac.setName("saveDynJac"); // NOI18N
+        saveDynJac.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                ssaButtonActionPerformed(evt);
+                saveDynJacActionPerformed(evt);
             }
         });
 
@@ -1993,7 +1994,7 @@ public class RamsesUI extends javax.swing.JFrame {
                             .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addComponent(jLabel8, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addGroup(jPanel8Layout.createSequentialGroup()
-                                .addComponent(ssaButton)
+                                .addComponent(saveDynJac)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(ssaButton1)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -2055,7 +2056,7 @@ public class RamsesUI extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(ssaButton1)
-                    .addComponent(ssaButton)
+                    .addComponent(saveDynJac)
                     .addComponent(viewSsaResults))
                 .addContainerGap(657, Short.MAX_VALUE))
         );
@@ -3280,6 +3281,13 @@ public class RamsesUI extends javax.swing.JFrame {
             // directory set they stay in the tool directory, and the window
             // header names that path, so a successful run can no longer look
             // identical to a no-op.
+            // The Jacobian stays where the run wrote it. Only the results are
+            // copied out automatically, because the Jacobian is large and most
+            // runs never want it; the button below is the deliberate step.
+            lastJacDir = new File(myTempDir.getAbsolutePath());
+            lastJacBasename = base;
+            saveDynJac.setEnabled(true);
+
             showSsaResults(resultsDir, base);
         } catch (InterruptedException | IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
@@ -3328,36 +3336,55 @@ public class RamsesUI extends javax.swing.JFrame {
         showSsaResults(dir, chosen);
     }//GEN-LAST:event_viewSsaResultsActionPerformed
 
-    private void ssaButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_ssaButtonActionPerformed
+    private void saveDynJacActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveDynJacActionPerformed
+        // Saves the Jacobian the last analysis reduced. The same run wrote it,
+        // from a JAC record at the same instant as the EIG record, so it is
+        // necessarily the matrix behind the eigenvalues that were displayed,
+        // not one a later run might have taken from an edited case or a
+        // different time. That is why this button is enabled by a successful
+        // analysis rather than standing on its own.
+        if (lastJacDir == null) {
+            return;
+        }
+        fileChooser.setSelectedFile(new File(""));
+        fileChooser.setDialogTitle("Choose a directory to save the dynamic Jacobian in");
+        fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        if (fileChooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        File target = fileChooser.getSelectedFile();
+        int saved = 0;
+        StringBuilder missing = new StringBuilder();
         try {
-            InputStream in = RamsesUI.class.getResourceAsStream("dampJac.dst");
-            File tmpFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "dampJac.dst");
-            OutputStream streamOut = FileUtils.openOutputStream(tmpFile);
-            IOUtils.copy(in, streamOut);
-            in.close();
-            streamOut.close();
-            String tmpString = fileDist.getText();
-            fileDist.setText("dampJac.dst");
-            ssa = true;
-            runSimulationActionPerformed(evt);
-            simulExecutorResultHandler.waitFor();
-            fileDist.setText(tmpString);
-
-            if (!"".equals(ssaDirectory.getText())) {
-                String[] produced = {"jac_eqs.dat", "jac_var.dat", "jac_val.dat", "jac_struc.dat"};
-                for (String name : produced) {
-                    File srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + name);
-                    File dstFile = new File(ssaDirectory.getText() + System.getProperty("file.separator") + name);
-                    if (srcFile.exists()) {
-                        fileOps.copyFiletoFile(srcFile, dstFile);
-                    }
+            for (String suffix : my.ramses.ssa.SsaDisturbance.JACOBIAN_SUFFIXES) {
+                File srcFile = new File(lastJacDir, lastJacBasename + suffix);
+                if (srcFile.exists()) {
+                    fileOps.copyFiletoFile(srcFile, new File(target, srcFile.getName()));
+                    saved++;
+                } else {
+                    missing.append("\n    ").append(srcFile.getName());
                 }
             }
-
-        } catch (InterruptedException | IOException ex) {
-            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Could not write to " + target + "\n\n" + ex.getMessage(),
+                    "Save dynamic Jacobian", JOptionPane.ERROR_MESSAGE);
+            return;
         }
-    }//GEN-LAST:event_ssaButtonActionPerformed
+        if (missing.length() > 0) {
+            JOptionPane.showMessageDialog(this,
+                    "Saved " + saved + " of "
+                    + my.ramses.ssa.SsaDisturbance.JACOBIAN_SUFFIXES.length
+                    + " Jacobian files to\n" + target
+                    + "\n\nThese were not in " + lastJacDir + ":" + missing,
+                    "Save dynamic Jacobian", JOptionPane.WARNING_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(this,
+                    "Saved the dynamic Jacobian, taken at the same instant as the\n"
+                    + "eigenvalues, to\n\n" + target,
+                    "Save dynamic Jacobian", JOptionPane.INFORMATION_MESSAGE);
+        }
+    }//GEN-LAST:event_saveDynJacActionPerformed
 
     private void loadTrajToFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadTrajToFileButtonActionPerformed
         try {
@@ -5301,6 +5328,15 @@ public class RamsesUI extends javax.swing.JFrame {
     private Toolchain toolchain;
     private File toolDir = null;
     private File myTempDir = null;
+    /**
+     * Where the last successful analysis left its Jacobian, and under what
+     * basename. Held so <i>Save dynamic Jacobian</i> saves the matrix that
+     * analysis reduced rather than whatever happens to be on disk now, and
+     * null until an analysis has succeeded, which is what keeps that button
+     * disabled.
+     */
+    private File lastJacDir = null;
+    private String lastJacBasename = null;
     private File selWorkDir = null;
     private File ramsesExec = null;
     private File heliosExec = null;
@@ -5483,6 +5519,7 @@ public class RamsesUI extends javax.swing.JFrame {
     private javax.swing.JCheckBox saveDumpButton;
     private javax.swing.JMenuItem saveObsFileMenuItem;
     private javax.swing.JCheckBox saveOutputTrajButton;
+    private javax.swing.JButton saveDynJac;
     private javax.swing.JButton saveSimulOutput;
     private javax.swing.JButton saveTrajToFileButton;
     private javax.swing.JButton savedynsim;
@@ -5502,7 +5539,6 @@ public class RamsesUI extends javax.swing.JFrame {
     private javax.swing.JTextArea simulationOutput;
     private javax.swing.JTextField ssaBasename;
     private javax.swing.JLabel ssaBasenameLabel;
-    private javax.swing.JButton ssaButton;
     private javax.swing.JButton ssaButton1;
     private javax.swing.JTextField ssaDirectory;
     private javax.swing.JLabel ssaEngineNote;

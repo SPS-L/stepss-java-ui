@@ -32,6 +32,15 @@ public final class SsaDisturbance {
      */
     private static final double STOP_MARGIN = 0.010;
 
+    /**
+     * What the JAC record writes, given the shared basename. These sit
+     * alongside the {@code _modes}, {@code _pf} and {@code _ms} files the
+     * analysis writes, so one basename covers a whole run with no collision.
+     */
+    public static final String[] JACOBIAN_SUFFIXES = {
+        "_eqs.dat", "_var.dat", "_val.dat", "_struc.dat",
+    };
+
     private SsaDisturbance() {
     }
 
@@ -100,7 +109,13 @@ public final class SsaDisturbance {
         if (Double.isNaN(t) || Double.isInfinite(t) || t < MIN_TIME) {
             throw new IllegalArgumentException("Invalid analysis time: " + t);
         }
+        // JAC and EIG both fire at t, and the engine acts on them in that
+        // order in the same step (simul_decomp: dump_jacobian then dump_eig).
+        // So the dumped Jacobian is necessarily the one the analysis reduced,
+        // at the same instant, rather than a separate run that could have
+        // drifted or been taken from a different case.
         return "0.000 CONTINUE SOLVER TR 0.010 0.001 0. ALL\n"
+                + time(t) + " JAC '" + basename + "'\n"
                 + time(t) + " EIG '" + basename + "'\n"
                 + time(t + STOP_MARGIN) + " STOP\n";
     }

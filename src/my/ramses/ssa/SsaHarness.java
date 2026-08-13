@@ -274,6 +274,7 @@ public final class SsaHarness {
         checkModeShapeReportsMissingRowsForDominantMode();
         checkModeShapeClampsTinyRadius();
         checkDisturbanceDefaultTime();
+        checkJacobianSharesTheBasename();
         checkDisturbanceLaterTime();
         checkDisturbanceRejectsBadBasename();
         checkDisturbanceRejectsEarlyOrUnreadableTime();
@@ -709,13 +710,37 @@ public final class SsaHarness {
         String dst = SsaDisturbance.text("ssa", SsaDisturbance.MIN_TIME);
         expect("default analysis time fires EIG at 0.001", true,
                 dst.contains("0.001000 EIG 'ssa'"));
+        expect("the Jacobian is dumped at the same instant", true,
+                dst.contains("0.001000 JAC 'ssa'"));
         expect("STOP follows the analysis", true, dst.contains("0.011000 STOP"));
         expect("the solver record is unchanged", true,
                 dst.startsWith("0.000 CONTINUE SOLVER TR 0.010 0.001 0. ALL\n"));
-        expect("exactly three records", 3, dst.split("\n").length);
+        expect("exactly four records", 4, dst.split("\n").length);
         // A disturbance would linearise about a point mid-swing rather than
-        // about the operating point, so the generated file must carry none.
-        expect("no event other than the analysis", 1, countOf(dst, "EIG"));
+        // about the operating point, so the generated file must carry none
+        // beyond the dump and the analysis themselves.
+        expect("one analysis", 1, countOf(dst, "EIG"));
+        expect("one Jacobian dump", 1, countOf(dst, "JAC"));
+        // dump_jacobian runs before dump_eig in the engine's step, so writing
+        // them the other way round in the file would read as if the Jacobian
+        // followed the reduction.
+        expect("JAC is written before EIG", true, dst.indexOf("JAC") < dst.indexOf("EIG"));
+    }
+
+    private static void checkJacobianSharesTheBasename() {
+        String dst = SsaDisturbance.text("run2", 3.0);
+        expect("the Jacobian carries the run's basename", true,
+                dst.contains("3.000000 JAC 'run2'"));
+        expect("and the analysis carries the same one", true,
+                dst.contains("3.000000 EIG 'run2'"));
+        // Distinct suffixes, so one basename covers a whole run and two runs
+        // in one directory cannot overwrite each other.
+        expect("four Jacobian suffixes", 4, SsaDisturbance.JACOBIAN_SUFFIXES.length);
+        for (String suffix : SsaDisturbance.JACOBIAN_SUFFIXES) {
+            expect("Jacobian suffix " + suffix + " does not collide with a results file",
+                    false, suffix.equals("_modes.dat") || suffix.equals("_pf.dat")
+                            || suffix.equals("_ms.dat"));
+        }
     }
 
     private static void checkDisturbanceLaterTime() {
@@ -723,6 +748,7 @@ public final class SsaHarness {
         expect("a later analysis time reaches the EIG record", true,
                 dst.contains("5.000000 EIG 'run2'"));
         expect("and moves STOP after it", true, dst.contains("5.010000 STOP"));
+        expect("the Jacobian moves with it", true, dst.contains("5.000000 JAC 'run2'"));
         expect("still no other event", 1, countOf(dst, "EIG"));
         expect("the basename reaches the record", true, dst.contains("'run2'"));
         // Fixed point, not scientific notation, so the file reads like every

@@ -2257,7 +2257,7 @@
                                       <Component id="jLabel4" alignment="0" min="-2" max="-2" attributes="0"/>
                                       <Component id="jLabel8" alignment="0" min="-2" max="-2" attributes="0"/>
                                       <Group type="102" alignment="0" attributes="0">
-                                          <Component id="ssaButton" min="-2" max="-2" attributes="0"/>
+                                          <Component id="saveDynJac" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace max="-2" attributes="0"/>
                                           <Component id="ssaButton1" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace max="-2" attributes="0"/>
@@ -2330,7 +2330,7 @@
                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
                           <Group type="103" groupAlignment="3" attributes="0">
                               <Component id="ssaButton1" alignment="3" min="-2" max="-2" attributes="0"/>
-                              <Component id="ssaButton" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="saveDynJac" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="viewSsaResults" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace pref="657" max="32767" attributes="0"/>
@@ -2403,14 +2403,15 @@
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loadTrajToFileButtonActionPerformed"/>
                   </Events>
                 </Component>
-                <Component class="javax.swing.JButton" name="ssaButton">
+                <Component class="javax.swing.JButton" name="saveDynJac">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Extract Jacobian matrix"/>
-                    <Property name="toolTipText" type="java.lang.String" value="Extract Jacobian matrix"/>
-                    <Property name="name" type="java.lang.String" value="ssaButton" noResource="true"/>
+                    <Property name="text" type="java.lang.String" value="Save dynamic Jacobian..."/>
+                    <Property name="toolTipText" type="java.lang.String" value="Saves the Jacobian the last analysis reduced, taken at the same instant as the eigenvalues"/>
+                    <Property name="enabled" type="boolean" value="false"/>
+                    <Property name="name" type="java.lang.String" value="saveDynJac" noResource="true"/>
                   </Properties>
                   <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="ssaButtonActionPerformed"/>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="saveDynJacActionPerformed"/>
                   </Events>
                 </Component>
                 <Component class="javax.swing.JLabel" name="jLabel4">

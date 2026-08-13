@@ -54,6 +54,14 @@ an aborted run can make the next run fail in a way that looks unrelated.
    ratios and frequencies, and for the mode you select shows the participation
    factors, a mode-shape dial and an s-plane. Its header names the directory
    the files were read from. Both plots save as SVG.
+6. **Save dynamic Jacobian...** becomes available once that run succeeds. The
+   same run dumped the Jacobian, from a `JAC` record at the same instant as
+   the `EIG` record, so what it saves is the matrix the analysis reduced
+   rather than one a separate run might have taken from an edited case or a
+   different time. It writes `<basename>_eqs.dat`, `_var.dat`, `_val.dat` and
+   `_struc.dat` into a directory you pick. They are not copied out
+   automatically, because they are much larger than the results files and most
+   runs do not need them.
 
 Swap `dyn.dat` for `dyn_noPSS.dat` and repeat to get the unstable variant.
 Change the basename between runs and both sets can live in one directory.
