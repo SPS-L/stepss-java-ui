@@ -3224,22 +3224,40 @@ public class RamsesUI extends javax.swing.JFrame {
                 return;
             }
 
+            // The two analysis parameters, but only against an engine that
+            // accepts them. applyEngineCapabilities() decides that from the
+            // engine's own banner and enables the fields to match, so a
+            // disabled field means the record stays two-argument.
+            //
+            // The asymmetry is deliberate and is why the check exists at all:
+            // disturb.f90 reads this record list-directed, so an engine
+            // without the feature takes the first two items and ignores the
+            // rest without erroring. Writing the parameters anyway would give
+            // a full results set computed with the engine's defaults, under a
+            // window header claiming these values. Nothing downstream could
+            // detect it.
+            double realLimit = 0.0;
+            double pfThreshold = 0.0;
+            if (eigParametersSupported) {
+                try {
+                    realLimit = my.ramses.ssa.SsaDisturbance.parseParameter(
+                            ssaRealLimit.getText(), "Real part limit");
+                    pfThreshold = my.ramses.ssa.SsaDisturbance.parseParameter(
+                            ssaPfThreshold.getText(), "PF threshold");
+                } catch (IllegalArgumentException ex) {
+                    JOptionPane.showMessageDialog(this, ex.getMessage(),
+                            "Small-signal analysis", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+            }
+
             File dstFile = new File(myTempDir.getAbsolutePath()
                     + System.getProperty("file.separator") + base + "Eig.dst");
-            // This one-argument EIG record is what makes the ssaEngineNote
-            // label, and the disabled ssaRealLimit and ssaPfThreshold fields,
-            // true. The day a RAMSES whose EIG accepts real_limit and
-            // pf_threshold is bundled, all four change together: this record
-            // grows the two values, the two fields and their labels are
-            // enabled, and ssaEngineNote goes. Nothing detects the mismatch,
-            // because disturb.f90's list-directed read silently ignores extra
-            // fields rather than erroring, so the label would simply become
-            // false in a way no run reports. This comment lives here rather
-            // than beside ssaEngineNote because that label is inside the
-            // NetBeans generated block, which carries no hand-written
-            // comments and is regenerated from RamsesUI.form.
-            FileUtils.writeStringToFile(dstFile,
-                    my.ramses.ssa.SsaDisturbance.text(base, analysisTime), "UTF-8");
+            String dstText = eigParametersSupported
+                    ? my.ramses.ssa.SsaDisturbance.text(base, analysisTime,
+                            realLimit, pfThreshold)
+                    : my.ramses.ssa.SsaDisturbance.text(base, analysisTime);
+            FileUtils.writeStringToFile(dstFile, dstText, "UTF-8");
 
             String tmpString = fileDist.getText();
             fileDist.setText(dstFile.getName());
@@ -5361,6 +5379,11 @@ public class RamsesUI extends javax.swing.JFrame {
     private static final String RELEASES_URL = "https://github.com/SPS-L/stepss-java-ui/releases";
     private static final String RELEASES_LATEST_URL = RELEASES_URL + "/latest";
     private boolean ssa = false;
+    // Whether the engine in use accepts real_limit and pf_threshold on its EIG
+    // record. Set by applyEngineCapabilities() from the engine's own banner on
+    // every initRamses(), so an adopted Codegen build re-decides it. False
+    // until then, matching the fields' disabled state in the generated block.
+    private boolean eigParametersSupported = false;
     private DefaultExecutor simulExecutor;
     private DefaultExecuteResultHandler simulExecutorResultHandler;
     private int highlighterIndex;
@@ -5666,6 +5689,88 @@ public class RamsesUI extends javax.swing.JFrame {
         return toolchain.ramses();
     }
 
+    /**
+     * The engine's startup banner, or an empty string if it could not be run.
+     *
+     * <p>Uses the {@code -v} switch, which prints the banner and returns
+     * without running anything, so this costs milliseconds and cannot start a
+     * simulation by accident. That path deliberately exits non-zero, so the
+     * exit value is ignored and only the output is read.
+     *
+     * <p>Lives here rather than beside {@link my.ramses.ssa.EngineVersion}
+     * because it needs commons-exec, and {@code tools/ssa-harness.sh} runs
+     * that package with only {@code build/classes} on the classpath.
+     */
+    private String engineBanner() {
+        if (ramsesExec == null || !ramsesExec.isFile()) {
+            return "";
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            CommandLine command = new CommandLine(ramsesExec.getAbsolutePath());
+            command.addArgument("-v");
+            DefaultExecutor exec = new DefaultExecutor();
+            exec.setExitValues(null);
+            exec.setWatchdog(new ExecuteWatchdog(10_000));
+            exec.setStreamHandler(new PumpStreamHandler(out, out));
+            exec.execute(command, WinEnvironment);
+        } catch (Exception ex) {
+            // An engine that cannot be run at all is reported as unknown, and
+            // the caller disables the parameters. Whatever stopped it will
+            // surface again, with a better message, the moment a run starts.
+            return "";
+        }
+        return out.toString();
+    }
+
+    /**
+     * Enables the two small-signal parameter fields only if the engine now in
+     * use accepts them, and says so either way.
+     *
+     * <p>Called from {@code initRamses()} after {@code ramsesExec} is
+     * resolved, so it re-evaluates whenever the engine changes: on every
+     * working-directory change, and after a Codegen build is adopted. That is
+     * the whole point of reading the engine rather than the pinned version,
+     * since an adopted build can be older than the bundled payload.
+     *
+     * <p>The fields ship disabled from the generated block, so this only ever
+     * has to turn them on, and {@code RamsesUI.form} needs no change.
+     */
+    private void applyEngineCapabilities() {
+        double version = my.ramses.ssa.EngineVersion.parseBanner(engineBanner());
+        eigParametersSupported =
+                my.ramses.ssa.EngineVersion.supportsEigParameters(version);
+
+        ssaRealLimit.setEnabled(eigParametersSupported);
+        ssaRealLimitLabel.setEnabled(eigParametersSupported);
+        ssaPfThreshold.setEnabled(eigParametersSupported);
+        ssaPfThresholdLabel.setEnabled(eigParametersSupported);
+        ssaEngineNote.setVisible(!eigParametersSupported);
+
+        if (eigParametersSupported) {
+            String tip = "Passed to the EIG record and recorded in the results header.";
+            ssaRealLimit.setToolTipText(tip);
+            ssaPfThreshold.setToolTipText(tip);
+        } else {
+            // Naming the version read, rather than repeating a fixed sentence,
+            // is what distinguishes "the bundled engine is old" from "you
+            // adopted an older build from the Codegen tab", which look
+            // identical from the Analysis tab otherwise.
+            String seen = Double.isNaN(version)
+                    ? "its version could not be read"
+                    : "it reports version " + String.format(java.util.Locale.ROOT, "%.2f", version);
+            String tip = "Needs RAMSES "
+                    + String.format(java.util.Locale.ROOT, "%.2f",
+                            my.ramses.ssa.EngineVersion.EIG_PARAMETERS_SINCE)
+                    + " or newer. The engine in use is not: " + seen
+                    + ". It would ignore these values silently, so they are"
+                    + " disabled rather than misleading.";
+            ssaRealLimit.setToolTipText(tip);
+            ssaPfThreshold.setToolTipText(tip);
+            ssaEngineNote.setToolTipText(tip);
+        }
+    }
+
     private boolean initRamses() {
         try {
             platform = Platform.current();
@@ -5696,6 +5801,11 @@ public class RamsesUI extends javax.swing.JFrame {
             codegenExec = toolchain.codegen();
             gnuplotExec = toolchain.gnuplot();
             WinEnvironment = PlatformLauncher.execEnvironment(platform, toolDir);
+
+            // After WinEnvironment, not beside ramsesExec above: this runs the
+            // engine, and on Windows it needs that environment to resolve the
+            // runtime DLLs beside it.
+            applyEngineCapabilities();
 
             if ((gnuplotExec == null || !gnuplotExec.exists()) && !gnuplotMissingWarned) {
                 gnuplotMissingWarned = true;

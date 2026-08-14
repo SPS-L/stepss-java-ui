@@ -278,6 +278,10 @@ public final class SsaHarness {
         checkDisturbanceLaterTime();
         checkDisturbanceRejectsBadBasename();
         checkDisturbanceRejectsEarlyOrUnreadableTime();
+        checkEngineVersionParsesBanner();
+        checkEngineVersionGuardsTheBoundary();
+        checkDisturbanceCarriesParameters();
+        checkDisturbanceRejectsUnreadableParameters();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -790,6 +794,94 @@ public final class SsaHarness {
     private static void expectTimeRejected(String what, String text) {
         try {
             SsaDisturbance.parseTime(text);
+            fail(what + ": no exception");
+        } catch (IllegalArgumentException expected) {
+            pass(what);
+        }
+    }
+
+    /**
+     * The real banner, as {@code ramses -v} prints it. The trap is the
+     * "(Full Version)" suffix on the same line: a pattern matching bare
+     * "Version" rather than "Version:" finds that instead and parses nothing.
+     */
+    private static final String BANNER =
+            "\nRApid Multithreaded Simulation of Electric power Systems\n"
+            + "Version:  3.74 (Full Version)\n\n"
+            + "Part of the STEPSS simulation platform -- https://stepss.sps-lab.org\n";
+
+    private static void checkEngineVersionParsesBanner() {
+        expect("banner version", 3.74,
+                round(EngineVersion.parseBanner(BANNER), 2));
+        expect("banner version, limited edition", 3.74,
+                round(EngineVersion.parseBanner(
+                        "Version:  3.74 (Limited Version)"), 2));
+        expect("banner with no version line", true,
+                Double.isNaN(EngineVersion.parseBanner("no banner here")));
+        expect("null banner", true,
+                Double.isNaN(EngineVersion.parseBanner(null)));
+    }
+
+    /**
+     * The boundary is the whole point: 3.74 is the first engine that accepts
+     * the parameters, and it is printed from a single precision constant, so
+     * an exact {@code >=} against the parsed text is what has to hold.
+     */
+    private static void checkEngineVersionGuardsTheBoundary() {
+        expect("3.73 unsupported", false,
+                EngineVersion.supportsEigParameters(3.73));
+        expect("3.74 supported", true,
+                EngineVersion.supportsEigParameters(3.74));
+        expect("3.74 parsed from a banner is supported", true,
+                EngineVersion.supportsEigParameters(
+                        EngineVersion.parseBanner(BANNER)));
+        expect("3.80 supported", true,
+                EngineVersion.supportsEigParameters(3.80));
+        expect("4.00 supported", true,
+                EngineVersion.supportsEigParameters(4.00));
+        // An engine that could not be read must not be treated as new enough.
+        expect("unknown version unsupported", false,
+                EngineVersion.supportsEigParameters(Double.NaN));
+    }
+
+    /**
+     * The parameters ride on the EIG record only, leaving JAC, the solver
+     * record and the STOP margin exactly as the two-argument form writes them.
+     */
+    private static void checkDisturbanceCarriesParameters() {
+        String text = SsaDisturbance.text("ssa", 0.001, -0.5, 0.10);
+        expect("EIG carries both parameters", true,
+                text.contains("0.001000 EIG 'ssa' -0.500000 0.100000"));
+        expect("JAC is untouched by the parameters", true,
+                text.contains("0.001000 JAC 'ssa'\n"));
+        // Same record set otherwise: only the EIG line differs from the
+        // two-argument form, which is what lets one form be built from the
+        // other rather than duplicated.
+        String plain = SsaDisturbance.text("ssa", 0.001);
+        expect("only the EIG line differs", plain.replace(
+                "0.001000 EIG 'ssa'\n",
+                "0.001000 EIG 'ssa' -0.500000 0.100000\n"), text);
+        // A comma-decimal locale would emit "-0,5", which the engine reads as
+        // two items and refuses as an overlong record.
+        expect("no comma decimals", false, text.contains(","));
+    }
+
+    private static void checkDisturbanceRejectsUnreadableParameters() {
+        rejectsParameter("parameter that is not a number", "abc");
+        rejectsParameter("empty parameter", "");
+        rejectsParameter("infinite parameter", "Infinity");
+        rejectsParameter("NaN parameter", "NaN");
+        try {
+            SsaDisturbance.text("ssa", 0.001, Double.NaN, 0.10);
+            fail("NaN real limit reaches the record: no exception");
+        } catch (IllegalArgumentException expected) {
+            pass("NaN real limit reaches the record");
+        }
+    }
+
+    private static void rejectsParameter(String what, String text) {
+        try {
+            SsaDisturbance.parseParameter(text, "Real part limit");
             fail(what + ": no exception");
         } catch (IllegalArgumentException expected) {
             pass(what);
