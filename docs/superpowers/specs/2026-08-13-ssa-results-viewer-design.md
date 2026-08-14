@@ -6,8 +6,9 @@ and export the plots as editable SVG. Fix the three defects that make the
 existing SSA buttons look broken.
 
 Status: approved 2026-08-13, and implemented with three changes made after
-approval. They are recorded here rather than edited into the body, so this
-stays a record of what was approved:
+approval, plus one item of deferred work since completed. They are recorded
+here rather than edited into the body, so this stays a record of what was
+approved:
 
 - **An analysis time is exposed.** The `EIG` record fires at a time the user
   sets, defaulting to the 0.001 s this document assumed throughout. A later
@@ -22,6 +23,31 @@ stays a record of what was approved:
 - **The two style tables were consolidated** into one `PlotStyle`, because two
   hand-maintained tables cannot deliver the no-drift guarantee the sink
   abstraction exists for.
+
+Done since, on 2026-08-14:
+
+- **`real_limit` and `pf_threshold` are live.** The out-of-scope table below
+  defers the `EIG` record accepting them to `stepss-ramses`, calling it "what
+  un-greys the two fields here". RAMSES 3.74 shipped it, so the two fields no
+  longer ship unconditionally disabled and the `ssaEngineNote` label is hidden
+  whenever they are usable. The engine grammar is both-or-nothing: it refuses a
+  record carrying one of the pair, an unreadable value, or more than the two,
+  rather than half applying any of them.
+
+  The guard this document calls for is implemented in
+  `my.ramses.ssa.EngineVersion`, reading the version from the engine banner
+  through its `-v` switch. Reading the banner rather than
+  `versions.properties` is what this document already argued for and it earns
+  its place: a Codegen build adopted mid-session can be older than the bundled
+  payload, and the pin cannot see that. The fields are re-decided on every
+  `initRamses()`, so adopting such a build disables them again and the tooltip
+  names the version actually seen.
+
+  The reasoning below about ordering is unchanged and still the reason the
+  guard exists: an engine before 3.74 reads the record list-directed, takes the
+  first two items and ignores the rest without erroring, so writing the
+  parameters at it would yield a full results set computed with its own
+  defaults under a window claiming these values.
 
 ## Why
 
