@@ -25,7 +25,8 @@ This one is a Java (Swing) desktop application. It bundles the complete simulati
 - **Observable wizard**: dialog for selecting buses, machines, shunts, branches, and injectors to record
 - **Integrated editing**: opens data and disturbance files in the operating system's default editor
 - **Built-in help**: online user guide, release notes, and update checker
-- **Cross-platform**: Windows, Linux, and macOS (Apple Silicon)
+- **Light and dark themes**: toggled from *Tools -> Dark theme*, remembered between sessions, and applied to the title bar as well as the window; the window icon and the About lockup come in the variant that matches
+- **Cross-platform**: Windows, Linux, and macOS (Apple Silicon), with menu shortcuts on each platform's own modifier
 
 ## Installation
 
@@ -41,13 +42,24 @@ cd stepss-java-ui
 ant jar
 ```
 
-The build (a NetBeans/Ant project) produces `dist/stepss.jar`, a self-contained jar with the Commons Exec and Commons IO libraries merged in.
+The build (a NetBeans/Ant project) produces `dist/stepss.jar`, a self-contained jar with the Commons Exec, Commons IO and FlatLaf libraries merged in.
 
 Building fetches the pinned RAMSES, Helios, DYNGRAPH, and CODEGEN binaries for all three platforms (`ant fetch-payloads`, run automatically as part of `ant jar`) from their releases in the SPS-L GitHub organisation. Those component repositories are private, so the first build needs network access and the [`gh` CLI](https://cli.github.com/) authenticated with SPS-L access (`gh auth login`); downloaded archives are checksum-verified against `versions.properties` and cached in `payload-cache/`, so later builds only need network again when a pinned version changes. CI authenticates the same way, through this repository's `STEPSS_TOKEN` secret, because Actions' default `GITHUB_TOKEN` is scoped to this repo alone and cannot reach the component repos.
 
 On macOS, the current RAMSES, DYNGRAPH, and CODEGEN builds are dynamically linked against gfortran and OpenBLAS; install them first with `brew install gcc openblas`. Statically linked builds that drop this requirement are expected from those projects.
 
 Compiling custom models is optional and needs a Fortran toolchain on your machine: `gfortran`, GNU `make`, and OpenBLAS. On Debian/Ubuntu that is `sudo apt install gfortran make libopenblas-dev`; on macOS `brew install gcc openblas`; on Windows install [MSYS2](https://www.msys2.org/) and run `pacman -S mingw-w64-x86_64-gcc-fortran mingw-w64-x86_64-openblas make` (STEPSS looks in `C:\msys64`, or wherever `MSYS2_ROOT` points). The bundled module kits are gfortran-ABI-specific and each platform's default compiler matches its own kit; if yours does not, STEPSS reports the exact compiler version to install. Everything else in STEPSS works without any of this.
+
+### Refreshing the application's marks
+
+The window icon and the About lockup are PNGs in `src/my/ramses/`, rendered from the SVG sources in [stepss-docs](https://github.com/SPS-L/stepss-docs) `src/assets`, in a light and a dark variant each. They are stored rasterised so that nothing has to render vectors at runtime and no SVG library is on the classpath; the cost is that they go stale when the artwork changes, and the build does not notice. Re-export all fourteen with:
+
+```bash
+tools/refresh-marks.sh                       # expects ../stepss-docs/src/assets
+tools/refresh-marks.sh /path/to/src/assets   # or say where they are
+```
+
+It needs [Inkscape](https://inkscape.org/), and that is not interchangeable with ImageMagick: `convert -resize` rasterises an SVG at the size the document declares and then scales the raster, which for the 295x100 lockup produces a visibly blurry enlargement. Inkscape rasterises the vectors at the size asked for. `tools/chrome-harness.sh` confirms every mark still resolves afterwards.
 
 ### Releases
 
@@ -93,7 +105,7 @@ DYNGRAPH is the same console program on all three platforms, but Extract Curves 
 
 The bundled RAMSES is the free *Limited* build (up to 1000 buses, 2 cores).
 
-In addition, the application distributes the following third-party Java libraries (merged into `stepss.jar` and shipped in `dist/lib/`): Apache Commons Exec, Apache Commons IO (both Apache License 2.0), and NetBeans AbsoluteLayout.
+In addition, the application distributes the following third-party Java libraries (merged into `stepss.jar` and shipped in `dist/lib/`): Apache Commons Exec, Apache Commons IO, and FlatLaf (all Apache License 2.0). FlatLaf is the look and feel; it renders the same on all three platforms, scales on HiDPI, and provides the dark theme offered under **Tools -> Dark theme**. Because it is a multi-release jar, `manifest.mf` declares `Multi-Release: true`.
 
 ## Related Projects
 
@@ -111,7 +123,7 @@ In addition, the application distributes the following third-party Java librarie
 
 STEPSS is distributed under the **Apache License 2.0**. See [LICENSE](LICENSE). Copyright © Petros Aristidou.
 
-The Apache license covers the Java source code in this repository only. The bundled RAMSES, Helios, CODEGEN, and DYNGRAPH executables are proprietary components under their own terms, and the bundled third-party tools and libraries (gnuplot, KLU, Apache Commons Exec/IO, NetBeans AbsoluteLayout) remain under their respective licenses. The license text of each bundled component is embedded in the application and viewable from the About dialog.
+The Apache license covers the Java source code in this repository only. The bundled RAMSES, Helios, CODEGEN, and DYNGRAPH executables are proprietary components under their own terms, and the bundled third-party tools and libraries (gnuplot, KLU, Apache Commons Exec/IO, FlatLaf) remain under their respective licenses. The license text of each bundled component is embedded in the application and viewable from the About dialog.
 
 ## Authors
 
