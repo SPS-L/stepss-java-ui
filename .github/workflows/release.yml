@@ -370,12 +370,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # The type is named rather than left to jpackage's platform default,
+          # because the default is not always the obvious one: on Windows it is
+          # .exe, so asking for the default and then looking for a .msi found
+          # nothing and failed the upload after a perfectly good build.
           - os: ubuntu-latest
-            artifact: bundle/*.deb
+            type: deb
           - os: windows-latest
-            artifact: bundle/*.msi
+            type: msi
           - os: macos-latest
-            artifact: bundle/*.dmg
+            type: dmg
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out the released tag
@@ -420,7 +424,7 @@ jobs:
           file packaging/stepss.icns
 
       - name: Build the installer
-        run: ant bundle
+        run: ant bundle "-Dbundle.type=--type ${{ matrix.type }}"
 
       - name: Attach it to the release
         env:
@@ -431,4 +435,4 @@ jobs:
           set -euo pipefail
           # --clobber so a re-run of this job replaces the asset rather than
           # failing on a name that is already there.
-          gh release upload "$VERSION" ${{ matrix.artifact }} --clobber
+          gh release upload "$VERSION" bundle/*.${{ matrix.type }} --clobber
