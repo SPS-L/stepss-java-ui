@@ -552,10 +552,10 @@ public class RamsesUI extends javax.swing.JFrame {
     }
 
     /**
-     * Writes the session down: where the window was, which tab was open, and
-     * which working directory was in use.
+     * Writes the session down: where the window was, and which working
+     * directory was in use.
      *
-     * <p>All three were thrown away at exit. The Preferences node was already
+     * <p>Both were thrown away at exit. The Preferences node was already
      * open and holding a single first-run flag, so this is the cheapest thing
      * in the whole plan and the one a user notices every single launch.
      */
@@ -573,7 +573,6 @@ public class RamsesUI extends javax.swing.JFrame {
             saved.putInt(SESSION_W, bounds.width);
             saved.putInt(SESSION_H, bounds.height);
         }
-        saved.putInt(SESSION_TAB, jTabbedPane1.getSelectedIndex());
         saved.put(SESSION_DIR, selWorkDir == null ? "" : selWorkDir.getAbsolutePath());
         try {
             saved.flush();
@@ -584,7 +583,7 @@ public class RamsesUI extends javax.swing.JFrame {
     }
 
     /**
-     * Puts the window back where it was, on the tab it was on.
+     * Puts the window back where it was, on the tab work starts on.
      *
      * <p>Bounds are accepted only if they still land on a screen that exists.
      * A window restored onto a monitor that has since been unplugged is a
@@ -601,10 +600,13 @@ public class RamsesUI extends javax.swing.JFrame {
                 setBounds(bounds);
             }
         }
-        int tab = saved.getInt(SESSION_TAB, 0);
-        if (tab >= 0 && tab < jTabbedPane1.getTabCount()) {
-            jTabbedPane1.setSelectedIndex(tab);
-        }
+        // The tab is deliberately not restored. The six tabs are in the
+        // order a study is actually run in, so System Data is not merely the
+        // first of them, it is where the work starts: load the network, then
+        // the disturbance, then observables, then run. Reopening on whichever
+        // tab the last session happened to end on drops the user into the
+        // middle of that sequence, which is the opposite of what remembering
+        // the session is for.
     }
 
     /** Whether enough of these bounds is on a connected screen to grab. */
@@ -5922,7 +5924,6 @@ public class RamsesUI extends javax.swing.JFrame {
     static final String SESSION_Y = "windowY";
     static final String SESSION_W = "windowWidth";
     static final String SESSION_H = "windowHeight";
-    static final String SESSION_TAB = "selectedTab";
     static final String SESSION_DIR = "workingDirectory";
 
     /**
