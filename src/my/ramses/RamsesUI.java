@@ -10,7 +10,11 @@
  */
 package my.ramses;
 
+import java.awt.BorderLayout;
 import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.HeadlessException;
 import java.awt.Insets;
 import java.awt.Rectangle;
@@ -77,7 +81,7 @@ public class RamsesUI extends javax.swing.JFrame {
         });
         this_version = getVersion();
         String fullLimited = getRamsesType();
-        versionLabel.setText("<html><B><U>Version</U>:</B> " + this_version + " (" + fullLimited + " Version)</html>");
+        versionLabel.setText("<html><b>Version:</b> " + this_version + " (" + fullLimited + " Version)</html>");
         prefs = Preferences.userRoot().node(this.getClass().getName());
         String ramsesFirtsTime = "";
         if (prefs.getBoolean(ramsesFirtsTime, true)) {
@@ -160,6 +164,337 @@ public class RamsesUI extends javax.swing.JFrame {
         styleEditButtons();
         addThemeToggle();
         applyBranding();
+        layoutTabs();
+    }
+
+    /**
+     * Replaces each tab's layout, leaving the form owning which controls exist.
+     *
+     * <p>The generated GroupLayout packed everything to the top left and let go:
+     * on a maximised window the System Data tab used the top 400px and left
+     * three quarters of the screen grey, with Clear Files stranded at the bottom
+     * on its own, about 1,250px from the rows it clears. Only the console panes
+     * grew, because only they were given a resize weight.
+     *
+     * <p>Every tab is BorderLayout now: what you set at the top, what you read
+     * in the middle carrying the weight, what you do along the bottom. That is
+     * the shape SsaResultsWindow already had, and the reason it feels current
+     * beside the rest.
+     *
+     * <p>Done here rather than in the designer because there is no NetBeans on
+     * this machine and hand-editing 196KB of generated layout across six tabs is
+     * how a week becomes a month. Setting a new layout discards the generated
+     * one along with its groups; the components are the panel's children either
+     * way, so they survive. No control is added, removed or reordered: this
+     * moves them, and the sequence a study runs in is untouched.
+     */
+    private void layoutTabs() {
+        layoutInitializationTab();
+        layoutDynamicSimulationTab();
+        layoutCodegenTab();
+        layoutSystemDataTab();
+        layoutObservablesTab();
+        layoutAnalysisTab();
+    }
+
+    /**
+     * Observables, regrouped as well as relaid.
+     *
+     * <p>The grouping was saying something false. Save Continuous trace, Save
+     * Discrete trace and the plot refresh interval each sat on the same
+     * baseline as one of the three runtime observable rows, which have nothing
+     * to do with them; proximity is the strongest grouping signal an interface
+     * has, and this one was pointing at the wrong things. They are three
+     * blocks now: what to plot while the run goes, what to write to file, and
+     * which observables file to use.
+     *
+     * <p>jPanel7, the inline picker the wizard checkbox reveals, keeps its own
+     * layout and takes the centre, so it has room when it is shown and costs
+     * nothing while it is not.
+     */
+    private void layoutObservablesTab() {
+        JPanel settings = new JPanel(new GridBagLayout());
+        settings.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+        int row = 0;
+        settings.add(heading(jLabel30), span(row++));
+        settings.add(observableRow(runtimeObsType, runtimeObsName), stretch(row++));
+        settings.add(observableRow(runtimeObsType1, runtimeObsName1), stretch(row++));
+        settings.add(observableRow(runtimeObsType2, runtimeObsName2), stretch(row++));
+        settings.add(leftRow(jLabel31, GP_REFRESH_RATE), span(row++));
+
+        settings.add(heading(new JLabel("Recording to file")), span(row++));
+        settings.add(leftRow(saveContTrace, saveDiscTrace), span(row++));
+        settings.add(leftRow(saveOutputTrajButton, saveDumpButton), span(row++));
+
+        settings.add(heading(jLabel10), span(row++));
+        settings.add(fileRow("", loadObsButton, fileObs, nppObsButton), stretch(row++));
+        settings.add(leftRow(observFileWizButton), span(row++));
+
+        jPanel4.removeAll();
+        jPanel4.setLayout(new BorderLayout());
+        jPanel4.add(settings, BorderLayout.NORTH);
+        jPanel4.add(jPanel7, BorderLayout.CENTER);
+        jPanel4.add(ActionBar.create().toTheEnd().add(clearObsFileButton).build(),
+                BorderLayout.SOUTH);
+    }
+
+    /**
+     * Analysis, which already had section headings and is the tab the rest of
+     * this pass is trying to catch up with. It keeps them, and gains a bar per
+     * section instead of buttons wrapped two wide then three then one.
+     *
+     * <p>Two actions are marked rather than one, against the rule the other
+     * tabs follow. The tab carries two independent tools, and marking neither
+     * would leave the tab with no answer to what it is for while marking one
+     * would claim the other is secondary, which it is not.
+     */
+    private void layoutAnalysisTab() {
+        ActionBar.markPrimary(runDyngraphButton);
+        ActionBar.markPrimary(ssaButton1);
+
+        JPanel content = new JPanel(new GridBagLayout());
+        content.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+        int row = 0;
+        content.add(heading(jLabel4), span(row++));
+        content.add(ActionBar.create()
+                .add(runDyngraphButton)
+                .add(viewCurvesButton)
+                .add(saveCurrentCurveButton)
+                .separate()
+                .add(saveTrajToFileButton)
+                .add(loadTrajToFileButton)
+                .toTheEnd()
+                .add(clearGnuplotButton)
+                .build(), stretch(row++));
+
+        content.add(heading(jLabel8), span(row++));
+        content.add(pathRow(loadSSADir, ssaDirectory), stretch(row++));
+        content.add(leftRow(ssaBasenameLabel, ssaBasename, ssaTimeLabel, ssaTime,
+                ssaRealLimitLabel, ssaRealLimit, ssaPfThresholdLabel, ssaPfThreshold),
+                span(row++));
+        content.add(ssaEngineNote, span(row++));
+        content.add(ActionBar.create()
+                .add(ssaButton1)
+                .add(viewSsaResults)
+                .separate()
+                .add(saveDynJac)
+                .build(), stretch(row++));
+
+        jPanel8.removeAll();
+        jPanel8.setLayout(new BorderLayout());
+        jPanel8.add(content, BorderLayout.NORTH);
+    }
+
+    /** A chooser and the path it fills, the path taking the width. */
+    private static JPanel pathRow(JButton chooser, JTextField path) {
+        JPanel line = new JPanel(new BorderLayout(6, 0));
+        line.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
+        line.add(chooser, BorderLayout.WEST);
+        line.add(path, BorderLayout.CENTER);
+        return line;
+    }
+
+    /**
+     * A section heading: bold, with a rule under it to carry the width.
+     *
+     * <p>A label that already carries HTML is left to it. Those use it to bold
+     * a file's name inside a longer line, and deriving a bold font over the top
+     * would make the whole line shout instead.
+     */
+    private static JPanel heading(JLabel label) {
+        if (!label.getText().toLowerCase(java.util.Locale.ROOT).startsWith("<html")) {
+            label.setFont(label.getFont().deriveFont(java.awt.Font.BOLD));
+        }
+        JPanel block = new JPanel(new BorderLayout(0, 3));
+        block.setBorder(BorderFactory.createEmptyBorder(14, 0, 4, 0));
+        block.add(label, BorderLayout.NORTH);
+        block.add(new javax.swing.JSeparator(), BorderLayout.CENTER);
+        return block;
+    }
+
+    /** One runtime observable: what kind, and which one. */
+    private static JPanel observableRow(JComboBox<?> type, JTextField name) {
+        JPanel line = new JPanel(new BorderLayout(6, 0));
+        line.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
+        type.setPreferredSize(new Dimension(190, type.getPreferredSize().height));
+        line.add(type, BorderLayout.WEST);
+        line.add(name, BorderLayout.CENTER);
+        return line;
+    }
+
+    /** Controls in a row at their own width, left aligned. */
+    private static JPanel leftRow(JComponent... controls) {
+        JPanel line = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 6, 2));
+        for (JComponent control : controls) {
+            line.add(control);
+        }
+        return line;
+    }
+
+    /** Console in the middle, run and inspect along the bottom. */
+    private void layoutInitializationTab() {
+        ActionBar.markPrimary(runPF);
+        JPanel bar = ActionBar.create()
+                .add(runPF)
+                .add(loadLFRESV2DAT)
+                .separate()
+                .add(loadBusOverview)
+                .add(loadGens)
+                .add(loadTrfos)
+                .add(loadPow)
+                .toTheEnd()
+                .add(clearPFCOutput)
+                .build();
+        console(jPanel6, jScrollPane3, bar);
+    }
+
+    /**
+     * The same, plus the console search, which sits at the right-hand end
+     * because it acts on what is above it rather than on the case.
+     */
+    private void layoutDynamicSimulationTab() {
+        ActionBar.markPrimary(runSimulation);
+        JPanel bar = ActionBar.create()
+                .add(runSimulation)
+                .add(stopSimulationButton)
+                .separate()
+                .add(loadOutput)
+                .add(loadContTrace)
+                .add(loadDiscTrace)
+                .add(loadDumpTraceButton)
+                .add(saveSimulOutput)
+                .toTheEnd()
+                .add(searchTextField)
+                .add(clearSimulOutput)
+                .build();
+        // The search field would otherwise stretch to fill the glue it follows.
+        searchTextField.setMaximumSize(new Dimension(220, 28));
+        console(jPanel5, jScrollPane1, bar);
+    }
+
+    /**
+     * Codegen's bar moves from the top of the tab to the bottom. It is the only
+     * one that sat above its console, and one tab disagreeing with three is the
+     * inconsistency this pass exists to remove.
+     */
+    private void layoutCodegenTab() {
+        ActionBar.markPrimary(execCodegen);
+        JPanel bar = ActionBar.create()
+                .add(loadCodegenFiles)
+                .add(execCodegen)
+                .separate()
+                .add(displayCGfiles)
+                .add(saveCGFiles)
+                .separate()
+                .add(Compile)
+                .add(savedynsim)
+                .build();
+        console(jPanel3, jScrollPane2, bar);
+    }
+
+    /** The shape the three console tabs share. */
+    private void console(JPanel tab, JScrollPane output, JPanel bar) {
+        tab.removeAll();
+        tab.setLayout(new BorderLayout());
+        tab.add(output, BorderLayout.CENTER);
+        tab.add(bar, BorderLayout.SOUTH);
+    }
+
+    /**
+     * The file rows become a column that grows with the window, each row
+     * numbered because the order they are read in is the order they are listed
+     * in, and that was previously legible only by counting.
+     *
+     * <p>Row ten carries no Load File button. That is how it arrived: the form
+     * has fileData1 through fileData10 and loadData1 through loadData9, so the
+     * last row can only be typed into or opened in an editor. The gap is kept
+     * rather than filled, because filling it would mean inventing a handler and
+     * this pass does not add behaviour.
+     */
+    private void layoutSystemDataTab() {
+        JPanel rows = new JPanel(new GridBagLayout());
+        rows.setBorder(BorderFactory.createEmptyBorder(4, 8, 8, 8));
+        JTextField[] fields = {fileData1, fileData2, fileData3, fileData4, fileData5,
+            fileData6, fileData7, fileData8, fileData9, fileData10};
+        JButton[] loaders = {loadData1, loadData2, loadData3, loadData4, loadData5,
+            loadData6, loadData7, loadData8, loadData9, null};
+        JButton[] editors = {nppData1Button, nppData2Button, nppData3Button,
+            nppData4Button, nppData5Button, nppData6Button, nppData7Button,
+            nppData8Button, nppData9Button, nppData10Button};
+
+        int row = 0;
+        rows.add(heading(jLabel1), span(row++));
+        for (int i = 0; i < fields.length; i++) {
+            rows.add(fileRow(String.valueOf(i + 1), loaders[i], fields[i], editors[i]),
+                    stretch(row++));
+        }
+        rows.add(Box.createVerticalStrut(10), span(row++));
+        rows.add(heading(jLabel9), span(row++));
+        rows.add(fileRow("", loadDist, fileDist, nppDstButton), stretch(row++));
+        // Absorbs the leftover height so the rows stay together at the top
+        // instead of spreading out over a tall window.
+        GridBagConstraints filler = new GridBagConstraints();
+        filler.gridy = row;
+        filler.weighty = 1.0;
+        filler.fill = GridBagConstraints.VERTICAL;
+        rows.add(Box.createGlue(), filler);
+
+        JPanel bar = ActionBar.create().toTheEnd().add(clearDataFiles).build();
+
+        jPanel2.removeAll();
+        jPanel2.setLayout(new BorderLayout());
+        JScrollPane scroller = new JScrollPane(rows,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroller.setBorder(BorderFactory.createEmptyBorder());
+        scroller.getVerticalScrollBar().setUnitIncrement(16);
+        jPanel2.add(scroller, BorderLayout.CENTER);
+        jPanel2.add(bar, BorderLayout.SOUTH);
+    }
+
+    /** One numbered file row: index, loader, path, editor. */
+    private JPanel fileRow(String index, JButton loader, JTextField field, JButton editor) {
+        JPanel line = new JPanel(new BorderLayout(6, 0));
+        line.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
+
+        JPanel lead = new JPanel(new BorderLayout(6, 0));
+        JLabel number = new JLabel(index, SwingConstants.RIGHT);
+        number.setForeground(UIManager.getColor("Label.disabledForeground"));
+        number.setPreferredSize(new Dimension(18, 1));
+        lead.add(number, BorderLayout.WEST);
+        if (loader != null) {
+            lead.add(loader, BorderLayout.CENTER);
+        } else {
+            // Keeps row ten's field aligned with the nine above it.
+            lead.add(Box.createRigidArea(
+                    new Dimension(loadData1.getPreferredSize().width, 1)),
+                    BorderLayout.CENTER);
+        }
+
+        line.add(lead, BorderLayout.WEST);
+        line.add(field, BorderLayout.CENTER);
+        line.add(editor, BorderLayout.EAST);
+        return line;
+    }
+
+    private static GridBagConstraints span(int row) {
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridy = row;
+        c.gridx = 0;
+        c.anchor = GridBagConstraints.WEST;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.weightx = 1.0;
+        c.insets = new Insets(4, 0, 2, 0);
+        return c;
+    }
+
+    private static GridBagConstraints stretch(int row) {
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridy = row;
+        c.gridx = 0;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.weightx = 1.0;
+        return c;
     }
 
     /**
@@ -534,13 +869,13 @@ public class RamsesUI extends javax.swing.JFrame {
 
 
 
-        versionLabel.setText("<html><B><U>Version</U>:</B> 1.0</html>");
+        versionLabel.setText("<html><b>Version:</b> 1.0</html>");
         versionLabel.setName("versionLabel"); // NOI18N
 
-        jLabel5.setText("<html><B><U>Creators</U>:</B> Petros Aristidou and Thierry Van Cutsem</html>");
+        jLabel5.setText("<html><b>Creators:</b> Petros Aristidou and Thierry Van Cutsem</html>");
         jLabel5.setName("jLabel5"); // NOI18N
 
-        webpageLabel.setText("<html><B><U>Webpage</U>:</B> <a href=\"https://stepss.sps-lab.org/\">https://stepss.sps-lab.org/</a> </html>");
+        webpageLabel.setText("<html><b>Webpage:</b> <a href=\"https://stepss.sps-lab.org/\">https://stepss.sps-lab.org/</a></html>");
         webpageLabel.setName("webpageLabel"); // NOI18N
         webpageLabel.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
@@ -572,7 +907,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        versionLabel1.setText("<html><B><U>Third party licenses</U>:</B></html>");
+        versionLabel1.setText("<html><b>Third party licenses:</b></html>");
         versionLabel1.setName("versionLabel1"); // NOI18N
 
         showRAMSESLicenseButton.setText("RAMSES");
@@ -599,7 +934,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        versionLabel2.setText("<html><B><U>Licenses</U>:</B></html>");
+        versionLabel2.setText("<html><b>Licenses:</b></html>");
         versionLabel2.setName("versionLabel2"); // NOI18N
 
         javax.swing.GroupLayout aboutBoxLayout = new javax.swing.GroupLayout(aboutBox.getContentPane());
@@ -679,7 +1014,7 @@ public class RamsesUI extends javax.swing.JFrame {
 
         jPanel2.setName("jPanel2"); // NOI18N
 
-        loadData1.setText("Load File");
+        loadData1.setText("Load file");
         loadData1.setToolTipText("Click to load a data file of the network.");
         loadData1.setName("loadData1"); // NOI18N
         loadData1.addActionListener(new java.awt.event.ActionListener() {
@@ -696,7 +1031,7 @@ public class RamsesUI extends javax.swing.JFrame {
         fileData2.setMinimumSize(new java.awt.Dimension(0, 24));
         fileData2.setName("fileData2"); // NOI18N
 
-        loadData2.setText("Load File");
+        loadData2.setText("Load file");
         loadData2.setToolTipText("Click to load a data file of the network.");
         loadData2.setName("loadData2"); // NOI18N
         loadData2.addActionListener(new java.awt.event.ActionListener() {
@@ -709,7 +1044,7 @@ public class RamsesUI extends javax.swing.JFrame {
         fileData3.setMinimumSize(new java.awt.Dimension(0, 24));
         fileData3.setName("fileData3"); // NOI18N
 
-        loadData3.setText("Load File");
+        loadData3.setText("Load file");
         loadData3.setToolTipText("Click to load a data file of the network.");
         loadData3.setName("loadData3"); // NOI18N
         loadData3.addActionListener(new java.awt.event.ActionListener() {
@@ -722,7 +1057,7 @@ public class RamsesUI extends javax.swing.JFrame {
         fileData4.setMinimumSize(new java.awt.Dimension(0, 24));
         fileData4.setName("fileData4"); // NOI18N
 
-        loadData4.setText("Load File");
+        loadData4.setText("Load file");
         loadData4.setToolTipText("Click to load a data file of the network.");
         loadData4.setName("loadData4"); // NOI18N
         loadData4.addActionListener(new java.awt.event.ActionListener() {
@@ -731,10 +1066,10 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        jLabel1.setText("<html>Load <B>System data</B> files. Necessary field!</html>");
+        jLabel1.setText("<html><b>System data files</b> (required)</html>");
         jLabel1.setName("jLabel1"); // NOI18N
 
-        clearDataFiles.setText("Clear Files");
+        clearDataFiles.setText("Clear files");
         clearDataFiles.setName("clearDataFiles"); // NOI18N
         clearDataFiles.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -746,7 +1081,7 @@ public class RamsesUI extends javax.swing.JFrame {
         fileData5.setMinimumSize(new java.awt.Dimension(0, 24));
         fileData5.setName("fileData5"); // NOI18N
 
-        loadData5.setText("Load File");
+        loadData5.setText("Load file");
         loadData5.setToolTipText("Click to load a data file of the network.");
         loadData5.setName("loadData5"); // NOI18N
         loadData5.addActionListener(new java.awt.event.ActionListener() {
@@ -801,7 +1136,7 @@ public class RamsesUI extends javax.swing.JFrame {
         fileDist.setMinimumSize(new java.awt.Dimension(0, 24));
         fileDist.setName("fileDist"); // NOI18N
 
-        loadDist.setText("Load File");
+        loadDist.setText("Load file");
         loadDist.setToolTipText("Click to load the disturbance file with the description of the fault to be simulated.");
         loadDist.setName("loadDist"); // NOI18N
         loadDist.addActionListener(new java.awt.event.ActionListener() {
@@ -810,10 +1145,10 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        jLabel9.setText("<html>Load the <B>Disturbance file</B>. Necessary field!</html>");
+        jLabel9.setText("<html><b>Disturbance file</b> (required)</html>");
         jLabel9.setName("jLabel9"); // NOI18N
 
-        loadData6.setText("Load File");
+        loadData6.setText("Load file");
         loadData6.setToolTipText("Click to load a data file of the network.");
         loadData6.setName("loadData6"); // NOI18N
         loadData6.addActionListener(new java.awt.event.ActionListener() {
@@ -833,7 +1168,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadData7.setText("Load File");
+        loadData7.setText("Load file");
         loadData7.setToolTipText("Click to load a data file of the network.");
         loadData7.setName("loadData7"); // NOI18N
         loadData7.addActionListener(new java.awt.event.ActionListener() {
@@ -853,7 +1188,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadData8.setText("Load File");
+        loadData8.setText("Load file");
         loadData8.setToolTipText("Click to load a data file of the network.");
         loadData8.setName("loadData8"); // NOI18N
         loadData8.addActionListener(new java.awt.event.ActionListener() {
@@ -873,7 +1208,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadData9.setText("Load File");
+        loadData9.setText("Load file");
         loadData9.setToolTipText("Click to load a data file of the network.");
         loadData9.setName("loadData9"); // NOI18N
         loadData9.addActionListener(new java.awt.event.ActionListener() {
@@ -1064,7 +1399,7 @@ public class RamsesUI extends javax.swing.JFrame {
 
         jPanel4.setName("jPanel4"); // NOI18N
 
-        clearObsFileButton.setText("Clear Files");
+        clearObsFileButton.setText("Clear files");
         clearObsFileButton.setName("clearObsFileButton"); // NOI18N
         clearObsFileButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1072,7 +1407,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        saveOutputTrajButton.setText("Save Output Trajectory");
+        saveOutputTrajButton.setText("Save output trajectory");
         saveOutputTrajButton.setToolTipText("<html>Click to save the trajectories of certain observables during the simulation. <br>\nThese observables need to be specified in a file and loaded below or with the Observable File Wizard.</html>");
         saveOutputTrajButton.setName("saveOutputTrajButton"); // NOI18N
         saveOutputTrajButton.addActionListener(new java.awt.event.ActionListener() {
@@ -1081,7 +1416,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadObsButton.setText("Load File");
+        loadObsButton.setText("Load file");
         loadObsButton.setToolTipText("<html>Click to load the file with the list of observables to be saved during the simulation.<br><br>\nEach observable needs to be on one line. The possibilities are: <br>\nBUS: followed by one bus name or * to denote all buses <br>\nSYNC: followed by one synchronous machine name or * to denote all sync machines<br>\nSHUNT: followed by a bus name or * to denote all buses<br>\nBRANCH: followed by the branch name or * to denote all branches<br>\nINJEC: followed by the injector name or * to denote all injectors<br>\nLINK: followed by the dclink name or * to denote all dclinks<br><br>\nAn example of an observable file is:<br><br>\nBUS B01 <br>\nSYNC SM01 <br>\nSYNC SM02 <br>\nSYNC SM03 <br>\nBRANCH *<br><br>\nwhich will save BUS B01 observables, synchronous machines SM01, SM02 and SM03 and all the branches observables.</html>");
         loadObsButton.setName("loadObsButton"); // NOI18N
         loadObsButton.addActionListener(new java.awt.event.ActionListener() {
@@ -1093,14 +1428,14 @@ public class RamsesUI extends javax.swing.JFrame {
         fileObs.setEditable(false);
         fileObs.setName("fileObs"); // NOI18N
 
-        jLabel10.setText("<html>Write the name of the <B>Observables file</B> or load. Necessary field if Trajectory has been asked</html>");
+        jLabel10.setText("<html><b>Observables file</b> (required when a trajectory is saved)</html>");
         jLabel10.setName("jLabel10"); // NOI18N
 
-        saveDumpButton.setText("Save settings, comments and initialization data in file");
+        saveDumpButton.setText("Save settings, comments and initialization data");
         saveDumpButton.setToolTipText("<html>Activate to save the initialization information. Useful for debugging reasons.</html>");
         saveDumpButton.setName("saveDumpButton"); // NOI18N
 
-        observFileWizButton.setText("Show Observable dialog");
+        observFileWizButton.setText("Show observable dialog");
         observFileWizButton.setName("observFileWizButton"); // NOI18N
         observFileWizButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1469,7 +1804,7 @@ public class RamsesUI extends javax.swing.JFrame {
         runtimeObsName.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName.setName("runtimeObsName"); // NOI18N
 
-        jLabel30.setText("<html>Choose name and type of <B>Runtime Observable</B>:</html>");
+        jLabel30.setText("<html><b>Runtime observables</b></html>");
         jLabel30.setName("jLabel30"); // NOI18N
 
         nppObsButton.setName("nppObsButton"); // NOI18N
@@ -1479,12 +1814,12 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        saveContTrace.setText("Save Continuous trace");
+        saveContTrace.setText("Save continuous trace");
         saveContTrace.setToolTipText("<html>Activate to save the initialization information. Useful for debugging reasons.</html>");
         saveContTrace.setName("saveContTrace"); // NOI18N
 
         saveDiscTrace.setSelected(true);
-        saveDiscTrace.setText("Save Discrete trace");
+        saveDiscTrace.setText("Save discrete trace");
         saveDiscTrace.setToolTipText("<html>Activate to save the initialization information. Useful for debugging reasons.</html>");
         saveDiscTrace.setName("saveDiscTrace"); // NOI18N
 
@@ -1613,7 +1948,7 @@ public class RamsesUI extends javax.swing.JFrame {
         pfcPane.setName("pfcPane"); // NOI18N
         jScrollPane3.setViewportView(pfcPane);
 
-        runPF.setText("Run Power Flow");
+        runPF.setText("Run power flow");
         runPF.setToolTipText("Click to run the simulation.");
         runPF.setName("runPF"); // NOI18N
         runPF.addActionListener(new java.awt.event.ActionListener() {
@@ -1622,7 +1957,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadBusOverview.setText("Bus Overview");
+        loadBusOverview.setText("Bus overview");
         loadBusOverview.setToolTipText("<html>Click to see the discrete trace of the simulation.<br>\nThis involves a detailed view on the discrete changes happening during the simulation.</html>");
         loadBusOverview.setEnabled(false);
         loadBusOverview.setName("loadBusOverview"); // NOI18N
@@ -1632,7 +1967,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadLFRESV2DAT.setText("Add Helios Results to Data");
+        loadLFRESV2DAT.setText("Add Helios results to data");
         loadLFRESV2DAT.setToolTipText("<html>Click to see the discrete trace of the simulation.<br>\nThis involves a detailed view on the discrete changes happening during the simulation.</html>");
         loadLFRESV2DAT.setEnabled(false);
         loadLFRESV2DAT.setName("loadLFRESV2DAT"); // NOI18N
@@ -1652,7 +1987,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadTrfos.setText("Adjustable transfos");
+        loadTrfos.setText("Adjustable transformers");
         loadTrfos.setToolTipText("<html>Click to see the discrete trace of the simulation.<br>\nThis involves a detailed view on the discrete changes happening during the simulation.</html>");
         loadTrfos.setEnabled(false);
         loadTrfos.setName("loadTrfos"); // NOI18N
@@ -1672,7 +2007,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        clearPFCOutput.setText("Clear All");
+        clearPFCOutput.setText("Clear all");
         clearPFCOutput.setToolTipText("Click to clear the above pane.");
         clearPFCOutput.setEnabled(false);
         clearPFCOutput.setName("clearPFCOutput"); // NOI18N
@@ -1737,7 +2072,7 @@ public class RamsesUI extends javax.swing.JFrame {
         simulationOutput.setName("simulationOutput"); // NOI18N
         jScrollPane1.setViewportView(simulationOutput);
 
-        runSimulation.setText("Run Dynamic Simulation");
+        runSimulation.setText("Run dynamic simulation");
         runSimulation.setToolTipText("Click to run the simulation.");
         runSimulation.setName("runSimulation"); // NOI18N
         runSimulation.addActionListener(new java.awt.event.ActionListener() {
@@ -1746,7 +2081,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        saveSimulOutput.setText("Save Current Output");
+        saveSimulOutput.setText("Save current output");
         saveSimulOutput.setToolTipText("Click to save the information shown above to a txt file.");
         saveSimulOutput.setEnabled(false);
         saveSimulOutput.setName("saveSimulOutput"); // NOI18N
@@ -1756,7 +2091,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadOutput.setText("Load Output");
+        loadOutput.setText("Load output");
         loadOutput.setToolTipText("Click to load the output of the simulation.");
         loadOutput.setEnabled(false);
         loadOutput.setName("loadOutput"); // NOI18N
@@ -1766,7 +2101,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadContTrace.setText("Load Continuous Trace");
+        loadContTrace.setText("Load continuous trace");
         loadContTrace.setToolTipText("<html>Click to see the continuous trace of the simulation.<br>\nThis involves a detailed view on the Newton iterations and the time-step evolution.</html>");
         loadContTrace.setEnabled(false);
         loadContTrace.setName("loadContTrace"); // NOI18N
@@ -1776,7 +2111,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadDiscTrace.setText("Load Discrete Trace");
+        loadDiscTrace.setText("Load discrete trace");
         loadDiscTrace.setToolTipText("<html>Click to see the discrete trace of the simulation.<br>\nThis involves a detailed view on the discrete changes happening during the simulation.</html>");
         loadDiscTrace.setEnabled(false);
         loadDiscTrace.setName("loadDiscTrace"); // NOI18N
@@ -1786,7 +2121,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        clearSimulOutput.setText("Clear All");
+        clearSimulOutput.setText("Clear all");
         clearSimulOutput.setToolTipText("Click to clear the above pane.");
         clearSimulOutput.setEnabled(false);
         clearSimulOutput.setName("clearSimulOutput"); // NOI18N
@@ -1796,7 +2131,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadDumpTraceButton.setText("Load Initialization");
+        loadDumpTraceButton.setText("Load initialization");
         loadDumpTraceButton.setToolTipText("<html>Click to see the initialization data of the simulation.<br>\nThis involves a detailed view of the initial state of the simulation.</html>");
         loadDumpTraceButton.setEnabled(false);
         loadDumpTraceButton.setName("loadDumpTraceButton"); // NOI18N
@@ -1806,7 +2141,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        stopSimulationButton.setText("Stop Simulation");
+        stopSimulationButton.setText("Stop simulation");
         stopSimulationButton.setToolTipText("Click to end the simulation before reaching the horizon (as defined in the disturbance file).");
         stopSimulationButton.setEnabled(false);
         stopSimulationButton.setName("stopSimulationButton"); // NOI18N
@@ -1891,7 +2226,7 @@ public class RamsesUI extends javax.swing.JFrame {
         jPanel8.setEnabled(false);
         jPanel8.setName("jPanel8"); // NOI18N
 
-        runDyngraphButton.setText("Extract Curves");
+        runDyngraphButton.setText("Extract curves");
         runDyngraphButton.setToolTipText("Click to initiate dialog for selecting the observables you want to plot.");
         runDyngraphButton.setEnabled(false);
         runDyngraphButton.setName("runDyngraphButton"); // NOI18N
@@ -1901,7 +2236,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        viewCurvesButton.setText("Preview Curve");
+        viewCurvesButton.setText("Preview curve");
         viewCurvesButton.setToolTipText("Click to preview the last extracted curve.");
         viewCurvesButton.setEnabled(false);
         viewCurvesButton.setName("viewCurvesButton"); // NOI18N
@@ -1911,7 +2246,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        saveTrajToFileButton.setText("Save Current Trajectory");
+        saveTrajToFileButton.setText("Save current trajectory");
         saveTrajToFileButton.setToolTipText("Click to save the trajectory file of the last simulation.");
         saveTrajToFileButton.setEnabled(false);
         saveTrajToFileButton.setName("saveTrajToFileButton"); // NOI18N
@@ -1921,7 +2256,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        clearGnuplotButton.setText("Clear all Gnuplot instances");
+        clearGnuplotButton.setText("Clear all gnuplot instances");
         clearGnuplotButton.setToolTipText("Kills all instances of Gnuplot.");
         clearGnuplotButton.setName("clearGnuplotButton"); // NOI18N
         clearGnuplotButton.addActionListener(new java.awt.event.ActionListener() {
@@ -1930,7 +2265,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        saveCurrentCurveButton.setText("Save Extracted Curve");
+        saveCurrentCurveButton.setText("Save extracted curve");
         saveCurrentCurveButton.setToolTipText("Save the extracted plots.");
         saveCurrentCurveButton.setEnabled(false);
         saveCurrentCurveButton.setName("saveCurrentCurveButton"); // NOI18N
@@ -1940,7 +2275,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        loadTrajToFileButton.setText("Load Trajectory");
+        loadTrajToFileButton.setText("Load trajectory");
         loadTrajToFileButton.setToolTipText("Click to load a trajectory file that you saved from a previous simulation.");
         loadTrajToFileButton.setName("loadTrajToFileButton"); // NOI18N
         loadTrajToFileButton.addActionListener(new java.awt.event.ActionListener() {
@@ -1959,13 +2294,13 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        jLabel4.setText("<html><b><u>Time-domain analysis:</u></b></html>");
+        jLabel4.setText("Time-domain analysis");
         jLabel4.setName("jLabel4"); // NOI18N
 
-        jLabel8.setText("<html><b><u>Small Signal Stability analysis:</u></b></html>");
+        jLabel8.setText("Small-signal stability analysis");
         jLabel8.setName("jLabel8"); // NOI18N
 
-        ssaButton1.setText("Perform small signal stability analysis");
+        ssaButton1.setText("Run small-signal stability analysis");
         ssaButton1.setName("ssaButton1"); // NOI18N
         ssaButton1.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2134,7 +2469,7 @@ public class RamsesUI extends javax.swing.JFrame {
         codegenPane.setName("codegenPane"); // NOI18N
         jScrollPane2.setViewportView(codegenPane);
 
-        loadCodegenFiles.setText("Load Files for Codegen");
+        loadCodegenFiles.setText("Load files for Codegen");
         loadCodegenFiles.setName("loadCodegenFiles"); // NOI18N
         loadCodegenFiles.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2151,7 +2486,7 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        displayCGfiles.setText("Display Loaded Files");
+        displayCGfiles.setText("Display loaded files");
         displayCGfiles.setEnabled(false);
         displayCGfiles.setName("displayCGfiles"); // NOI18N
         displayCGfiles.addActionListener(new java.awt.event.ActionListener() {
@@ -2245,7 +2580,7 @@ public class RamsesUI extends javax.swing.JFrame {
         fileMenu.setName("fileMenu"); // NOI18N
 
         saveConfigMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        saveConfigMenuItem.setText("Save Configuration");
+        saveConfigMenuItem.setText("Save configuration");
         saveConfigMenuItem.setName("saveConfigMenuItem"); // NOI18N
         saveConfigMenuItem.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2255,7 +2590,7 @@ public class RamsesUI extends javax.swing.JFrame {
         fileMenu.add(saveConfigMenuItem);
 
         loadConfigMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        loadConfigMenuItem.setText("Load Configuration");
+        loadConfigMenuItem.setText("Load configuration");
         loadConfigMenuItem.setName("loadConfigMenuItem"); // NOI18N
         loadConfigMenuItem.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2279,7 +2614,7 @@ public class RamsesUI extends javax.swing.JFrame {
         toolsMenu.setText("Tools");
         toolsMenu.setName("toolsMenu"); // NOI18N
 
-        saveCommandFileMenuItem.setText("Save Command File");
+        saveCommandFileMenuItem.setText("Save command file");
         saveCommandFileMenuItem.setName("saveCommandFileMenuItem"); // NOI18N
         saveCommandFileMenuItem.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2288,7 +2623,7 @@ public class RamsesUI extends javax.swing.JFrame {
         });
         toolsMenu.add(saveCommandFileMenuItem);
 
-        saveObsFileMenuItem.setText("Save Observables File");
+        saveObsFileMenuItem.setText("Save observables file");
         saveObsFileMenuItem.setName("saveObsFileMenuItem"); // NOI18N
         saveObsFileMenuItem.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2298,7 +2633,7 @@ public class RamsesUI extends javax.swing.JFrame {
         toolsMenu.add(saveObsFileMenuItem);
 
         openNppButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        openNppButton.setText("Open in Editor");
+        openNppButton.setText("Open in editor");
         openNppButton.setName("openNppButton"); // NOI18N
         openNppButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2308,7 +2643,7 @@ public class RamsesUI extends javax.swing.JFrame {
         toolsMenu.add(openNppButton);
 
         loadExtSimButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        loadExtSimButton.setText("Select External Simulator");
+        loadExtSimButton.setText("Select external simulator");
         loadExtSimButton.setName("loadExtSimButton"); // NOI18N
         loadExtSimButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2317,7 +2652,7 @@ public class RamsesUI extends javax.swing.JFrame {
         });
         toolsMenu.add(loadExtSimButton);
 
-        selWorkDirButton.setText("Select Working Directory");
+        selWorkDirButton.setText("Select working directory");
         selWorkDirButton.setName("selWorkDirButton"); // NOI18N
         selWorkDirButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2327,7 +2662,7 @@ public class RamsesUI extends javax.swing.JFrame {
         toolsMenu.add(selWorkDirButton);
 
         openExplButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_E, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        openExplButton.setText("Open Explorer in Working Folder");
+        openExplButton.setText("Open working folder");
         openExplButton.setEnabled(false);
         openExplButton.setName("openExplButton"); // NOI18N
         openExplButton.addActionListener(new java.awt.event.ActionListener() {
@@ -2338,7 +2673,7 @@ public class RamsesUI extends javax.swing.JFrame {
         toolsMenu.add(openExplButton);
 
         openTermButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_T, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        openTermButton.setText("Open Terminal in Working Folder");
+        openTermButton.setText("Open terminal in working folder");
         openTermButton.setEnabled(false);
         openTermButton.setName("openTermButton"); // NOI18N
         openTermButton.addActionListener(new java.awt.event.ActionListener() {
@@ -2349,7 +2684,7 @@ public class RamsesUI extends javax.swing.JFrame {
         toolsMenu.add(openTermButton);
 
         killAllGnupMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        killAllGnupMenuItem.setText("Clear all Gnuplot Instances");
+        killAllGnupMenuItem.setText("Clear all gnuplot instances");
         killAllGnupMenuItem.setName("killAllGnupMenuItem"); // NOI18N
         killAllGnupMenuItem.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2374,7 +2709,7 @@ public class RamsesUI extends javax.swing.JFrame {
         helpMenu.add(showChangeLogButton);
 
         showUserGuideButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F1, 0));
-        showUserGuideButton.setText("User Guide");
+        showUserGuideButton.setText("User guide");
         showUserGuideButton.setName("showUserGuideButton"); // NOI18N
         showUserGuideButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2384,7 +2719,7 @@ public class RamsesUI extends javax.swing.JFrame {
         helpMenu.add(showUserGuideButton);
 
         checkUpdateButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F3, 0));
-        checkUpdateButton.setText("Check Updates");
+        checkUpdateButton.setText("Check for updates");
         checkUpdateButton.setName("checkUpdateButton"); // NOI18N
         checkUpdateButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -3157,7 +3492,7 @@ public class RamsesUI extends javax.swing.JFrame {
             } else if (Version.compare(published, running) > 0) {
                 msg = "<html>New version " + current_version + " is now available!<br />Current version: " + this_version
                         + "<br /><br />The release page lists what has changed and carries the download.</html>";
-                versionLabel.setText("<html><B><U>Version</U>:</B> " + this_version + " (latest version available: " + current_version + ")</html>");
+                versionLabel.setText("<html><b>Version:</b> " + this_version + " (latest version available: " + current_version + ")</html>");
                 // `location` is the redirect target, so it is the page for this
                 // exact release rather than for whatever is newest whenever the
                 // link is followed.

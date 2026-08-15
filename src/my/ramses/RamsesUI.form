@@ -103,19 +103,19 @@
         </Component>
         <Component class="javax.swing.JLabel" name="versionLabel">
           <Properties>
-            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;B&gt;&lt;U&gt;Version&lt;/U&gt;:&lt;/B&gt; 1.0&lt;/html&gt;"/>
+            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Version:&lt;/b&gt; 1.0&lt;/html&gt;"/>
             <Property name="name" type="java.lang.String" value="versionLabel" noResource="true"/>
           </Properties>
         </Component>
         <Component class="javax.swing.JLabel" name="jLabel5">
           <Properties>
-            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;B&gt;&lt;U&gt;Creators&lt;/U&gt;:&lt;/B&gt; Petros Aristidou and Thierry Van Cutsem&lt;/html&gt;"/>
+            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Creators:&lt;/b&gt; Petros Aristidou and Thierry Van Cutsem&lt;/html&gt;"/>
             <Property name="name" type="java.lang.String" value="jLabel5" noResource="true"/>
           </Properties>
         </Component>
         <Component class="javax.swing.JLabel" name="webpageLabel">
           <Properties>
-            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;B&gt;&lt;U&gt;Webpage&lt;/U&gt;:&lt;/B&gt; &lt;a href=&quot;https://stepss.sps-lab.org/&quot;&gt;https://stepss.sps-lab.org/&lt;/a&gt; &lt;/html&gt;"/>
+            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Webpage:&lt;/b&gt; &lt;a href=&quot;https://stepss.sps-lab.org/&quot;&gt;https://stepss.sps-lab.org/&lt;/a&gt; &lt;/html&gt;"/>
             <Property name="name" type="java.lang.String" value="webpageLabel" noResource="true"/>
           </Properties>
           <Events>
@@ -151,7 +151,7 @@
         </Component>
         <Component class="javax.swing.JLabel" name="versionLabel1">
           <Properties>
-            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;B&gt;&lt;U&gt;Third party licenses&lt;/U&gt;:&lt;/B&gt;&lt;/html&gt;"/>
+            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Third party licenses:&lt;/b&gt;&lt;/html&gt;"/>
             <Property name="name" type="java.lang.String" value="versionLabel1" noResource="true"/>
           </Properties>
         </Component>
@@ -184,7 +184,7 @@
         </Component>
         <Component class="javax.swing.JLabel" name="versionLabel2">
           <Properties>
-            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;B&gt;&lt;U&gt;Licenses&lt;/U&gt;:&lt;/B&gt;&lt;/html&gt;"/>
+            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Licenses:&lt;/b&gt;&lt;/html&gt;"/>
             <Property name="name" type="java.lang.String" value="versionLabel2" noResource="true"/>
           </Properties>
         </Component>
@@ -208,7 +208,7 @@
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="Ctrl+S"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="Save Configuration"/>
+                <Property name="text" type="java.lang.String" value="Save configuration"/>
                 <Property name="name" type="java.lang.String" value="saveConfigMenuItem" noResource="true"/>
               </Properties>
               <Events>
@@ -220,7 +220,7 @@
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="Ctrl+L"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="Load Configuration"/>
+                <Property name="text" type="java.lang.String" value="Load configuration"/>
                 <Property name="name" type="java.lang.String" value="loadConfigMenuItem" noResource="true"/>
               </Properties>
               <Events>
@@ -249,7 +249,7 @@
           <SubComponents>
             <MenuItem class="javax.swing.JMenuItem" name="saveCommandFileMenuItem">
               <Properties>
-                <Property name="text" type="java.lang.String" value="Save Command File"/>
+                <Property name="text" type="java.lang.String" value="Save command file"/>
                 <Property name="name" type="java.lang.String" value="saveCommandFileMenuItem" noResource="true"/>
               </Properties>
               <Events>
@@ -258,7 +258,7 @@
             </MenuItem>
             <MenuItem class="javax.swing.JMenuItem" name="saveObsFileMenuItem">
               <Properties>
-                <Property name="text" type="java.lang.String" value="Save Observables File"/>
+                <Property name="text" type="java.lang.String" value="Save observables file"/>
                 <Property name="name" type="java.lang.String" value="saveObsFileMenuItem" noResource="true"/>
               </Properties>
               <Events>
@@ -270,7 +270,7 @@
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="Ctrl+N"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="Open in Editor"/>
+                <Property name="text" type="java.lang.String" value="Open in editor"/>
                 <Property name="name" type="java.lang.String" value="openNppButton" noResource="true"/>
               </Properties>
               <Events>
@@ -282,7 +282,7 @@
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="Ctrl+R"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="Select External Simulator"/>
+                <Property name="text" type="java.lang.String" value="Select external simulator"/>
                 <Property name="name" type="java.lang.String" value="loadExtSimButton" noResource="true"/>
               </Properties>
               <Events>
@@ -291,7 +291,7 @@
             </MenuItem>
             <MenuItem class="javax.swing.JMenuItem" name="selWorkDirButton">
               <Properties>
-                <Property name="text" type="java.lang.String" value="Select Working Directory"/>
+                <Property name="text" type="java.lang.String" value="Select working directory"/>
                 <Property name="name" type="java.lang.String" value="selWorkDirButton" noResource="true"/>
               </Properties>
               <Events>
@@ -303,7 +303,7 @@
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="Ctrl+E"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="Open Explorer in Working Folder"/>
+                <Property name="text" type="java.lang.String" value="Open working folder"/>
                 <Property name="enabled" type="boolean" value="false"/>
                 <Property name="name" type="java.lang.String" value="openExplButton" noResource="true"/>
               </Properties>
@@ -316,7 +316,7 @@
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="Ctrl+T"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="Open Terminal in Working Folder"/>
+                <Property name="text" type="java.lang.String" value="Open terminal in working folder"/>
                 <Property name="enabled" type="boolean" value="false"/>
                 <Property name="name" type="java.lang.String" value="openTermButton" noResource="true"/>
               </Properties>
@@ -329,7 +329,7 @@
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="Ctrl+G"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="Clear all Gnuplot Instances"/>
+                <Property name="text" type="java.lang.String" value="Clear all gnuplot instances"/>
                 <Property name="name" type="java.lang.String" value="killAllGnupMenuItem" noResource="true"/>
               </Properties>
               <Events>
@@ -361,7 +361,7 @@
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="F1"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="User Guide"/>
+                <Property name="text" type="java.lang.String" value="User guide"/>
                 <Property name="name" type="java.lang.String" value="showUserGuideButton" noResource="true"/>
               </Properties>
               <Events>
@@ -373,7 +373,7 @@
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="F3"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="Check Updates"/>
+                <Property name="text" type="java.lang.String" value="Check for updates"/>
                 <Property name="name" type="java.lang.String" value="checkUpdateButton" noResource="true"/>
               </Properties>
               <Events>
@@ -679,7 +679,7 @@
               <SubComponents>
                 <Component class="javax.swing.JButton" name="loadData1">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load File"/>
+                    <Property name="text" type="java.lang.String" value="Load file"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load a data file of the network."/>
                     <Property name="name" type="java.lang.String" value="loadData1" noResource="true"/>
                   </Properties>
@@ -707,7 +707,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadData2">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load File"/>
+                    <Property name="text" type="java.lang.String" value="Load file"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load a data file of the network."/>
                     <Property name="name" type="java.lang.String" value="loadData2" noResource="true"/>
                   </Properties>
@@ -726,7 +726,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadData3">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load File"/>
+                    <Property name="text" type="java.lang.String" value="Load file"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load a data file of the network."/>
                     <Property name="name" type="java.lang.String" value="loadData3" noResource="true"/>
                   </Properties>
@@ -745,7 +745,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadData4">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load File"/>
+                    <Property name="text" type="java.lang.String" value="Load file"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load a data file of the network."/>
                     <Property name="name" type="java.lang.String" value="loadData4" noResource="true"/>
                   </Properties>
@@ -755,13 +755,13 @@
                 </Component>
                 <Component class="javax.swing.JLabel" name="jLabel1">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="&lt;html&gt;Load &lt;B&gt;System data&lt;/B&gt; files. Necessary field!&lt;/html&gt;"/>
+                    <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;System data files&lt;/b&gt; (required)&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="jLabel1" noResource="true"/>
                   </Properties>
                 </Component>
                 <Component class="javax.swing.JButton" name="clearDataFiles">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Clear Files"/>
+                    <Property name="text" type="java.lang.String" value="Clear files"/>
                     <Property name="name" type="java.lang.String" value="clearDataFiles" noResource="true"/>
                   </Properties>
                   <Events>
@@ -779,7 +779,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadData5">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load File"/>
+                    <Property name="text" type="java.lang.String" value="Load file"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load a data file of the network."/>
                     <Property name="name" type="java.lang.String" value="loadData5" noResource="true"/>
                   </Properties>
@@ -846,7 +846,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadDist">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load File"/>
+                    <Property name="text" type="java.lang.String" value="Load file"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load the disturbance file with the description of the fault to be simulated."/>
                     <Property name="name" type="java.lang.String" value="loadDist" noResource="true"/>
                   </Properties>
@@ -856,13 +856,13 @@
                 </Component>
                 <Component class="javax.swing.JLabel" name="jLabel9">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="&lt;html&gt;Load the &lt;B&gt;Disturbance file&lt;/B&gt;. Necessary field!&lt;/html&gt;"/>
+                    <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Disturbance file&lt;/b&gt; (required)&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="jLabel9" noResource="true"/>
                   </Properties>
                 </Component>
                 <Component class="javax.swing.JButton" name="loadData6">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load File"/>
+                    <Property name="text" type="java.lang.String" value="Load file"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load a data file of the network."/>
                     <Property name="name" type="java.lang.String" value="loadData6" noResource="true"/>
                   </Properties>
@@ -889,7 +889,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadData7">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load File"/>
+                    <Property name="text" type="java.lang.String" value="Load file"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load a data file of the network."/>
                     <Property name="name" type="java.lang.String" value="loadData7" noResource="true"/>
                   </Properties>
@@ -916,7 +916,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadData8">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load File"/>
+                    <Property name="text" type="java.lang.String" value="Load file"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load a data file of the network."/>
                     <Property name="name" type="java.lang.String" value="loadData8" noResource="true"/>
                   </Properties>
@@ -943,7 +943,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadData9">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load File"/>
+                    <Property name="text" type="java.lang.String" value="Load file"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load a data file of the network."/>
                     <Property name="name" type="java.lang.String" value="loadData9" noResource="true"/>
                   </Properties>
@@ -1117,7 +1117,7 @@
               <SubComponents>
                 <Component class="javax.swing.JButton" name="clearObsFileButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Clear Files"/>
+                    <Property name="text" type="java.lang.String" value="Clear files"/>
                     <Property name="name" type="java.lang.String" value="clearObsFileButton" noResource="true"/>
                   </Properties>
                   <Events>
@@ -1126,7 +1126,7 @@
                 </Component>
                 <Component class="javax.swing.JCheckBox" name="saveOutputTrajButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Save Output Trajectory"/>
+                    <Property name="text" type="java.lang.String" value="Save output trajectory"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to save the trajectories of certain observables during the simulation. &lt;br&gt;&#xa;These observables need to be specified in a file and loaded below or with the Observable File Wizard.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="saveOutputTrajButton" noResource="true"/>
                   </Properties>
@@ -1136,7 +1136,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadObsButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load File"/>
+                    <Property name="text" type="java.lang.String" value="Load file"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to load the file with the list of observables to be saved during the simulation.&lt;br&gt;&lt;br&gt;&#xa;Each observable needs to be on one line. The possibilities are: &lt;br&gt;&#xa;BUS: followed by one bus name or * to denote all buses &lt;br&gt;&#xa;SYNC: followed by one synchronous machine name or * to denote all sync machines&lt;br&gt;&#xa;SHUNT: followed by a bus name or * to denote all buses&lt;br&gt;&#xa;BRANCH: followed by the branch name or * to denote all branches&lt;br&gt;&#xa;INJEC: followed by the injector name or * to denote all injectors&lt;br&gt;&#xa;LINK: followed by the dclink name or * to denote all dclinks&lt;br&gt;&lt;br&gt;&#xa;An example of an observable file is:&lt;br&gt;&lt;br&gt;&#xa;BUS B01 &lt;br&gt;&#xa;SYNC SM01 &lt;br&gt;&#xa;SYNC SM02 &lt;br&gt;&#xa;SYNC SM03 &lt;br&gt;&#xa;BRANCH *&lt;br&gt;&lt;br&gt;&#xa;which will save BUS B01 observables, synchronous machines SM01, SM02 and SM03 and all the branches observables.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="loadObsButton" noResource="true"/>
                   </Properties>
@@ -1152,20 +1152,20 @@
                 </Component>
                 <Component class="javax.swing.JLabel" name="jLabel10">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="&lt;html&gt;Write the name of the &lt;B&gt;Observables file&lt;/B&gt; or load. Necessary field if Trajectory has been asked&lt;/html&gt;"/>
+                    <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Observables file&lt;/b&gt; (required when a trajectory is saved)&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="jLabel10" noResource="true"/>
                   </Properties>
                 </Component>
                 <Component class="javax.swing.JCheckBox" name="saveDumpButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Save settings, comments and initialization data in file"/>
+                    <Property name="text" type="java.lang.String" value="Save settings, comments and initialization data"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Activate to save the initialization information. Useful for debugging reasons.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="saveDumpButton" noResource="true"/>
                   </Properties>
                 </Component>
                 <Component class="javax.swing.JCheckBox" name="observFileWizButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Show Observable dialog"/>
+                    <Property name="text" type="java.lang.String" value="Show observable dialog"/>
                     <Property name="name" type="java.lang.String" value="observFileWizButton" noResource="true"/>
                   </Properties>
                   <Events>
@@ -1651,7 +1651,7 @@
                 </Component>
                 <Component class="javax.swing.JLabel" name="jLabel30">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="&lt;html&gt;Choose name and type of &lt;B&gt;Runtime Observable&lt;/B&gt;:&lt;/html&gt;"/>
+                    <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Runtime observables&lt;/b&gt;&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="jLabel30" noResource="true"/>
                   </Properties>
                 </Component>
@@ -1665,7 +1665,7 @@
                 </Component>
                 <Component class="javax.swing.JCheckBox" name="saveContTrace">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Save Continuous trace"/>
+                    <Property name="text" type="java.lang.String" value="Save continuous trace"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Activate to save the initialization information. Useful for debugging reasons.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="saveContTrace" noResource="true"/>
                   </Properties>
@@ -1673,7 +1673,7 @@
                 <Component class="javax.swing.JCheckBox" name="saveDiscTrace">
                   <Properties>
                     <Property name="selected" type="boolean" value="true"/>
-                    <Property name="text" type="java.lang.String" value="Save Discrete trace"/>
+                    <Property name="text" type="java.lang.String" value="Save discrete trace"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Activate to save the initialization information. Useful for debugging reasons.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="saveDiscTrace" noResource="true"/>
                   </Properties>
@@ -1832,7 +1832,7 @@
                 </Container>
                 <Component class="javax.swing.JButton" name="runPF">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Run Power Flow"/>
+                    <Property name="text" type="java.lang.String" value="Run power flow"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to run the simulation."/>
                     <Property name="name" type="java.lang.String" value="runPF" noResource="true"/>
                   </Properties>
@@ -1842,7 +1842,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadBusOverview">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Bus Overview"/>
+                    <Property name="text" type="java.lang.String" value="Bus overview"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the discrete trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the discrete changes happening during the simulation.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadBusOverview" noResource="true"/>
@@ -1853,7 +1853,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadLFRESV2DAT">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Add Helios Results to Data"/>
+                    <Property name="text" type="java.lang.String" value="Add Helios results to data"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the discrete trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the discrete changes happening during the simulation.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadLFRESV2DAT" noResource="true"/>
@@ -1875,7 +1875,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadTrfos">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Adjustable transfos"/>
+                    <Property name="text" type="java.lang.String" value="Adjustable transformers"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the discrete trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the discrete changes happening during the simulation.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadTrfos" noResource="true"/>
@@ -1897,7 +1897,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="clearPFCOutput">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Clear All"/>
+                    <Property name="text" type="java.lang.String" value="Clear all"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to clear the above pane."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="clearPFCOutput" noResource="true"/>
@@ -2014,7 +2014,7 @@
                 </Container>
                 <Component class="javax.swing.JButton" name="runSimulation">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Run Dynamic Simulation"/>
+                    <Property name="text" type="java.lang.String" value="Run dynamic simulation"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to run the simulation."/>
                     <Property name="name" type="java.lang.String" value="runSimulation" noResource="true"/>
                   </Properties>
@@ -2024,7 +2024,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="saveSimulOutput">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Save Current Output"/>
+                    <Property name="text" type="java.lang.String" value="Save current output"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to save the information shown above to a txt file."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="saveSimulOutput" noResource="true"/>
@@ -2035,7 +2035,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadOutput">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load Output"/>
+                    <Property name="text" type="java.lang.String" value="Load output"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load the output of the simulation."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadOutput" noResource="true"/>
@@ -2046,7 +2046,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadContTrace">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load Continuous Trace"/>
+                    <Property name="text" type="java.lang.String" value="Load continuous trace"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the continuous trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the Newton iterations and the time-step evolution.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadContTrace" noResource="true"/>
@@ -2057,7 +2057,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadDiscTrace">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load Discrete Trace"/>
+                    <Property name="text" type="java.lang.String" value="Load discrete trace"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the discrete trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the discrete changes happening during the simulation.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadDiscTrace" noResource="true"/>
@@ -2068,7 +2068,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="clearSimulOutput">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Clear All"/>
+                    <Property name="text" type="java.lang.String" value="Clear all"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to clear the above pane."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="clearSimulOutput" noResource="true"/>
@@ -2079,7 +2079,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadDumpTraceButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load Initialization"/>
+                    <Property name="text" type="java.lang.String" value="Load initialization"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the initialization data of the simulation.&lt;br&gt;&#xa;This involves a detailed view of the initial state of the simulation.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadDumpTraceButton" noResource="true"/>
@@ -2090,7 +2090,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="stopSimulationButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Stop Simulation"/>
+                    <Property name="text" type="java.lang.String" value="Stop simulation"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to end the simulation before reaching the horizon (as defined in the disturbance file)."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="stopSimulationButton" noResource="true"/>
@@ -2239,7 +2239,7 @@
               <SubComponents>
                 <Component class="javax.swing.JButton" name="runDyngraphButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Extract Curves"/>
+                    <Property name="text" type="java.lang.String" value="Extract curves"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to initiate dialog for selecting the observables you want to plot."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="runDyngraphButton" noResource="true"/>
@@ -2250,7 +2250,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="viewCurvesButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Preview Curve"/>
+                    <Property name="text" type="java.lang.String" value="Preview curve"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to preview the last extracted curve."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="viewCurvesButton" noResource="true"/>
@@ -2261,7 +2261,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="saveTrajToFileButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Save Current Trajectory"/>
+                    <Property name="text" type="java.lang.String" value="Save current trajectory"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to save the trajectory file of the last simulation."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="saveTrajToFileButton" noResource="true"/>
@@ -2272,7 +2272,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="clearGnuplotButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Clear all Gnuplot instances"/>
+                    <Property name="text" type="java.lang.String" value="Clear all gnuplot instances"/>
                     <Property name="toolTipText" type="java.lang.String" value="Kills all instances of Gnuplot."/>
                     <Property name="name" type="java.lang.String" value="clearGnuplotButton" noResource="true"/>
                   </Properties>
@@ -2282,7 +2282,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="saveCurrentCurveButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Save Extracted Curve"/>
+                    <Property name="text" type="java.lang.String" value="Save extracted curve"/>
                     <Property name="toolTipText" type="java.lang.String" value="Save the extracted plots."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="saveCurrentCurveButton" noResource="true"/>
@@ -2293,7 +2293,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="loadTrajToFileButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load Trajectory"/>
+                    <Property name="text" type="java.lang.String" value="Load trajectory"/>
                     <Property name="toolTipText" type="java.lang.String" value="Click to load a trajectory file that you saved from a previous simulation."/>
                     <Property name="name" type="java.lang.String" value="loadTrajToFileButton" noResource="true"/>
                   </Properties>
@@ -2314,19 +2314,19 @@
                 </Component>
                 <Component class="javax.swing.JLabel" name="jLabel4">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;&lt;u&gt;Time-domain analysis:&lt;/u&gt;&lt;/b&gt;&lt;/html&gt;"/>
+                    <Property name="text" type="java.lang.String" value="Time-domain analysis"/>
                     <Property name="name" type="java.lang.String" value="jLabel4" noResource="true"/>
                   </Properties>
                 </Component>
                 <Component class="javax.swing.JLabel" name="jLabel8">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;&lt;u&gt;Small Signal Stability analysis:&lt;/u&gt;&lt;/b&gt;&lt;/html&gt;"/>
+                    <Property name="text" type="java.lang.String" value="Small-signal stability analysis"/>
                     <Property name="name" type="java.lang.String" value="jLabel8" noResource="true"/>
                   </Properties>
                 </Component>
                 <Component class="javax.swing.JButton" name="ssaButton1">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Perform small signal stability analysis"/>
+                    <Property name="text" type="java.lang.String" value="Run small-signal stability analysis"/>
                     <Property name="name" type="java.lang.String" value="ssaButton1" noResource="true"/>
                   </Properties>
                   <Events>
@@ -2502,7 +2502,7 @@
                 </Container>
                 <Component class="javax.swing.JButton" name="loadCodegenFiles">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Load Files for Codegen"/>
+                    <Property name="text" type="java.lang.String" value="Load files for Codegen"/>
                     <Property name="name" type="java.lang.String" value="loadCodegenFiles" noResource="true"/>
                   </Properties>
                   <Events>
@@ -2521,7 +2521,7 @@
                 </Component>
                 <Component class="javax.swing.JButton" name="displayCGfiles">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Display Loaded Files"/>
+                    <Property name="text" type="java.lang.String" value="Display loaded files"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="displayCGfiles" noResource="true"/>
                   </Properties>
