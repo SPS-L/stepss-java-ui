@@ -103,7 +103,9 @@ The jar embeds the toolchain executables for the platform it runs on and extract
 
 DYNGRAPH is the same console program on all three platforms, but Extract Curves no longer opens it in a terminal window: STEPSS reads the trajectory's observables with `dyngraph --list`, presents them in a selection dialog, and drives the extraction through a generated command file (`-t`). Running DYNGRAPH by hand, outside STEPSS, still gives the console prompts.
 
-The bundled RAMSES is the free *Limited* build (up to 1000 buses, 2 cores).
+The bundled RAMSES runs limited (up to 1000 buses, 2 cores) unless a `LICENSE` record is supplied among the data files. There is only one engine build; the limit is lifted by the licence the engine itself reads, not by a different binary, so STEPSS cannot tell which of the two you are running and does not claim to. The engine's own banner in the simulation output reports it.
+
+On first run STEPSS shows the RAMSES licence and asks you to accept it. Declining exits.
 
 In addition, the application distributes the following third-party Java libraries (merged into `stepss.jar` and shipped in `dist/lib/`): Apache Commons Exec, Apache Commons IO, and FlatLaf (all Apache License 2.0). FlatLaf is the look and feel; it renders the same on all three platforms, scales on HiDPI, and provides the dark theme offered under **Tools -> Dark theme**. Because it is a multi-release jar, `manifest.mf` declares `Multi-Release: true`.
 

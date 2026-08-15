@@ -80,8 +80,7 @@ public class RamsesUI extends javax.swing.JFrame {
                     "Launch failed", JOptionPane.ERROR_MESSAGE));
         });
         this_version = getVersion();
-        String fullLimited = getRamsesType();
-        versionLabel.setText("<html><b>Version:</b> " + this_version + " (" + fullLimited + " Version)</html>");
+        versionLabel.setText("<html><b>Version:</b> " + this_version + "</html>");
         prefs = Preferences.userRoot().node(this.getClass().getName());
         // Before initRamses(), which is what reads it: the session's working
         // directory is restored only if it is still a directory, so a case on
@@ -89,9 +88,13 @@ public class RamsesUI extends javax.swing.JFrame {
         selWorkDir = lastWorkingDirectory();
         String ramsesFirtsTime = "";
         if (prefs.getBoolean(ramsesFirtsTime, true)) {
-            if (fullLimited.equalsIgnoreCase("Limited")) {
-                licenseAgreement(null);
-            }
+            // Unconditionally. This used to be shown only when type.txt said
+            // "Limited", which asked the interface a question it cannot
+            // answer: every bundled engine is limited until the user puts a
+            // LICENSE among their own data files, and nothing here can see
+            // that. The licence being agreed to is the engine's own, and it
+            // applies either way.
+            licenseAgreement(null);
             prefs.putBoolean(ramsesFirtsTime, false);
         }
 //        prefs.remove(ramsesFirtsTime);
@@ -765,25 +768,6 @@ public class RamsesUI extends javax.swing.JFrame {
         }
     }
 
-    private String getRamsesType() {
-        InputStream in = RamsesUI.class.getResourceAsStream("type.txt");
-        if (in == null) {
-            return "Limited";
-        }
-        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-        try {
-            String line = reader.readLine();
-            return (line == null || line.trim().isEmpty()) ? "Limited" : line.trim();
-        } catch (IOException ex) {
-            Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-            return "Limited";
-        } finally {
-            try {
-                reader.close();
-            } catch (IOException ignore) {
-            }
-        }
-    }
 
     private void licenseAgreement(java.awt.event.ActionEvent evt) {
         try {
