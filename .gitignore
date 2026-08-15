@@ -3,6 +3,10 @@
 .mcp.json
 /.superpowers/
 
+# NetBeans per-user state: compile-on-save flags, the last profiler
+# configuration, local paths. Machine specific, never the project's.
+/nbproject/private/
+
 # Ant build outputs
 /build/
 /dist/
