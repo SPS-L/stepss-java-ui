@@ -12,7 +12,9 @@ package my.ramses;
 
 import java.awt.Component;
 import java.awt.HeadlessException;
+import java.awt.Insets;
 import java.awt.Rectangle;
+import java.awt.event.KeyEvent;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -61,6 +63,7 @@ public class RamsesUI extends javax.swing.JFrame {
      */
     public RamsesUI() {
         initComponents();
+        applyModernChrome();
         // PlatformLauncher's launches (editor/terminal/file manager) run via
         // Commons Exec's async execute(), which hands a launch failure (e.g.
         // a missing xdg-open or terminal emulator) to this listener instead
@@ -95,7 +98,6 @@ public class RamsesUI extends javax.swing.JFrame {
 //            }
 //        });
 
-        this.setIconImage(new ImageIcon(getClass().getResource("logo.png")).getImage());
         ToolTipManager.sharedInstance().setDismissDelay(6000000);
         ToolTipManager.sharedInstance().setEnabled(false);
         DefaultCaret caret = (DefaultCaret) simulationOutput.getCaret();
@@ -134,6 +136,118 @@ public class RamsesUI extends javax.swing.JFrame {
             // repeat the failure without adding information.
             System.exit(1);
         }
+    }
+
+    /**
+     * Everything about the window's chrome that the NetBeans form cannot
+     * express, applied once, immediately after {@code initComponents()}.
+     *
+     * <p>Lives here rather than in the generated block on purpose. The form is
+     * still the source of truth for what exists and where it sits; this is the
+     * source of truth for how it is presented and what it is bound to. Reopening
+     * RamsesUI.form in the designer and letting it regenerate cannot undo any of
+     * it, because all of it runs afterwards.
+     */
+    private void applyModernChrome() {
+        // FlatLaf embeds the menu bar into the title bar by default wherever it
+        // draws one. Refused here: File, Tools and Help stay where a decade of
+        // users expect to find them.
+        getRootPane().putClientProperty("JRootPane.menuBarEmbedded", false);
+        MenuShortcuts.applyPlatformModifier(menuBar);
+        fileMenu.setMnemonic(KeyEvent.VK_F);
+        toolsMenu.setMnemonic(KeyEvent.VK_T);
+        helpMenu.setMnemonic(KeyEvent.VK_H);
+        styleEditButtons();
+        addThemeToggle();
+        applyBranding();
+    }
+
+    /**
+     * Points the window icon and the About drawing at the variant that matches
+     * the current theme. Re-run by the theme toggle, which is why it is a method
+     * rather than three lines in the constructor: the light mark on a dark
+     * dialog is invisible, and it is the same drawing either way.
+     */
+    private void applyBranding() {
+        boolean dark = themePreference().getBoolean(DARK_THEME_KEY, false);
+        setIconImages(Branding.windowIcons(dark));
+        aboutBox.setIconImages(Branding.windowIcons(dark));
+        // The lockup already carries the wordmark and the tagline, which is why
+        // the two labels that used to repeat them are gone from the form.
+        logo.setIcon(Branding.logo(dark));
+    }
+
+    /**
+     * Puts the painted pencil on the twelve "edit this file" buttons and takes
+     * Notepad++ out of their tooltips.
+     *
+     * <p>The buttons are pinned to 27px wide by the layout, so they are also
+     * given the toolbar-button treatment and no margin: at the stock button
+     * insets a 16px icon needs about 44px and the glyph would be clipped. The
+     * client property is a no-op under a look and feel that does not know it,
+     * which is what the fallback path in {@link #installTheme} leaves behind.
+     */
+    private void styleEditButtons() {
+        JButton[] editButtons = {
+            nppData1Button, nppData2Button, nppData3Button, nppData4Button,
+            nppData5Button, nppData6Button, nppData7Button, nppData8Button,
+            nppData9Button, nppData10Button, nppDstButton, nppObsButton};
+        for (JButton button : editButtons) {
+            button.setIcon(EditIcon.SMALL);
+            button.setToolTipText("Open this file in your default editor");
+            button.putClientProperty("JButton.buttonType", "toolBarButton");
+            button.setMargin(new Insets(0, 0, 0, 0));
+        }
+    }
+
+    /**
+     * Adds the theme toggle to the end of the Tools menu.
+     *
+     * <p>Added here rather than in the form because it is the one control in
+     * the window that has to survive being rebuilt by the thing it switches:
+     * {@code FlatLaf.updateUI()} re-creates every component's UI delegate, and
+     * an item the designer owns would be the same object either way, whereas
+     * this one is created after the look and feel is already up.
+     */
+    private void addThemeToggle() {
+        final JCheckBoxMenuItem darkTheme = new JCheckBoxMenuItem("Dark theme");
+        darkTheme.setSelected(themePreference().getBoolean(DARK_THEME_KEY, false));
+        darkTheme.addActionListener(event -> {
+            boolean dark = darkTheme.isSelected();
+            themePreference().putBoolean(DARK_THEME_KEY, dark);
+            try {
+                // Preferences writes back on its own schedule, so without this
+                // a choice made and then followed by a kill or a crash is lost,
+                // and the next launch silently contradicts the menu.
+                themePreference().flush();
+            } catch (java.util.prefs.BackingStoreException ex) {
+                Logger.getLogger(RamsesUI.class.getName()).log(Level.WARNING,
+                        "Theme choice could not be saved", ex);
+            }
+            installTheme(dark);
+            com.formdev.flatlaf.FlatLaf.updateUI();
+            // After updateUI, not before: it rebuilds every UI delegate, and a
+            // JLabel's icon is not one of the things it rebuilds, but the About
+            // dialog is re-laid-out around whatever the label holds when it is
+            // next packed.
+            applyBranding();
+        });
+        toolsMenu.addSeparator();
+        toolsMenu.add(darkTheme);
+    }
+
+    /**
+     * Puts the working directory in the title bar, so two STEPSS windows on two
+     * networks are told apart in a taskbar, in an alt-tab switcher, and in the
+     * screenshot someone sends when a run will not converge. Called from
+     * {@code initRamses()}, which re-runs on every working-directory change.
+     */
+    private void updateWindowTitle() {
+        // Only a directory the user chose. Before they choose one the working
+        // directory is the extracted toolchain's temp directory, and
+        // "STEPSS - stepssTools4821" would be noise dressed as context.
+        String name = (selWorkDir == null) ? "" : selWorkDir.getName();
+        setTitle(name.isEmpty() ? "STEPSS" : "STEPSS - " + name);
     }
 
     private String getVersion() {
@@ -234,8 +348,6 @@ public class RamsesUI extends javax.swing.JFrame {
         fileChooser = new javax.swing.JFileChooser(new File ("."));
         aboutBox = new javax.swing.JDialog();
         logo = new javax.swing.JLabel();
-        jLabel2 = new javax.swing.JLabel();
-        jLabel3 = new javax.swing.JLabel();
         versionLabel = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
         webpageLabel = new javax.swing.JLabel();
@@ -416,24 +528,11 @@ public class RamsesUI extends javax.swing.JFrame {
 
         aboutBox.setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         aboutBox.setTitle("About");
-        aboutBox.setAlwaysOnTop(true);
-        aboutBox.setBounds(new java.awt.Rectangle(0, 0, 0, 0));
-        aboutBox.setIconImage(new ImageIcon(getClass().getResource("logo.png")).getImage());
-        aboutBox.setMinimumSize(new java.awt.Dimension(500, 350));
         aboutBox.setName("aboutBox"); // NOI18N
 
-        logo.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/logo.png"))); // NOI18N
-        logo.setMaximumSize(new java.awt.Dimension(554, 440));
-        logo.setMinimumSize(new java.awt.Dimension(554, 440));
         logo.setName("logo"); // NOI18N
-        logo.setPreferredSize(new java.awt.Dimension(763, 545));
 
-        jLabel2.setText("<html>Static and Transient Electric Power Systems Simulation</html>");
-        jLabel2.setName("jLabel2"); // NOI18N
 
-        jLabel3.setFont(new java.awt.Font("Bitstream Vera Sans", 0, 24)); // NOI18N
-        jLabel3.setText("<html><U><B>STEPSS</B></U></html>");
-        jLabel3.setName("jLabel3"); // NOI18N
 
         versionLabel.setText("<html><B><U>Version</U>:</B> 1.0</html>");
         versionLabel.setName("versionLabel"); // NOI18N
@@ -510,28 +609,21 @@ public class RamsesUI extends javax.swing.JFrame {
             .addGroup(aboutBoxLayout.createSequentialGroup()
                 .addContainerGap()
                 .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(aboutBoxLayout.createSequentialGroup()
-                        .addGap(196, 196, 196)
-                        .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jLabel2)
-                            .addComponent(jLabel3)))
-                    .addGroup(aboutBoxLayout.createSequentialGroup()
-                        .addComponent(logo, javax.swing.GroupLayout.PREFERRED_SIZE, 159, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(29, 29, 29)
-                        .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jLabel5)
-                            .addComponent(webpageLabel)
-                            .addComponent(versionLabel)))
+                    .addComponent(logo)
+                    .addComponent(versionLabel)
+                    .addComponent(jLabel5)
+                    .addComponent(webpageLabel)
                     .addGroup(aboutBoxLayout.createSequentialGroup()
                         .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(aboutBoxLayout.createSequentialGroup()
                                 .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(showKLULicenseButton)
-                                    .addComponent(versionLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 121, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(showApacheLicenseButton)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(showGnupCopyrightButton))
+                                    .addGroup(aboutBoxLayout.createSequentialGroup()
+                                        .addComponent(showKLULicenseButton)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                        .addComponent(showApacheLicenseButton)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                        .addComponent(showGnupCopyrightButton))
+                                    .addComponent(versionLabel1)))
                             .addGroup(aboutBoxLayout.createSequentialGroup()
                                 .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                                     .addGroup(aboutBoxLayout.createSequentialGroup()
@@ -540,8 +632,7 @@ public class RamsesUI extends javax.swing.JFrame {
                                         .addComponent(showPFCLicenseButton)
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                         .addComponent(showCODEGENLicenseButton))
-                                    .addComponent(versionLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 121, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addGap(110, 110, 110)))
+                                    .addComponent(versionLabel2))))
                         .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
         );
@@ -549,18 +640,13 @@ public class RamsesUI extends javax.swing.JFrame {
             aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(aboutBoxLayout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(logo, javax.swing.GroupLayout.PREFERRED_SIZE, 128, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addGroup(aboutBoxLayout.createSequentialGroup()
-                        .addComponent(jLabel3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(versionLabel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(webpageLabel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addComponent(logo, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
+                .addComponent(versionLabel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(webpageLabel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(versionLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
@@ -568,9 +654,9 @@ public class RamsesUI extends javax.swing.JFrame {
                     .addComponent(showRAMSESLicenseButton)
                     .addComponent(showPFCLicenseButton)
                     .addComponent(showCODEGENLicenseButton))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(versionLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
+                .addComponent(versionLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(showGnupCopyrightButton)
                     .addComponent(showApacheLicenseButton)
@@ -669,8 +755,6 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        nppData1Button.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppData1Button.setToolTipText("Click to edit the file in Notepad++.");
         nppData1Button.setName("nppData1Button"); // NOI18N
         nppData1Button.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -678,8 +762,6 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        nppData2Button.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppData2Button.setToolTipText("Click to edit the file in Notepad++.");
         nppData2Button.setName("nppData2Button"); // NOI18N
         nppData2Button.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -687,8 +769,6 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        nppData3Button.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppData3Button.setToolTipText("Click to edit the file in Notepad++.");
         nppData3Button.setName("nppData3Button"); // NOI18N
         nppData3Button.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -696,8 +776,6 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        nppData4Button.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppData4Button.setToolTipText("Click to edit the file in Notepad++.");
         nppData4Button.setName("nppData4Button"); // NOI18N
         nppData4Button.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -705,8 +783,6 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        nppData5Button.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppData5Button.setToolTipText("Click to edit the file in Notepad++.");
         nppData5Button.setName("nppData5Button"); // NOI18N
         nppData5Button.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -714,8 +790,6 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
 
-        nppDstButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppDstButton.setToolTipText("Click to edit the file in Notepad++.");
         nppDstButton.setName("nppDstButton"); // NOI18N
         nppDstButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -752,8 +826,6 @@ public class RamsesUI extends javax.swing.JFrame {
         fileData6.setMinimumSize(new java.awt.Dimension(0, 24));
         fileData6.setName("fileData6"); // NOI18N
 
-        nppData6Button.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppData6Button.setToolTipText("Click to edit the file in Notepad++.");
         nppData6Button.setName("nppData6Button"); // NOI18N
         nppData6Button.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -774,8 +846,6 @@ public class RamsesUI extends javax.swing.JFrame {
         fileData7.setMinimumSize(new java.awt.Dimension(0, 24));
         fileData7.setName("fileData7"); // NOI18N
 
-        nppData7Button.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppData7Button.setToolTipText("Click to edit the file in Notepad++.");
         nppData7Button.setName("nppData7Button"); // NOI18N
         nppData7Button.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -796,8 +866,6 @@ public class RamsesUI extends javax.swing.JFrame {
         fileData8.setMinimumSize(new java.awt.Dimension(0, 24));
         fileData8.setName("fileData8"); // NOI18N
 
-        nppData8Button.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppData8Button.setToolTipText("Click to edit the file in Notepad++.");
         nppData8Button.setName("nppData8Button"); // NOI18N
         nppData8Button.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -818,8 +886,6 @@ public class RamsesUI extends javax.swing.JFrame {
         fileData9.setMinimumSize(new java.awt.Dimension(0, 24));
         fileData9.setName("fileData9"); // NOI18N
 
-        nppData9Button.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppData9Button.setToolTipText("Click to edit the file in Notepad++.");
         nppData9Button.setName("nppData9Button"); // NOI18N
         nppData9Button.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -831,8 +897,6 @@ public class RamsesUI extends javax.swing.JFrame {
         fileData10.setMinimumSize(new java.awt.Dimension(0, 24));
         fileData10.setName("fileData10"); // NOI18N
 
-        nppData10Button.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppData10Button.setToolTipText("Click to edit the file in Notepad++.");
         nppData10Button.setName("nppData10Button"); // NOI18N
         nppData10Button.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1408,8 +1472,6 @@ public class RamsesUI extends javax.swing.JFrame {
         jLabel30.setText("<html>Choose name and type of <B>Runtime Observable</B>:</html>");
         jLabel30.setName("jLabel30"); // NOI18N
 
-        nppObsButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/my/ramses/npp.png"))); // NOI18N
-        nppObsButton.setToolTipText("Click to edit the file in Notepad++.");
         nppObsButton.setName("nppObsButton"); // NOI18N
         nppObsButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2202,7 +2264,7 @@ public class RamsesUI extends javax.swing.JFrame {
         });
         fileMenu.add(loadConfigMenuItem);
 
-        exitMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_X, java.awt.event.InputEvent.CTRL_DOWN_MASK));
+        exitMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Q, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         exitMenuItem.setText("Exit");
         exitMenuItem.setName("exitMenuItem"); // NOI18N
         exitMenuItem.addActionListener(new java.awt.event.ActionListener() {
@@ -2301,7 +2363,7 @@ public class RamsesUI extends javax.swing.JFrame {
         helpMenu.setText("Help");
         helpMenu.setName("helpMenu"); // NOI18N
 
-        showChangeLogButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F1, 0));
+        showChangeLogButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F2, 0));
         showChangeLogButton.setText("Changelog");
         showChangeLogButton.setName("showChangeLogButton"); // NOI18N
         showChangeLogButton.addActionListener(new java.awt.event.ActionListener() {
@@ -2311,7 +2373,7 @@ public class RamsesUI extends javax.swing.JFrame {
         });
         helpMenu.add(showChangeLogButton);
 
-        showUserGuideButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F2, 0));
+        showUserGuideButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F1, 0));
         showUserGuideButton.setText("User Guide");
         showUserGuideButton.setName("showUserGuideButton"); // NOI18N
         showUserGuideButton.addActionListener(new java.awt.event.ActionListener() {
@@ -2365,8 +2427,16 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_exitMenuItemActionPerformed
 
     private void showAboutBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showAboutBoxActionPerformed
+        // pack() first, and it has to be here rather than in initComponents:
+        // without it the dialog opens at whatever size it was last given, which
+        // was the 500x350 minimum, and 500x350 is smaller than the layout's own
+        // minimum, so GroupLayout clipped the third-party licence row off the
+        // bottom edge where nothing could reach it. The logo label's inherited
+        // 763x545 preferred size had to go for the same reason, or packing to
+        // preferred would have produced an 800px dialog around a 152px image.
+        aboutBox.pack();
         aboutBox.setLocationRelativeTo(this);
-        aboutBox.setVisible(rootPaneCheckingEnabled);
+        aboutBox.setVisible(true);
     }//GEN-LAST:event_showAboutBoxActionPerformed
 
     private boolean createCommandFile() {
@@ -5306,28 +5376,9 @@ public class RamsesUI extends javax.swing.JFrame {
      * @param args the command line arguments
      */
     public static void main(String args[]) {
-        /*
-         * Set the Nimbus look and feel
-         */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /*
-         * If Nimbus (introduced in Java SE 6) is not available, stay with the
-         * default look and feel. For details see
-         * http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html
-         */
-        try {
-//            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-//                if ("Nimbus".equals(info.getName())) {
-//                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-//                    break;
-//                }
-//            }
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-//            UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
-        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(RamsesUI.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        }
-        //</editor-fold>
+        boolean dark = themePreference().getBoolean(DARK_THEME_KEY, false);
+        installTheme(dark);
+        useThemedTitleBar(dark);
 
         /*
          * Create and display the form
@@ -5341,6 +5392,119 @@ public class RamsesUI extends javax.swing.JFrame {
             }
         });
     }
+
+    /** Preferences key holding the theme choice, read at startup. */
+    static final String DARK_THEME_KEY = "darkTheme";
+
+    /**
+     * The node the theme choice lives in. Deliberately the same node the
+     * constructor opens for the first-run flag, so there is one STEPSS
+     * preferences node rather than two that drift.
+     */
+    static Preferences themePreference() {
+        return Preferences.userRoot().node(RamsesUI.class.getName());
+    }
+
+    /**
+     * Lets the title bar follow the theme instead of staying whatever the
+     * desktop painted it.
+     *
+     * <p>Without this the window turns dark and its title bar does not, because
+     * the title bar is drawn by the window manager and knows nothing about the
+     * application's own choice. The fix differs per platform:
+     *
+     * <ul>
+     * <li><b>Linux</b>: FlatLaf can draw the title bar itself, but only if asked
+     * before the first window exists, which is what these two calls do. The
+     * documented caveat is that this must not be used by an application that
+     * switches to a <i>non-FlatLaf</i> look and feel at runtime, since that
+     * would leave the window undecorated. This one only ever switches between
+     * FlatLaf's own light and dark themes; the single non-FlatLaf path is the
+     * fallback in {@link #installTheme}, which happens before any window is
+     * created and skips this entirely.
+     * <li><b>Windows 10 and 11</b>: FlatLaf decorations are on by default, so
+     * the title bar already follows and there is nothing to do.
+     * <li><b>macOS</b>: the title bar stays native and takes its appearance from
+     * this property, which the OS reads once at startup. A theme switched
+     * mid-session therefore leaves the Mac title bar until the next launch,
+     * which is the one place this is not live.
+     * </ul>
+     *
+     * <p>The menu bar is deliberately <i>not</i> embedded into the title bar,
+     * which FlatLaf would otherwise do by default. File, Tools and Help stay
+     * exactly where they have always been.
+     */
+    private static void useThemedTitleBar(boolean dark) {
+        if (!(UIManager.getLookAndFeel() instanceof com.formdev.flatlaf.FlatLaf)) {
+            return;  // the fallback look and feel has no decorations to offer
+        }
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        if (os.contains("mac") || os.contains("darwin")) {
+            System.setProperty("apple.awt.application.appearance",
+                    dark ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
+        } else if (os.contains("linux") || os.contains("unix")) {
+            JFrame.setDefaultLookAndFeelDecorated(true);
+            JDialog.setDefaultLookAndFeelDecorated(true);
+        }
+    }
+
+    /**
+     * Installs FlatLaf and the handful of metrics the stock theme does not get
+     * right for this application.
+     *
+     * <p>What this replaced was {@code getSystemLookAndFeelClassName()}, which
+     * on Linux resolves to the GTK peer. That peer is unmaintained in OpenJDK,
+     * ignores the desktop's dark preference, and rendered sibling combo boxes
+     * at two different heights on the Observables tab. FlatLaf renders the same
+     * way on all three platforms, scales on HiDPI, and has a dark theme.
+     *
+     * <p>Order matters and is the one trap here: the {@code UIManager.put}
+     * calls have to come <em>after</em> {@code setup()}, because setup replaces
+     * the defaults table, and before any component is constructed, because
+     * components read these values once. Called again by the Tools menu toggle,
+     * which is why the puts live here rather than inline in {@code main}.
+     *
+     * <p>Falls back to the previous behaviour if FlatLaf cannot be installed
+     * for any reason, so a broken theme can never be what stops the engine from
+     * being usable.
+     */
+    static void installTheme(boolean dark) {
+        try {
+            if (dark) {
+                com.formdev.flatlaf.FlatDarkLaf.setup();
+            } else {
+                com.formdev.flatlaf.FlatLightLaf.setup();
+            }
+        } catch (RuntimeException ex) {
+            Logger.getLogger(RamsesUI.class.getName()).log(Level.WARNING,
+                    "FlatLaf could not be installed; falling back to the system look and feel", ex);
+            try {
+                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
+                    | javax.swing.UnsupportedLookAndFeelException fallbackFailure) {
+                Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, fallbackFailure);
+            }
+            return;
+        }
+
+        // Softer than FlatLaf's default 0, and short of a pill: these controls
+        // sit in dense rows of ten, where a large radius reads as noise.
+        UIManager.put("Component.arc", 6);
+        UIManager.put("Button.arc", 6);
+        UIManager.put("TextComponent.arc", 6);
+        // The tabs were 23px of unpadded text crammed against the menu bar and
+        // were the hardest thing in the window to hit.
+        UIManager.put("TabbedPane.tabHeight", 34);
+        UIManager.put("TabbedPane.tabWidthMode", "preferred");
+        UIManager.put("TabbedPane.showTabSeparators", true);
+        UIManager.put("ScrollBar.showButtons", false);
+        UIManager.put("ScrollBar.width", 12);
+        // Ten file rows and five observable rows benefit from the extra 2px far
+        // more than the console panes lose by it.
+        UIManager.put("Table.rowHeight", 22);
+        UIManager.put("List.rowHeight", 20);
+    }
+
     private Boolean savedOutputBool = false;
     private Platform platform;
     private Toolchain toolchain;
@@ -5449,13 +5613,11 @@ public class RamsesUI extends javax.swing.JFrame {
     private javax.swing.JComboBox injObsList;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
-    private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel25;
     private javax.swing.JLabel jLabel26;
     private javax.swing.JLabel jLabel27;
     private javax.swing.JLabel jLabel28;
     private javax.swing.JLabel jLabel29;
-    private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel30;
     private javax.swing.JLabel jLabel31;
     private javax.swing.JLabel jLabel4;
@@ -5791,6 +5953,7 @@ public class RamsesUI extends javax.swing.JFrame {
             toolchain.extractAll();
 
             myTempDir = (selWorkDir != null) ? selWorkDir : toolDir;
+            updateWindowTitle();
 
             openExplButton.setEnabled(true);
             openTermButton.setEnabled(true);

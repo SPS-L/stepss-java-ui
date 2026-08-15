@@ -71,11 +71,24 @@
     nbproject/build-impl.xml file. 
 
     -->
+ <!-- FlatLaf is a multi-release jar: its Java 9+ implementations of two
+      helper classes live under META-INF/versions/9/. The excludes pattern is
+      one level deep, so those survive the merge, but they are only ever
+      loaded from a jar whose manifest says Multi-Release, which is why that
+      attribute is in manifest.mf. It goes there rather than in a manifest
+      element here because this task runs with update="true" over a jar that
+      already has Main-Class and Class-Path in it, and supplying a manifest to
+      an updating jar task is how you lose them.
+      The natives under com/formdev/flatlaf/natives/ are not excluded either:
+      they are what FlatLaf uses for window decorations on Windows and macOS,
+      and it degrades quietly if they are absent, which is the kind of quiet
+      that costs an afternoon to diagnose on someone else's machine. -->
  <target name="-post-jar">
   <jar jarfile="dist/stepss.jar" update="true">
 	<zipfileset src="${dist.jar}" excludes="META-INF/*" />
 	<zipfileset src="dist/lib/commons-exec-1.3.jar" excludes="META-INF/*" />
 	<zipfileset src="dist/lib/commons-io-2.11.0.jar" excludes="META-INF/*" />
+	<zipfileset src="dist/lib/flatlaf-3.7.2.jar" excludes="META-INF/*" />
   </jar>
  </target>
 
