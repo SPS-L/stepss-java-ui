@@ -343,11 +343,43 @@ public final class SsaResultsWindow extends JFrame {
                         ((Double) value).doubleValue()));
             }
             if (!selected) {
-                c.setForeground(mode.zeta < 0.0 ? new java.awt.Color(0xdc, 0x14, 0x3c)
-                        : !mode.simple ? new java.awt.Color(0xb0, 0x7d, 0x1a)
-                        : java.awt.Color.BLACK);
+                boolean dark = isDark(t.getBackground());
+                c.setForeground(mode.zeta < 0.0
+                        ? (dark ? UNSTABLE_ON_DARK : UNSTABLE_ON_LIGHT)
+                        : !mode.simple
+                        ? (dark ? DEGENERATE_ON_DARK : DEGENERATE_ON_LIGHT)
+                        : t.getForeground());
             }
             return c;
+        }
+
+        // The ordinary rows follow the table's own foreground rather than a
+        // hardcoded black, which under a dark theme was black text on a dark
+        // ground. The two flag colours cannot follow it, because they carry
+        // meaning: crimson is the same crimson the s-plane draws its stability
+        // boundary in, so they are lightened for a dark ground rather than
+        // dropped. The s-plane and mode-shape panels themselves stay on white
+        // in both themes: PlotStyle is the one source of truth behind both the
+        // on-screen and the SVG renderer, and an exported figure belongs on
+        // white whatever the application is wearing.
+        private static final java.awt.Color UNSTABLE_ON_LIGHT = new java.awt.Color(0xdc, 0x14, 0x3c);
+        private static final java.awt.Color UNSTABLE_ON_DARK = new java.awt.Color(0xff, 0x6b, 0x83);
+        private static final java.awt.Color DEGENERATE_ON_LIGHT = new java.awt.Color(0xb0, 0x7d, 0x1a);
+        private static final java.awt.Color DEGENERATE_ON_DARK = new java.awt.Color(0xdf, 0xa5, 0x3a);
+
+        /**
+         * Whether text on this background wants light ink. Measured off the
+         * colour rather than asked of the look and feel, so it stays right
+         * under the system fallback too.
+         */
+        private static boolean isDark(java.awt.Color background) {
+            if (background == null) {
+                return false;
+            }
+            double luminance = (0.299 * background.getRed()
+                    + 0.587 * background.getGreen()
+                    + 0.114 * background.getBlue()) / 255.0;
+            return luminance < 0.5;
         }
     }
 }
