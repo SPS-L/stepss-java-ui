@@ -59,7 +59,7 @@
 
     An example of overriding the target for project execution could look like this:
 
-        <target name="run" depends="ramses-impl.jar">
+        <target name="run" depends="stepss-impl.jar">
             <exec dir="bin" executable="launcher.exe">
                 <arg file="${dist.jar}"/>
             </exec>
@@ -112,6 +112,10 @@
  </target>
 
  <property file="versions.properties"/>
+ <property name="bundle.dir" location="bundle"/>
+ <!-- Empty means jpackage's platform default installer. CI also asks for
+      the app-image type, which is a directory that needs no installer. -->
+ <property name="bundle.type" value=""/>
  <property name="payload.cache" location="payload-cache"/>
 
  <macrodef name="fetch-asset">
@@ -297,6 +301,80 @@
  </target>
 
  <target name="-pre-compile" depends="stage-payloads"/>
+
+ <!-- Native bundles: the jar wrapped in a launcher, an icon and a runtime, so
+      STEPSS installs and starts like an application instead of being run from
+      a terminal. jpackage builds for the platform it runs on and no other, so
+      the three installers come from the three CI runners, not from here.
+
+      It packages dist/, which is the fat jar plus dist/lib/, rather than
+      re-resolving dependencies: whatever `ant jar` produced and the harnesses
+      passed against is exactly what ships, and there is no second definition
+      of the classpath to drift.
+
+      A trimmed runtime is deliberately not used. jlink needs the module graph
+      of everything reachable, and the toolchain this jar extracts and runs is
+      native executables invoked through Commons Exec, so what a module scan
+      finds and what the application actually needs are not the same question.
+      A full runtime costs about 40MB on top of a 34MB jar and removes the
+      class of failure where a bundle starts and then cannot find a class. -->
+ <target name="bundle" depends="jar"
+         description="Build a native installer for the platform this runs on">
+  <mkdir dir="${bundle.dir}"/>
+  <delete dir="${bundle.dir}/work" quiet="true"/>
+  <mkdir dir="${bundle.dir}/work"/>
+  <loadfile property="stepss.version" srcFile="src/my/stepss/version.txt">
+   <filterchain><striplinebreaks/></filterchain>
+  </loadfile>
+  <!-- One icon format per platform. The mac test comes first because macOS
+       answers to the unix family too. stepss.icns is not in the repository:
+       a real icns container needs iconutil, which only exists on macOS, so
+       the mac CI job builds one from the PNG just before this runs. When it
+       is absent the icon argument is dropped rather than passed a file
+       jpackage would reject, and the bundle gets the default icon. -->
+  <condition property="bundle.icon.file" value="packaging/stepss.icns">
+   <os family="mac"/>
+  </condition>
+  <condition property="bundle.icon.file" value="packaging/stepss.ico">
+   <os family="windows"/>
+  </condition>
+  <property name="bundle.icon.file" value="packaging/stepss.png"/>
+  <condition property="bundle.icon.arg" value="--icon ${bundle.icon.file}">
+   <available file="${bundle.icon.file}"/>
+  </condition>
+  <property name="bundle.icon.arg" value=""/>
+
+  <!-- Menu entries and shortcuts, so an installed application is reachable
+       from where the desktop keeps applications rather than only from the
+       directory it was unpacked into. -->
+  <condition property="bundle.platform.args" value="">
+   <os family="mac"/>
+  </condition>
+  <condition property="bundle.platform.args"
+             value="--win-shortcut --win-menu --win-dir-chooser --win-menu-group STEPSS">
+   <os family="windows"/>
+  </condition>
+  <condition property="bundle.platform.args"
+             value="--linux-shortcut --linux-menu-group Science --linux-package-name stepss">
+   <os family="unix"/>
+  </condition>
+  <property name="bundle.platform.args" value=""/>
+  <exec executable="jpackage" failonerror="true">
+   <arg line="--name STEPSS"/>
+   <arg line="--app-version ${stepss.version}"/>
+   <arg line="--vendor 'Sustainable Power Systems Laboratory, Cyprus University of Technology'"/>
+   <arg line="--description 'Static and Transient Electric Power Systems Simulation'"/>
+   <arg line="--input dist"/>
+   <arg line="--main-jar stepss.jar"/>
+   <arg line="--main-class my.stepss.StepssUI"/>
+   <arg line="${bundle.icon.arg}"/>
+   <arg line="--dest ${bundle.dir}"/>
+   <arg line="--temp ${bundle.dir}/work"/>
+   <arg line="${bundle.platform.args}"/>
+   <arg line="${bundle.type}"/>
+  </exec>
+  <echo>Bundles written to ${bundle.dir}</echo>
+ </target>
 
  <target name="-post-clean" description="Remove staged payload copies so ant clean leaves no residue">
   <delete dir="src/my/stepss/payload" quiet="true"/>

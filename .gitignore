@@ -11,6 +11,9 @@
 /build/
 /dist/
 
+# jpackage output (ant bundle)
+/bundle/
+
 # Fetched release payloads (see versions.properties)
 /payload-cache/
 

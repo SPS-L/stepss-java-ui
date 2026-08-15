@@ -61,6 +61,21 @@ tools/refresh-marks.sh /path/to/src/assets   # or say where they are
 
 It needs [Inkscape](https://inkscape.org/), and that is not interchangeable with ImageMagick: `convert -resize` rasterises an SVG at the size the document declares and then scales the raster, which for the 295x100 lockup produces a visibly blurry enlargement. Inkscape rasterises the vectors at the size asked for. `tools/chrome-harness.sh` confirms every mark still resolves afterwards.
 
+### Native installers
+
+`ant jar` produces a jar you run with `java -jar`. `ant bundle` wraps that jar in a launcher, an icon and a Java runtime, so STEPSS installs and starts like an application and the machine it runs on needs no Java of its own:
+
+```bash
+ant bundle                              # the platform's installer: .deb, .msi or .dmg
+ant bundle -Dbundle.type="--type app-image"   # just the unpacked application directory
+```
+
+It needs `jpackage`, which ships with JDK 14 and later, and it only ever builds for the platform it runs on. The three installers on a release therefore come from three CI runners rather than from one machine. The icon is `packaging/stepss.png` on Linux and `packaging/stepss.ico` on Windows, both rendered from the same stepss-docs source as the in-application marks; macOS needs a real `.icns` container, which only `iconutil` produces, so the release workflow builds one on the macOS runner and it is not committed.
+
+The bundles are a second CI job that runs *after* the release is published and attaches its installer to it. A runner failing there leaves the release intact with `stepss.jar`, which is the artifact that matters.
+
+The bundled runtime is the full JDK runtime rather than a trimmed `jlink` image. STEPSS extracts and runs native executables through Commons Exec, so what a module scan can see and what the application actually needs are different questions, and roughly 40MB is a fair price for removing a class of failure where the bundle starts and then cannot find a class.
+
 ### Releases
 
 Releases are cut automatically. A daily GitHub Actions run checks the five pinned components (RAMSES, Helios, DYNGRAPH, CODEGEN and URAMSES) for new releases; when one has moved, it re-pins `versions.properties` and the matching resource names in `Toolchain.java`, rebuilds, verifies that the bundled toolchain extracts correctly, and publishes a release with `stepss.jar` attached. The notes list every component's pinned version, and embed the upstream release notes of the components that actually moved, since four of the five component repos are private and cannot be linked to usefully.
