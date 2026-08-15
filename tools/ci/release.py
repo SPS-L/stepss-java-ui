@@ -1,10 +1,14 @@
 """Assemble the release: version number and notes.
 
-Pure. Everything here is derived from what the bump already produced.
+Derived from what the bump already produced, plus this repository's own git
+history: repository_changes is the one function here that reads the world, and
+it is kept apart from compose_notes so the composition stays a pure function of
+its arguments and testable as one.
 """
 
 import json
 import re
+import subprocess
 import sys
 
 from . import pins
@@ -127,7 +131,45 @@ DISPLAY_NAMES = {
 }
 
 
-def compose_notes(version, props, changed, jar_sha256, previous_tag):
+RELEASE_COMMIT = re.compile(r"^Release v\d")
+
+
+def repository_changes(previous_tag):
+    """This repository's own commits since previous_tag, newest first.
+
+    Without this the notes can only describe components moving, and a release
+    made entirely of changes here reads as "No component changes since v3.74"
+    which a reader fairly takes to mean nothing changed at all. That is the
+    documented way a change to the Java sources reaches a release, so it is not
+    an edge case.
+
+    First-parent, because this repository merges topic branches with a summary
+    commit and that summary is the useful line: the alternative is a list of
+    the steps that built the branch. Release commits are dropped as
+    bookkeeping; they say the version number, which the heading already does.
+
+    Returns an empty list rather than raising when git cannot answer, so notes
+    that are merely thinner than usual never fail a release that has already
+    built and passed its checks.
+    """
+    if not previous_tag:
+        return []
+    try:
+        completed = subprocess.run(
+            ["git", "log", "--first-parent", "--format=%s",
+             "%s..HEAD" % previous_tag],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    subjects = []
+    for line in completed.stdout.decode("utf-8", "replace").splitlines():
+        subject = line.strip()
+        if subject and not RELEASE_COMMIT.match(subject):
+            subjects.append(subject)
+    return subjects
+
+
+def compose_notes(version, props, changed, jar_sha256, previous_tag, changes=()):
     """The release body.
 
     Four of the five component repos are private, so a link to an upstream
@@ -135,6 +177,11 @@ def compose_notes(version, props, changed, jar_sha256, previous_tag):
     therefore embedded rather than linked, which is the whole point of the
     exercise: the bundle's provenance has to be readable here or it is not
     readable anywhere.
+
+    `changes` is this repository's own commit subjects, as gathered by
+    repository_changes. They are listed whether or not a component moved: a
+    component-driven release can still carry work of its own, and before this
+    it went unmentioned.
 
     The bundle table's Published column is the upstream release date, which is
     known only for the components this run bumped - it arrives on the summary
@@ -153,11 +200,21 @@ def compose_notes(version, props, changed, jar_sha256, previous_tag):
             for entry in changed
         )
         lines.append("Rebuilt for %s." % described)
+    elif changes and previous_tag:
+        lines.append("Changes to STEPSS itself. The bundled components are "
+                     "unchanged since %s." % previous_tag)
     elif previous_tag:
         lines.append("Manual release. No component changes since %s." % previous_tag)
     else:
         lines.append("Manual release.")
     lines.append("")
+
+    if changes:
+        lines.append("## Changes in this release")
+        lines.append("")
+        for subject in changes:
+            lines.append("- %s" % subject)
+        lines.append("")
 
     published = {
         entry["component"]: entry.get("published") for entry in changed
@@ -234,6 +291,7 @@ def notes_main(argv):
             summary["changed"],
             upstream.sha256_file(jar_path),
             previous,
+            repository_changes(previous),
         )
     )
     return 0

@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -178,6 +179,73 @@ class ComposeNotesTest(unittest.TestCase):
         self.assertIn("Manual release.", body)
         self.assertNotIn("since None", body)
 
+    def test_lists_this_repositorys_own_changes(self):
+        body = release.compose_notes(
+            "v3.55.1", PROPS, [], "abc123", "v3.55",
+            ["Merge: look and feel", "Fix the About dialog"])
+        self.assertIn("## Changes in this release", body)
+        self.assertIn("- Merge: look and feel", body)
+        self.assertIn("- Fix the About dialog", body)
+
+    def test_a_release_of_our_own_changes_does_not_read_as_nothing(self):
+        # The fault this section exists for: a release made entirely of work
+        # here used to announce itself as "No component changes since v3.55",
+        # which a reader fairly takes to mean nothing changed at all.
+        body = release.compose_notes(
+            "v3.55.1", PROPS, [], "abc123", "v3.55", ["Merge: look and feel"])
+        self.assertIn("Changes to STEPSS itself", body)
+        self.assertNotIn("No component changes", body)
+
+    def test_a_component_release_lists_its_own_changes_too(self):
+        # A component-driven release can still carry work from this repository,
+        # and before this it went unmentioned.
+        body = release.compose_notes(
+            "v3.55.1", PROPS, [DYNGRAPH_CHANGE], "abc123", "v3.55",
+            ["Fix the About dialog"])
+        self.assertIn("Rebuilt for", body)
+        self.assertIn("- Fix the About dialog", body)
+
+    def test_no_changes_means_no_heading(self):
+        self.assertNotIn("## Changes in this release", self.notes([]))
+
+
+class RepositoryChangesTest(unittest.TestCase):
+    def test_no_previous_tag_means_no_history_to_report(self):
+        # The first-ever release has nothing to diff against, and asking git
+        # for "..HEAD" would be a different question than the one meant.
+        self.assertEqual([], release.repository_changes(None))
+        self.assertEqual([], release.repository_changes(""))
+
+    def test_release_commits_are_dropped_as_bookkeeping(self):
+        with mock.patch("subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess(
+                [], 0, stdout=b"Release v3.74.1\nMerge: look and feel\n")
+            self.assertEqual(["Merge: look and feel"],
+                             release.repository_changes("v3.74"))
+
+    def test_first_parent_so_a_merge_reports_its_summary(self):
+        with mock.patch("subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess([], 0, stdout=b"")
+            release.repository_changes("v3.74")
+        self.assertIn("--first-parent", run.call_args[0][0])
+
+    def test_a_git_failure_thins_the_notes_rather_than_failing_the_release(self):
+        # The build and every check have already passed by the time notes are
+        # composed. Losing a section is the right cost of git being unhappy;
+        # losing the release is not.
+        with mock.patch("subprocess.run",
+                        side_effect=subprocess.CalledProcessError(128, "git")):
+            self.assertEqual([], release.repository_changes("v3.74"))
+        with mock.patch("subprocess.run", side_effect=OSError("no git")):
+            self.assertEqual([], release.repository_changes("v3.74"))
+
+    def test_blank_lines_are_not_reported_as_commits(self):
+        with mock.patch("subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess(
+                [], 0, stdout=b"Merge: look and feel\n\n  \n")
+            self.assertEqual(["Merge: look and feel"],
+                             release.repository_changes("v3.74"))
+
 
 class NotesMainTest(unittest.TestCase):
     """CLI coverage for notes_main.
@@ -328,10 +396,17 @@ class NotesMainTest(unittest.TestCase):
         with os.fdopen(handle, "w") as out:
             json.dump({"changed": []}, out)
         try:
+            # repository_changes is stubbed rather than left to run: it shells
+            # out to git against the checkout the suite happens to be sitting
+            # in, so without this the assertion below depends on this
+            # repository's history at the moment the test runs. Its own
+            # behaviour is covered by RepositoryChangesTest.
             with mock.patch.object(
                 release.pins, "load", return_value=PROPS
             ), mock.patch(
                 "tools.ci.upstream.sha256_file", return_value="abc123"
+            ), mock.patch.object(
+                release, "repository_changes", return_value=[]
             ), mock.patch(
                 "sys.stdout", new_callable=io.StringIO
             ) as fake_stdout:
