@@ -2901,16 +2901,25 @@ public class RamsesUI extends javax.swing.JFrame {
         aboutBox.setVisible(true);
     }//GEN-LAST:event_showAboutBoxActionPerformed
 
-    private boolean createCommandFile() {
+    /**
+     * Writes the simulation command file, or returns why it could not be.
+     *
+     * <p>Returns null on success and a sentence on failure, rather than a
+     * boolean and a dialog of its own. It used to do both: show a dialog
+     * naming the specific problem, return false, and have the caller show a
+     * second dialog saying the command file was not created. Two boxes for one
+     * mistake, and the second one carried no information. The caller says it
+     * once now, in the banner.
+     */
+    private String createCommandFile() {
         try {
             FileWriter ryt = new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "cmd.txt");
             BufferedWriter out = new BufferedWriter(ryt);
             out.write("");
             out.flush();
             if (fileData1.getText().equals("") && fileData2.getText().equals("") && fileData3.getText().equals("") && fileData4.getText().equals("")) {
-                JOptionPane.showMessageDialog(this, "You didn't enter any System files", "System files!", JOptionPane.ERROR_MESSAGE);
                 out.close();
-                return false;
+                return "No system data files are loaded. Add at least one on the System Data tab.";
             }
             for (JTextField s : dataFileList) {
                 if (!s.getText().equals("")) {
@@ -2932,9 +2941,8 @@ public class RamsesUI extends javax.swing.JFrame {
                 out.append(fileDist.getText());
                 out.newLine();
             } else {
-                JOptionPane.showMessageDialog(this, "You didn't enter any Disturbance file", "Disturbance file!", JOptionPane.ERROR_MESSAGE);
                 out.close();
-                return false;
+                return "No disturbance file is loaded. Add one on the System Data tab.";
             }
             if (saveOutputTrajButton.isSelected() && !ssa) {
                 if (!fileObs.getText().equals("") && !observFileWizButton.isSelected()) {
@@ -2949,9 +2957,8 @@ public class RamsesUI extends javax.swing.JFrame {
                         out.append("customObs.txt");
                         out.newLine();
                     } else {
-                        JOptionPane.showMessageDialog(this, "Could not create the Observables file!", "Observables file!", JOptionPane.ERROR_MESSAGE);
                         out.close();
-                        return false;
+                        return "The observables file could not be written.";
                     }
                 } else if (!fileObs.getText().equals("") && observFileWizButton.isSelected()) {
                     if (createCustomObsFile()) {
@@ -2980,14 +2987,12 @@ public class RamsesUI extends javax.swing.JFrame {
                         out.append("customObs.txt");
                         out.newLine();
                     } else {
-                        JOptionPane.showMessageDialog(this, "Could not create the Observables file!", "Observables file!", JOptionPane.ERROR_MESSAGE);
                         out.close();
-                        return false;
+                        return "The observables file could not be written.";
                     }
                 } else {
-                    JOptionPane.showMessageDialog(this, "You didn't enter any Observables", "Observables missing!", JOptionPane.ERROR_MESSAGE);
                     out.close();
-                    return false;
+                    return "A trajectory will be saved, so an observables file is needed. Load one on the Observables tab, or use the observable dialog.";
                 }
             } else {
                 out.newLine();
@@ -3048,7 +3053,7 @@ public class RamsesUI extends javax.swing.JFrame {
                         out.append("ON " + runtimeObsName.getText());
                         break;
                     default:
-                        return false;
+                        return "The command file could not be written.";
                 }
                 out.newLine();
             }
@@ -3092,7 +3097,7 @@ public class RamsesUI extends javax.swing.JFrame {
                         out.append("ON " + runtimeObsName1.getText());
                         break;
                     default:
-                        return false;
+                        return "The command file could not be written.";
                 }
                 out.newLine();
             }
@@ -3136,7 +3141,7 @@ public class RamsesUI extends javax.swing.JFrame {
                         out.append("ON " + runtimeObsName2.getText());
                         break;
                     default:
-                        return false;
+                        return "The command file could not be written.";
                 }
                 out.newLine();
             }
@@ -3146,21 +3151,30 @@ public class RamsesUI extends javax.swing.JFrame {
             out.close();
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-            return false;
+            return "The command file could not be written.";
         }
-        return true;
+        return null;
     }
 
-    private boolean createPFCCommandFile() {
+    /**
+     * Writes the power-flow command file, or returns why it could not be.
+     *
+     * <p>Returns null on success and a sentence on failure, rather than a
+     * boolean and a dialog of its own. It used to do both: show a dialog
+     * naming the specific problem, return false, and have the caller show a
+     * second dialog saying the command file was not created. Two boxes for one
+     * mistake, and the second one carried no information. The caller says it
+     * once now, in the banner.
+     */
+    private String createPFCCommandFile() {
         try {
             FileWriter ryt = new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "PFCcmd.txt");
             BufferedWriter out = new BufferedWriter(ryt);
             out.write("");
             out.flush();
             if (fileData1.getText().equals("") && fileData2.getText().equals("") && fileData3.getText().equals("") && fileData4.getText().equals("")) {
-                JOptionPane.showMessageDialog(this, "You didn't enter any System files", "System files!", JOptionPane.ERROR_MESSAGE);
                 out.close();
-                return false;
+                return "No system data files are loaded. Add at least one on the System Data tab.";
             }
             for (JTextField s : dataFileList) {
                 if (!s.getText().equals("")) {
@@ -3209,12 +3223,22 @@ public class RamsesUI extends javax.swing.JFrame {
             out.close();
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-            return false;
+            return "The command file could not be written.";
         }
-        return true;
+        return null;
     }
 
-    private boolean createCGCommandFile() {
+    /**
+     * Writes the Codegen command file, or returns why it could not be.
+     *
+     * <p>Returns null on success and a sentence on failure, rather than a
+     * boolean and a dialog of its own. It used to do both: show a dialog
+     * naming the specific problem, return false, and have the caller show a
+     * second dialog saying the command file was not created. Two boxes for one
+     * mistake, and the second one carried no information. The caller says it
+     * once now, in the banner.
+     */
+    private String createCGCommandFile() {
         try {
             FileWriter ryt = new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "CGcmd.txt");
             BufferedWriter out = new BufferedWriter(ryt);
@@ -3222,9 +3246,8 @@ public class RamsesUI extends javax.swing.JFrame {
             out.flush();
 
             if (codeGenFiles == null) {
-                JOptionPane.showMessageDialog(this, "You didn't enter any CG files", "CG files!", JOptionPane.ERROR_MESSAGE);
                 out.close();
-                return false;
+                return "No Codegen files are loaded. Load them on the Codegen tab.";
             }
             for (File temp : codeGenFiles) {
                 out.append(temp.getAbsolutePath());
@@ -3234,9 +3257,9 @@ public class RamsesUI extends javax.swing.JFrame {
             out.close();
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
-            return false;
+            return "The command file could not be written.";
         }
-        return true;
+        return null;
     }
 
 
@@ -3355,8 +3378,9 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void saveCommandFileMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveCommandFileMenuItemActionPerformed
         try {
-            if (!createCommandFile()) {
-                JOptionPane.showMessageDialog(this, "<html>Command File not created.</html>", "Command File Error!", JOptionPane.ERROR_MESSAGE);
+            String problem = createCommandFile();
+            if (problem != null) {
+                banner.warn(problem);
                 return;
             }
             fileChooser.setSelectedFile(new File(""));
@@ -3464,18 +3488,14 @@ public class RamsesUI extends javax.swing.JFrame {
     private void nppOpen(java.awt.event.ActionEvent evt, String filename) {
         File target = filename.isEmpty() ? myTempDir : new File(filename);
         if (!target.exists()) {
-            JOptionPane.showMessageDialog(this,
-                    "<html>The file <B>" + target.getName() + "</B> does not exist.</html>",
-                    "File not found", JOptionPane.ERROR_MESSAGE);
+            banner.warn("<html>The file <B>" + target.getName() + "</B> does not exist.</html>");
             return;
         }
         try {
             PlatformLauncher.openInEditor(target);
         } catch (IOException ex) {
-            JOptionPane.showMessageDialog(this,
-                    "Could not open an editor for " + target.getAbsolutePath()
-                    + "\n\n" + ex.getMessage(),
-                    "Editor error", JOptionPane.ERROR_MESSAGE);
+            banner.warn("Could not open an editor for " + target.getAbsolutePath()
+                    + "\n\n" + ex.getMessage());
         }
     }
 
@@ -3734,12 +3754,10 @@ public class RamsesUI extends javax.swing.JFrame {
             // solver settings that were never the problem. A path separator
             // writes the files somewhere the loader will not look.
             if (!my.ramses.ssa.SsaDisturbance.validBasename(base)) {
-                JOptionPane.showMessageDialog(this,
-                        "The results basename \"" + base + "\" cannot be used.\n\n"
+                banner.warn("The results basename \"" + base + "\" cannot be used.\n\n"
                         + "It names the three results files and is written into the\n"
                         + "EIG disturbance record, so it may contain only letters,\n"
-                        + "digits, dot, underscore and hyphen.",
-                        "Small-signal analysis", JOptionPane.WARNING_MESSAGE);
+                        + "digits, dot, underscore and hyphen.");
                 return;
             }
 
@@ -3753,8 +3771,7 @@ public class RamsesUI extends javax.swing.JFrame {
             try {
                 analysisTime = my.ramses.ssa.SsaDisturbance.parseTime(ssaTime.getText());
             } catch (IllegalArgumentException ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(),
-                        "Small-signal analysis", JOptionPane.WARNING_MESSAGE);
+                banner.warn(ex.getMessage());
                 return;
             }
 
@@ -3779,8 +3796,7 @@ public class RamsesUI extends javax.swing.JFrame {
                     pfThreshold = my.ramses.ssa.SsaDisturbance.parseParameter(
                             ssaPfThreshold.getText(), "PF threshold");
                 } catch (IllegalArgumentException ex) {
-                    JOptionPane.showMessageDialog(this, ex.getMessage(),
-                            "Small-signal analysis", JOptionPane.WARNING_MESSAGE);
+                    banner.warn(ex.getMessage());
                     return;
                 }
             }
@@ -3806,11 +3822,9 @@ public class RamsesUI extends javax.swing.JFrame {
             File modes = new File(myTempDir.getAbsolutePath()
                     + System.getProperty("file.separator") + base + "_modes.dat");
             if (!modes.exists()) {
-                JOptionPane.showMessageDialog(this,
-                        "No results were produced. Small-signal analysis needs $OMEGA_REF SYN and\n"
+                banner.warn("No results were produced. Small-signal analysis needs $OMEGA_REF SYN and\n"
                         + "$SCHEME DE in the solver settings, and a system within $EIG_MAX_STATES.\n"
-                        + "See the log for the reason.",
-                        "Small-signal analysis", JOptionPane.WARNING_MESSAGE);
+                        + "See the log for the reason.");
                 return;
             }
 
@@ -4186,9 +4200,7 @@ public class RamsesUI extends javax.swing.JFrame {
             return;
         }
         if (index.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    "<html>The trajectory file carries no observables to plot.</html>",
-                    "Nothing to extract", JOptionPane.WARNING_MESSAGE);
+            banner.warn("<html>The trajectory file carries no observables to plot.</html>");
             return;
         }
         java.util.List<Selection> selections = ObservablePicker.show(this, index);
@@ -4283,12 +4295,12 @@ public class RamsesUI extends javax.swing.JFrame {
                 RXTextUtilities.gotoFirstWordOnLine(simulationOutput, simulationOutput.getLineOfOffset(highlighterIndex) + 1);
             } else {
                 if (highlighterLen == 0) {
-                    JOptionPane.showMessageDialog(this, "<html>The word <B>" + searchTextField.getText() + "</B> does not exist.</html>", "Keyword not found!", JOptionPane.WARNING_MESSAGE);
+                    banner.warn("\"" + searchTextField.getText() + "\" is not in the output.");
                     highlighterIndex = 0;
                     highlighterLen = 0;
                     highlighter.removeAllHighlights();
                 } else {
-                    JOptionPane.showMessageDialog(this, "<html>No more occurences. Press enter to start again.</html>", "Keyword not found!", JOptionPane.WARNING_MESSAGE);
+                    banner.warn("No more matches. Press Enter to search from the top again.");
                     highlighterIndex = 0;
                     highlighter.removeAllHighlights();
                 }
@@ -4486,8 +4498,9 @@ public class RamsesUI extends javax.swing.JFrame {
     }//GEN-LAST:event_saveSimulOutputActionPerformed
 
     private void runSimulationActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runSimulationActionPerformed
-        if (!createCommandFile()) {
-            JOptionPane.showMessageDialog(this, "<html>Command File not created.</html>", "Command File Error!", JOptionPane.ERROR_MESSAGE);
+        String problem = createCommandFile();
+        if (problem != null) {
+            banner.warn(problem);
             return;
         }
         CommandLine command;
@@ -5012,8 +5025,9 @@ public class RamsesUI extends javax.swing.JFrame {
     }
 
     private void runPFActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runPFActionPerformed
-        if (!createPFCCommandFile()) {
-            JOptionPane.showMessageDialog(this, "<html>Command File for Helios not created.</html>", "Command File Error!", JOptionPane.ERROR_MESSAGE);
+        String problem = createPFCCommandFile();
+        if (problem != null) {
+            banner.warn(problem);
             return;
         }
         CommandLine command;
@@ -5397,8 +5411,9 @@ public class RamsesUI extends javax.swing.JFrame {
         codegenExec = toolchain.codegen();
     }
 
-    if (!createCGCommandFile()) {
-        JOptionPane.showMessageDialog(this, "<html>Command File for CG not created.</html>", "Command File Error!", JOptionPane.ERROR_MESSAGE);
+    String problem = createCGCommandFile();
+    if (problem != null) {
+        banner.warn(problem);
         return;
     }
     codegenPane.setText("");
@@ -5516,16 +5531,12 @@ public class RamsesUI extends javax.swing.JFrame {
     
     private void CompileActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_CompileActionPerformed
         if (compileInProgress) {
-            JOptionPane.showMessageDialog(this,
-                    "<html>A build is already running. Wait for it to finish before"
-                    + " starting another.</html>",
-                    "Build in progress", JOptionPane.WARNING_MESSAGE);
+            banner.warn("<html>A build is already running. Wait for it to finish before"
+                    + " starting another.</html>");
             return;
         }
         if (codeGenFiles == null || codeGenFiles.length == 0) {
-            JOptionPane.showMessageDialog(this,
-                    "<html>No generated models to compile. Run Codegen first.</html>",
-                    "Nothing to compile", JOptionPane.WARNING_MESSAGE);
+            banner.warn("<html>No generated models to compile. Run Codegen first.</html>");
             return;
         }
 
@@ -5817,9 +5828,7 @@ public class RamsesUI extends javax.swing.JFrame {
 
     private void savedynsimActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_savedynsimActionPerformed
         if (modelCompiler == null || modelCompiler.builtExecutable() == null) {
-            JOptionPane.showMessageDialog(this,
-                    "<html>No compiled simulator to save. Compile first.</html>",
-                    "Nothing to save", JOptionPane.WARNING_MESSAGE);
+            banner.warn("<html>No compiled simulator to save. Compile first.</html>");
             return;
         }
         File source = modelCompiler.builtExecutable();
@@ -6474,11 +6483,9 @@ public class RamsesUI extends javax.swing.JFrame {
 
             if ((gnuplotExec == null || !gnuplotExec.exists()) && !gnuplotMissingWarned) {
                 gnuplotMissingWarned = true;
-                JOptionPane.showMessageDialog(this,
-                        "<html>gnuplot was not found, so real-time plotting is disabled."
+                banner.warn("<html>gnuplot was not found, so real-time plotting is disabled."
                         + "<br>Install it and restart to enable it: <b>" + gnuplotInstallHint()
-                        + "</b></html>",
-                        "gnuplot not found", JOptionPane.WARNING_MESSAGE);
+                        + "</b></html>");
             }
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this,
