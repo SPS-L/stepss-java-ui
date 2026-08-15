@@ -83,6 +83,10 @@ public class RamsesUI extends javax.swing.JFrame {
         String fullLimited = getRamsesType();
         versionLabel.setText("<html><b>Version:</b> " + this_version + " (" + fullLimited + " Version)</html>");
         prefs = Preferences.userRoot().node(this.getClass().getName());
+        // Before initRamses(), which is what reads it: the session's working
+        // directory is restored only if it is still a directory, so a case on
+        // a disconnected drive comes up as no directory rather than an error.
+        selWorkDir = lastWorkingDirectory();
         String ramsesFirtsTime = "";
         if (prefs.getBoolean(ramsesFirtsTime, true)) {
             if (fullLimited.equalsIgnoreCase("Limited")) {
@@ -162,9 +166,29 @@ public class RamsesUI extends javax.swing.JFrame {
         toolsMenu.setMnemonic(KeyEvent.VK_T);
         helpMenu.setMnemonic(KeyEvent.VK_H);
         styleEditButtons();
+        styleConsoles();
         addThemeToggle();
         applyBranding();
         layoutTabs();
+        addStatusBar();
+        restoreSession();
+    }
+
+    /**
+     * Puts the status bar along the bottom of the frame, below the tabs rather
+     * than inside any of them, because what it reports is true of the
+     * application rather than of whichever tab happens to be open.
+     */
+    private void addStatusBar() {
+        // The content pane carries a GroupLayout holding jPanel1 alone, which
+        // has no room in it for a second child. Replaced wholesale, the same
+        // way each tab's layout is, rather than edited.
+        java.awt.Container content = getContentPane();
+        content.removeAll();
+        content.setLayout(new BorderLayout());
+        content.add(banner, BorderLayout.NORTH);
+        content.add(jPanel1, BorderLayout.CENTER);
+        content.add(statusBar, BorderLayout.SOUTH);
     }
 
     /**
@@ -498,6 +522,88 @@ public class RamsesUI extends javax.swing.JFrame {
     }
 
     /**
+     * Writes the session down: where the window was, which tab was open, and
+     * which working directory was in use.
+     *
+     * <p>All three were thrown away at exit. The Preferences node was already
+     * open and holding a single first-run flag, so this is the cheapest thing
+     * in the whole plan and the one a user notices every single launch.
+     */
+    private void rememberSession() {
+        Preferences saved = themePreference();
+        // The maximised state, not the bounds it would report while maximised:
+        // restoring those gives a window that looks maximised, is not, and
+        // cannot be un-maximised back to anything sensible.
+        boolean maximised = (getExtendedState() & JFrame.MAXIMIZED_BOTH) == JFrame.MAXIMIZED_BOTH;
+        saved.putBoolean(SESSION_MAXIMISED, maximised);
+        if (!maximised) {
+            Rectangle bounds = getBounds();
+            saved.putInt(SESSION_X, bounds.x);
+            saved.putInt(SESSION_Y, bounds.y);
+            saved.putInt(SESSION_W, bounds.width);
+            saved.putInt(SESSION_H, bounds.height);
+        }
+        saved.putInt(SESSION_TAB, jTabbedPane1.getSelectedIndex());
+        saved.put(SESSION_DIR, selWorkDir == null ? "" : selWorkDir.getAbsolutePath());
+        try {
+            saved.flush();
+        } catch (java.util.prefs.BackingStoreException ex) {
+            Logger.getLogger(RamsesUI.class.getName()).log(Level.WARNING,
+                    "Session could not be saved", ex);
+        }
+    }
+
+    /**
+     * Puts the window back where it was, on the tab it was on.
+     *
+     * <p>Bounds are accepted only if they still land on a screen that exists.
+     * A window restored onto a monitor that has since been unplugged is a
+     * window the user cannot reach, and the fix for it is not obvious from
+     * inside the application.
+     */
+    private void restoreSession() {
+        Preferences saved = themePreference();
+        if (!saved.getBoolean(SESSION_MAXIMISED, true)) {
+            Rectangle bounds = new Rectangle(
+                    saved.getInt(SESSION_X, getX()), saved.getInt(SESSION_Y, getY()),
+                    saved.getInt(SESSION_W, getWidth()), saved.getInt(SESSION_H, getHeight()));
+            if (bounds.width > 200 && bounds.height > 150 && onAScreen(bounds)) {
+                setBounds(bounds);
+            }
+        }
+        int tab = saved.getInt(SESSION_TAB, 0);
+        if (tab >= 0 && tab < jTabbedPane1.getTabCount()) {
+            jTabbedPane1.setSelectedIndex(tab);
+        }
+    }
+
+    /** Whether enough of these bounds is on a connected screen to grab. */
+    private static boolean onAScreen(Rectangle bounds) {
+        for (java.awt.GraphicsDevice screen : java.awt.GraphicsEnvironment
+                .getLocalGraphicsEnvironment().getScreenDevices()) {
+            if (screen.getDefaultConfiguration().getBounds().intersects(bounds)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether the frame should come up maximised, as it always used to. */
+    private static boolean startMaximised() {
+        return themePreference().getBoolean(SESSION_MAXIMISED, true);
+    }
+
+    /** The working directory the last session ended in, if it is still there. */
+    private static File lastWorkingDirectory() {
+        String path = themePreference().get(SESSION_DIR, "");
+        if (path.isEmpty()) {
+            return null;
+        }
+        File directory = new File(path);
+        return directory.isDirectory() ? directory : null;
+    }
+
+    /**
      * Points the window icon and the About drawing at the variant that matches
      * the current theme. Re-run by the theme toggle, which is why it is a method
      * rather than three lines in the constructor: the light mark on a dark
@@ -533,6 +639,28 @@ public class RamsesUI extends javax.swing.JFrame {
             button.putClientProperty("JButton.buttonType", "toolBarButton");
             button.setMargin(new Insets(0, 0, 0, 0));
         }
+    }
+
+    /**
+     * Gives the three console panes a monospaced font at the size the rest of
+     * the interface is using.
+     *
+     * <p>The simulation console was pinned to {@code Monospaced 12} in the
+     * form: a fixed pixel size that ignores the platform's text scale, so it
+     * came out small on a 4K panel and unreadable at 150%. Sizing it from the
+     * theme's own font means it follows whatever the user has set, and the
+     * other two panes, which had no font of their own, now match it rather
+     * than being proportionally spaced beside a monospaced one.
+     */
+    private void styleConsoles() {
+        java.awt.Font base = UIManager.getFont("defaultFont");
+        int size = base != null ? base.getSize()
+                : new JLabel().getFont().getSize();
+        java.awt.Font mono = new java.awt.Font(java.awt.Font.MONOSPACED,
+                java.awt.Font.PLAIN, size);
+        simulationOutput.setFont(mono);
+        pfcPane.setFont(mono);
+        codegenPane.setFont(mono);
     }
 
     /**
@@ -2067,7 +2195,6 @@ public class RamsesUI extends javax.swing.JFrame {
 
         simulationOutput.setEditable(false);
         simulationOutput.setColumns(20);
-        simulationOutput.setFont(new java.awt.Font("Monospaced", 0, 12)); // NOI18N
         simulationOutput.setRows(5);
         simulationOutput.setName("simulationOutput"); // NOI18N
         jScrollPane1.setViewportView(simulationOutput);
@@ -3119,12 +3246,14 @@ public class RamsesUI extends javax.swing.JFrame {
             "Cancel"};
         int confirmed = JOptionPane.showOptionDialog(this, "Are you sure you want to exit? All simulation data will be lost!", "Exit Confirmation", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[2]);
         if (confirmed == JOptionPane.YES_OPTION) {
+            rememberSession();
             if (toolDir == null) {
             } else {
                 fileOps.deleteDirectory(toolDir);
             }
             System.exit(0);
         } else if (confirmed == JOptionPane.NO_OPTION) {
+            rememberSession();
             if (toolDir == null) {
             } else {
                 clearGnuplotButtonActionPerformed(null);
@@ -3802,10 +3931,8 @@ public class RamsesUI extends javax.swing.JFrame {
                     + "\n\nThese were not in " + lastJacDir + ":" + missing,
                     "Save dynamic Jacobian", JOptionPane.WARNING_MESSAGE);
         } else {
-            JOptionPane.showMessageDialog(this,
-                    "Saved the dynamic Jacobian, taken at the same instant as the\n"
-                    + "eigenvalues, to\n\n" + target,
-                    "Save dynamic Jacobian", JOptionPane.INFORMATION_MESSAGE);
+            banner.confirm("Saved the dynamic Jacobian, taken at the same instant"
+                    + " as the eigenvalues, to " + target);
         }
     }//GEN-LAST:event_saveDynJacActionPerformed
 
@@ -4392,6 +4519,7 @@ public class RamsesUI extends javax.swing.JFrame {
         simulExecutor.setProcessDestroyer(processDestroyer);
         try {
             simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
+            statusBar.running("Simulating");
             runSimulation.setEnabled(false);
             runDyngraphButton.setEnabled(false);
             saveTrajToFileButton.setEnabled(false);
@@ -4420,15 +4548,22 @@ public class RamsesUI extends javax.swing.JFrame {
                 } catch (InterruptedException ex) {
                     Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
                 }
-                runSimulation.setEnabled(true);
-                saveTrajToFileButton.setEnabled(true);
-                if (saveOutputTrajButton.isSelected()) {
+                // Marshalled rather than called straight from this thread.
+                // Swing is not thread safe and these are Swing calls; they
+                // have always been made from here, which mostly worked and
+                // was never right.
+                SwingUtilities.invokeLater(() -> {
+                    statusBar.finished("Simulation finished");
+                    runSimulation.setEnabled(true);
                     saveTrajToFileButton.setEnabled(true);
-                    runDyngraphButton.setEnabled(true);
-                } else {
-                    saveTrajToFileButton.setEnabled(false);
-                    runDyngraphButton.setEnabled(false);
-                }
+                    if (saveOutputTrajButton.isSelected()) {
+                        saveTrajToFileButton.setEnabled(true);
+                        runDyngraphButton.setEnabled(true);
+                    } else {
+                        saveTrajToFileButton.setEnabled(false);
+                        runDyngraphButton.setEnabled(false);
+                    }
+                });
             }
         }).start();
     }//GEN-LAST:event_runSimulationActionPerformed
@@ -4612,7 +4747,9 @@ public class RamsesUI extends javax.swing.JFrame {
         if (!saveOutputTrajButton.isSelected()) {
             clearObsFileButtonActionPerformed(evt);
         } else {
-            JOptionPane.showMessageDialog(this, "<html>Now you need to add an observables files or use the Observable File Wizard</html>", "Observables", JOptionPane.INFORMATION_MESSAGE);
+            banner.warn("A trajectory will be saved, so an observables file is"
+                    + " needed. Load one on the Observables tab, or use the"
+                    + " observable dialog.");
         }
     }//GEN-LAST:event_saveOutputTrajButtonActionPerformed
 
@@ -4934,6 +5071,7 @@ public class RamsesUI extends javax.swing.JFrame {
         final DefaultExecuteResultHandler resultHandler = simulExecutorResultHandler;
         try {
             simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
+            statusBar.running("Solving power flow");
         } catch (IOException ex) {
             Logger.getLogger(RamsesUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -4957,12 +5095,17 @@ public class RamsesUI extends javax.swing.JFrame {
                 }
 
                 if (f.exists()) {
-                    loadOutput.setEnabled(true);
-                    loadBusOverview.setEnabled(true);
-                    loadGens.setEnabled(true);
-                    loadTrfos.setEnabled(true);
-                    loadPow.setEnabled(true);
-                    loadLFRESV2DAT.setEnabled(true);
+                    SwingUtilities.invokeLater(() -> {
+                        loadOutput.setEnabled(true);
+                        loadBusOverview.setEnabled(true);
+                        loadGens.setEnabled(true);
+                        loadTrfos.setEnabled(true);
+                        loadPow.setEnabled(true);
+                        loadLFRESV2DAT.setEnabled(true);
+                    });
+                    statusBar.finished("Power flow finished");
+                } else {
+                    statusBar.failed("Power flow produced no results");
                 }
 
                 reportHeliosExitStatus(resultHandler, heliosStderr);
@@ -5563,10 +5706,8 @@ public class RamsesUI extends javax.swing.JFrame {
         savedynsim.setEnabled(true);
         codegenPane.append("\nBuild succeeded: " + dynsim.getAbsolutePath() + "\n");
         codegenPane.append("Simulations will now run on this custom simulator.\n");
-        JOptionPane.showMessageDialog(this,
-                "<html>Custom simulator built.<br>Simulations will now run on it"
-                + " instead of the bundled engine.</html>",
-                "Compilation complete", JOptionPane.INFORMATION_MESSAGE);
+        banner.confirm("Custom simulator built. Simulations will run on it"
+                + " instead of the bundled engine.");
     }
 
     /**
@@ -5723,13 +5864,27 @@ public class RamsesUI extends javax.swing.JFrame {
             public void run() {
                 RamsesUI RamsesFrame = new RamsesUI();
                 RamsesFrame.setVisible(true);
-                RamsesFrame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                // Maximised is still the default, and stays what happens on a
+                // first run; a window sized and placed by hand now comes back
+                // that way instead of being flattened to the screen again.
+                if (startMaximised()) {
+                    RamsesFrame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                }
             }
         });
     }
 
     /** Preferences key holding the theme choice, read at startup. */
     static final String DARK_THEME_KEY = "darkTheme";
+
+    /** What is remembered between sessions, all in the one STEPSS node. */
+    static final String SESSION_MAXIMISED = "windowMaximised";
+    static final String SESSION_X = "windowX";
+    static final String SESSION_Y = "windowY";
+    static final String SESSION_W = "windowWidth";
+    static final String SESSION_H = "windowHeight";
+    static final String SESSION_TAB = "selectedTab";
+    static final String SESSION_DIR = "workingDirectory";
 
     /**
      * The node the theme choice lives in. Deliberately the same node the
@@ -5840,6 +5995,8 @@ public class RamsesUI extends javax.swing.JFrame {
         UIManager.put("List.rowHeight", 20);
     }
 
+    private final StatusBar statusBar = new StatusBar();
+    private final InlineBanner banner = new InlineBanner();
     private Boolean savedOutputBool = false;
     private Platform platform;
     private Toolchain toolchain;
@@ -6238,6 +6395,15 @@ public class RamsesUI extends javax.swing.JFrame {
         eigParametersSupported =
                 my.ramses.ssa.EngineVersion.supportsEigParameters(version);
 
+        // Which engine is actually answering, in the status bar. It is not
+        // always the bundled one: a compiled simulator is adopted when this
+        // session has built one, and until now nothing in the window said so
+        // except a line of Codegen console output that scrolls away.
+        boolean custom = ramsesExec != null && !ramsesExec.equals(toolchain.ramses());
+        statusBar.setEngine((custom ? "Custom engine" : "RAMSES")
+                + (version > 0
+                ? " " + String.format(java.util.Locale.ROOT, "%.2f", version) : ""));
+
         ssaRealLimit.setEnabled(eigParametersSupported);
         ssaRealLimitLabel.setEnabled(eigParametersSupported);
         ssaPfThreshold.setEnabled(eigParametersSupported);
@@ -6289,6 +6455,7 @@ public class RamsesUI extends javax.swing.JFrame {
 
             myTempDir = (selWorkDir != null) ? selWorkDir : toolDir;
             updateWindowTitle();
+            statusBar.setWorkingDirectory(selWorkDir);
 
             openExplButton.setEnabled(true);
             openTermButton.setEnabled(true);
