@@ -18,7 +18,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 ASSETS="${1:-../stepss-docs/src/assets}"
-DEST="src/my/ramses"
+DEST="src/my/stepss"
 
 if [ ! -d "$ASSETS" ]; then
     echo "Asset directory not found: $ASSETS" >&2

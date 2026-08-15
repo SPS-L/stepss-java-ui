@@ -93,13 +93,13 @@ def uramses_manifest_digest(archive, repo_root, run=subprocess.run):
     workdir = tempfile.mkdtemp(prefix="uramses-manifest-")
     try:
         source = os.path.join(
-            repo_root, "src", "my", "ramses", "platform", "UramsesKitPack.java"
+            repo_root, "src", "my", "stepss", "platform", "UramsesKitPack.java"
         )
         run(["javac", "-d", workdir, source], check=True, capture_output=True, text=True)
         result = run(
             [
                 "java", "-cp", workdir,
-                "my.ramses.platform.UramsesKitPack",
+                "my.stepss.platform.UramsesKitPack",
                 archive,
                 os.path.join(workdir, "out.zip"),
                 "COMPUTE",

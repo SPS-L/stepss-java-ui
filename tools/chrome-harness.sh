@@ -3,7 +3,7 @@
 # This repository has no unit-test framework; this is the substitute.
 #
 # Like tools/picker-harness.sh, dist/lib is NOT on the classpath: ChromeCheck
-# touches only Swing and my.ramses.EditIcon, and reaches RamsesUI for one static
+# touches only Swing and my.stepss.EditIcon, and reaches StepssUI for one static
 # method that takes a JMenuBar, so build/classes alone is enough to load it.
 #
 # 'ant compile' still needs the payloads: build.xml makes -pre-compile depend on
@@ -15,4 +15,4 @@ if [ ! -d build/classes ]; then
     echo "build/classes not found - run 'ant compile' (or 'ant jar') first." >&2
     exit 1
 fi
-exec java -cp build/classes my.ramses.ChromeCheck
+exec java -cp build/classes my.stepss.ChromeCheck

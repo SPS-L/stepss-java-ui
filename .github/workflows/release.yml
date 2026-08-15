@@ -217,10 +217,10 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          # Bare, without the tag's leading "v": my.ramses.Version.key parses
-          # dotted integers and rejects anything else, and RamsesUI shows this
+          # Bare, without the tag's leading "v": my.stepss.Version.key parses
+          # dotted integers and rejects anything else, and StepssUI shows this
           # string to the user as it stands.
-          printf '%s\n' "${VERSION#v}" > src/my/ramses/version.txt
+          printf '%s\n' "${VERSION#v}" > src/my/stepss/version.txt
 
       # `ant` happens to be preinstalled on today's ubuntu-latest image, and
       # the build step assumes it silently. Runner images drop tools between
@@ -252,7 +252,7 @@ jobs:
 
       - name: Verify the bundled toolchain
         if: steps.bump.outputs.proceed == 'true'
-        run: java -cp dist/stepss.jar my.ramses.platform.ToolchainDump
+        run: java -cp dist/stepss.jar my.stepss.platform.ToolchainDump
 
       - name: Compose the release notes
         if: steps.bump.outputs.proceed == 'true'
@@ -283,7 +283,7 @@ jobs:
           set -euo pipefail
           git config user.name "stepss-release-bot"
           git config user.email "actions@github.com"
-          git add versions.properties src/my/ramses/platform/Toolchain.java src/my/ramses/version.txt
+          git add versions.properties src/my/stepss/platform/Toolchain.java src/my/stepss/version.txt
           if git diff --cached --quiet; then
             echo "No pin changes to commit (manual release of unchanged sources)."
           else
