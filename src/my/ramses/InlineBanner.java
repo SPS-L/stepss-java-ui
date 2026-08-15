@@ -23,16 +23,18 @@ import javax.swing.UIManager;
  * asked for the thing, the thing happened, and now they have to dismiss a box
  * saying so.
  *
- * <p>Not a toast. It stays until it is dismissed or replaced, because a
- * message that disappears on a timer is one a user can miss entirely, and
- * because "saved to <i>here</i>" is worth being able to re-read. The one
- * exception is {@link #confirm}, which fades after a while: a success notice
- * that outlives its usefulness becomes furniture.
+ * <p>A message lives exactly as long as the situation it describes. It stays
+ * while the user reads it, and ends the moment they do something else, which
+ * is what {@link #newAction} is for. The first version had no lifetime at all
+ * and a warning outlived the problem it named, which is worse than a dialog:
+ * a dialog is at least gone once dismissed. A confirmation additionally fades
+ * on its own, so a success notice nobody acts on does not become furniture.
  */
 final class InlineBanner extends JPanel {
 
     private final JLabel message = new JLabel();
     private final Timer expiry;
+
 
     InlineBanner() {
         setLayout(new BorderLayout(8, 0));
@@ -58,6 +60,29 @@ final class InlineBanner extends JPanel {
     /** Something is worth knowing but nothing is broken. */
     void warn(String text) {
         show(text, UIManager.getColor("Component.warning.focusedBorderColor"), false);
+    }
+
+    /**
+     * The user has begun doing something else, so whatever is on the banner is
+     * now out of date.
+     *
+     * <p>This exists because the first version had no lifetime at all. A
+     * message stayed until it was dismissed, so "No system data files are
+     * loaded" was still sitting above the tabs after the files had been loaded
+     * and the simulation had run: the status bar said the run had finished
+     * while the banner said it could not start. A banner reports the outcome
+     * of the last thing that was asked for, and asking for something else has
+     * to end it.
+     *
+     * <p>Clearing outright is only safe because of <em>when</em> this is
+     * called: on a mouse or key press, which strictly precedes the action
+     * event that a click on the same control generates. A message raised by
+     * that action therefore lands after this has run. Move the caller to the
+     * action event instead and every warning is cleared on its way out of the
+     * click that raised it, so none of them is ever seen.
+     */
+    void newAction() {
+        clear();
     }
 
     void clear() {

@@ -54,6 +54,8 @@ public final class ChromeCheck {
         checkStatusBarReportsItsState();
         checkStatusBarCanBeDrivenOffTheEdt();
         checkBannerShowsAndDismisses();
+        checkBannerSurvivesTheActionThatRaisedIt();
+        checkBannerDoesNotOutliveTheProblem();
         System.out.println(failures == 0 ? "ALL CHROME CHECKS PASSED"
                 : failures + " CHROME CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -306,6 +308,58 @@ public final class ChromeCheck {
         settle();
         if (banner.isVisible()) {
             fail("banner", "clear() left it on screen");
+        }
+    }
+
+    /**
+     * A message raised by the very action that announces itself stays up.
+     *
+     * <p>This is the half that is easy to break while fixing the other half.
+     * Both listeners hang off the same button, and if the expiry won outright
+     * the banner would be cleared on its way out of the click that raised it,
+     * so no warning would ever be seen at all.
+     */
+    private static void checkBannerSurvivesTheActionThatRaisedIt() {
+        // The order the application guarantees: the press reaches the event
+        // queue listener, which tells the banner a gesture has begun, and only
+        // then does the button's handler run and raise its message. An
+        // implementation that clears outright rather than deferring the
+        // decision to the end of the gesture fails here, which is what an
+        // earlier attempt did, swallowing every warning before it was seen.
+        InlineBanner banner = new InlineBanner();
+        javax.swing.JButton run = new javax.swing.JButton("Run");
+        run.addActionListener(event -> banner.warn("No system data files are loaded."));
+
+        banner.newAction();                 // the press
+        run.doClick();                      // the action it generates
+        settle();
+        settle();
+        if (!banner.isVisible()) {
+            fail("banner lifetime",
+                    "the warning raised by the click was cleared by the same click");
+        }
+    }
+
+    /**
+     * The reported fault. A message about a problem must not outlive the
+     * problem: after loading the files and running successfully, the banner
+     * still read "No system data files are loaded" while the status bar said
+     * the run had finished.
+     */
+    private static void checkBannerDoesNotOutliveTheProblem() {
+        InlineBanner banner = new InlineBanner();
+        javax.swing.JButton run = new javax.swing.JButton("Run");
+
+        banner.warn("No system data files are loaded.");
+        settle();
+        // The user loads the files and runs again; this time nothing complains.
+        banner.newAction();                 // the press
+        run.doClick();                      // a handler that raises nothing
+        settle();
+        settle();
+        if (banner.isVisible()) {
+            fail("banner lifetime",
+                    "a warning survived the next action: " + textIn(banner).trim());
         }
     }
 

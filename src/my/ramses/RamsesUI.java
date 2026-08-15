@@ -171,8 +171,38 @@ public class RamsesUI extends javax.swing.JFrame {
         applyBranding();
         layoutTabs();
         addStatusBar();
+        expireTheBannerOnEveryAction();
         restoreSession();
     }
+
+    /**
+     * Ends the banner's message when the user starts doing something else.
+     *
+     * <p>The fault this fixes: a banner had no lifetime at all, so "No system
+     * data files are loaded" was still sitting above the tabs after the files
+     * had been loaded and the simulation had run. The status bar said the run
+     * had finished while the banner said it could not start.
+     *
+     * <p>One listener on the event queue rather than one per control, and it
+     * watches presses rather than actions. A press strictly precedes the
+     * action event a click generates, so the banner is always told the gesture
+     * has begun <em>before</em> the handler for it gets the chance to raise a
+     * new message. Hanging listeners off each button instead makes the outcome
+     * depend on the order Swing happens to call two listeners on the same
+     * button in, which is undocumented, and getting it backwards means every
+     * warning is cleared on its way out of the click that raised it, so none
+     * of them is ever seen. That is not a thing to leave to luck, and an
+     * attempt at it here did get it backwards.
+     */
+    private void expireTheBannerOnEveryAction() {
+        java.awt.Toolkit.getDefaultToolkit().addAWTEventListener(event -> {
+            if (event.getID() == java.awt.event.MouseEvent.MOUSE_PRESSED
+                    || event.getID() == KeyEvent.KEY_PRESSED) {
+                banner.newAction();
+            }
+        }, java.awt.AWTEvent.MOUSE_EVENT_MASK | java.awt.AWTEvent.KEY_EVENT_MASK);
+    }
+
 
     /**
      * Puts the status bar along the bottom of the frame, below the tabs rather
