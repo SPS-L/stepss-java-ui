@@ -359,6 +359,22 @@
    <os family="unix"/>
   </condition>
   <property name="bundle.platform.args" value=""/>
+
+  <!-- Linux only, and only to add one line to the menu entry.
+       StartupWMClass is what lets the desktop tie a running window to the
+       application it installed. Java derives WM_CLASS from the main class, so
+       the window announces itself as my-stepss-StepssUI while the menu entry
+       is stepss-STEPSS.desktop; with nothing to connect them, the shell shows
+       a generic cog in the dock beside a window whose own title bar has the
+       right icon. The file is jpackage's own template with that one line
+       added, tokens and all, so everything else stays generated. -->
+  <condition property="bundle.resource.arg" value="--resource-dir packaging/linux">
+   <and>
+    <os family="unix"/>
+    <not><os family="mac"/></not>
+   </and>
+  </condition>
+  <property name="bundle.resource.arg" value=""/>
   <exec executable="jpackage" failonerror="true">
    <arg line="--name STEPSS"/>
    <arg line="--app-version ${stepss.version}"/>
@@ -371,6 +387,7 @@
    <arg line="--dest ${bundle.dir}"/>
    <arg line="--temp ${bundle.dir}/work"/>
    <arg line="${bundle.platform.args}"/>
+   <arg line="${bundle.resource.arg}"/>
    <arg line="${bundle.type}"/>
   </exec>
   <echo>Bundles written to ${bundle.dir}</echo>

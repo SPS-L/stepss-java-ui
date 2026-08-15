@@ -56,6 +56,7 @@ public final class ChromeCheck {
         checkBannerShowsAndDismisses();
         checkBannerSurvivesTheActionThatRaisedIt();
         checkBannerDoesNotOutliveTheProblem();
+        checkTheDockCanFindTheWindow();
         System.out.println(failures == 0 ? "ALL CHROME CHECKS PASSED"
                 : failures + " CHROME CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -361,6 +362,54 @@ public final class ChromeCheck {
             fail("banner lifetime",
                     "a warning survived the next action: " + textIn(banner).trim());
         }
+    }
+
+    /**
+     * The Linux menu entry's StartupWMClass still matches the class Java names
+     * its windows after.
+     *
+     * <p>A desktop shell ties a running window to the application that installed
+     * it by comparing the window's WM_CLASS against StartupWMClass in the .desktop
+     * file. Java derives WM_CLASS from the main class, so the two agree only for
+     * as long as nobody renames anything, and when they stop agreeing the failure
+     * is a generic cog in the dock next to a window whose own title bar has the
+     * right icon. That is subtle enough to survive a release, and it did.
+     *
+     * <p>Compares the packaging template against main.class rather than against a
+     * constant, so the rename that would break it is the rename that fails here.
+     * Skipped rather than failed when either file is missing, since the harness
+     * can be run from a directory that is not the repository root.
+     */
+    private static void checkTheDockCanFindTheWindow() {
+        String mainClass = valueFrom("nbproject/project.properties", "main.class=");
+        String startupClass = valueFrom("packaging/linux/STEPSS.desktop", "StartupWMClass=");
+        if (mainClass == null || startupClass == null) {
+            return;
+        }
+        String expected = mainClass.replace('.', '-');
+        if (!expected.equals(startupClass)) {
+            fail("dock icon", "the menu entry says StartupWMClass=" + startupClass
+                    + " but Java will name its windows " + expected
+                    + ", so the desktop cannot match them");
+        }
+    }
+
+    /** The remainder of the first line starting with prefix, or null. */
+    private static String valueFrom(String path, String prefix) {
+        java.io.File file = new java.io.File(path);
+        if (!file.isFile()) {
+            return null;
+        }
+        try {
+            for (String line : java.nio.file.Files.readAllLines(file.toPath())) {
+                if (line.startsWith(prefix)) {
+                    return line.substring(prefix.length()).trim();
+                }
+            }
+        } catch (java.io.IOException ex) {
+            return null;
+        }
+        return null;
     }
 
     /** Every label's text under a component, flattened. */
