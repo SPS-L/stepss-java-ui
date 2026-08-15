@@ -51,6 +51,9 @@ public final class ChromeCheck {
         checkEditIconFollowsTheTheme();
         checkBothThemesHaveEveryMark();
         checkLockupKeepsItsAspect();
+        checkStatusBarReportsItsState();
+        checkStatusBarCanBeDrivenOffTheEdt();
+        checkBannerShowsAndDismisses();
         System.out.println(failures == 0 ? "ALL CHROME CHECKS PASSED"
                 : failures + " CHROME CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -214,6 +217,110 @@ public final class ChromeCheck {
             fail("about lockup", "aspect is " + String.format(java.util.Locale.ROOT, "%.2f", aspect)
                     + ", which is not the horizontal lockup this slot is laid out for");
         }
+    }
+
+    /**
+     * Drains the event queue, so an update the bar marshalled onto the EDT has
+     * landed before it is asserted on. These checks run on the main thread,
+     * which is exactly the position the completion threads are in, so waiting
+     * here is not a test artefact: it is the same wait the application does.
+     */
+    private static void settle() {
+        try {
+            javax.swing.SwingUtilities.invokeAndWait(() -> { });
+        } catch (Exception ex) {
+            fail("event queue", "could not be drained: " + ex);
+        }
+    }
+
+    /** The bar says which state it is in, and what it is working on. */
+    private static void checkStatusBarReportsItsState() {
+        StatusBar bar = new StatusBar();
+        settle();
+        if (!textIn(bar).contains("Idle")) {
+            fail("status bar", "does not start Idle: " + textIn(bar));
+        }
+        bar.running("Simulating");
+        settle();
+        if (!textIn(bar).contains("Simulating")) {
+            fail("status bar", "running() did not report what is running");
+        }
+        bar.finished("Simulation finished");
+        settle();
+        String settled = textIn(bar);
+        if (!settled.contains("Simulation finished")) {
+            fail("status bar", "finished() did not report the outcome");
+        }
+        // The elapsed time stays up rather than being wiped, which is the
+        // whole reason a run reports through here rather than through a dialog
+        // that has already been dismissed by the time anyone wonders.
+        if (!settled.contains("s")) {
+            fail("status bar", "finished() cleared the elapsed time");
+        }
+        bar.setWorkingDirectory(new java.io.File("/tmp/kundur-ssa"));
+        settle();
+        if (!textIn(bar).contains("kundur-ssa")) {
+            fail("status bar", "the working directory is not shown");
+        }
+    }
+
+    /**
+     * The bar can be driven from a background thread.
+     *
+     * <p>This is not a nicety. A run's completion is noticed by a thread
+     * polling for a lock file, so every state change after "running" arrives
+     * off the EDT. The bar marshals internally so those call sites cannot get
+     * it wrong; this asserts it, by driving it from a thread that is
+     * definitely not the EDT and waiting for the change to land.
+     */
+    private static void checkStatusBarCanBeDrivenOffTheEdt() {
+        final StatusBar bar = new StatusBar();
+        Thread worker = new Thread(() -> bar.running("Solving power flow"));
+        worker.start();
+        try {
+            worker.join(2000);
+            // Let anything the worker posted to the EDT run to completion.
+            javax.swing.SwingUtilities.invokeAndWait(() -> { });
+        } catch (Exception ex) {
+            fail("status bar threading", "interrupted: " + ex);
+            return;
+        }
+        if (!textIn(bar).contains("Solving power flow")) {
+            fail("status bar threading",
+                    "a background thread's update never reached the bar");
+        }
+    }
+
+    /** The banner shows what it is given and goes away when dismissed. */
+    private static void checkBannerShowsAndDismisses() {
+        InlineBanner banner = new InlineBanner();
+        if (banner.isVisible()) {
+            fail("banner", "starts visible, so an empty line sits above the tabs");
+        }
+        banner.warn("An observables file is needed");
+        settle();
+        if (!banner.isVisible() || !textIn(banner).contains("observables file")) {
+            fail("banner", "warn() did not show the message");
+        }
+        banner.clear();
+        settle();
+        if (banner.isVisible()) {
+            fail("banner", "clear() left it on screen");
+        }
+    }
+
+    /** Every label's text under a component, flattened. */
+    private static String textIn(java.awt.Container root) {
+        StringBuilder text = new StringBuilder();
+        for (java.awt.Component child : root.getComponents()) {
+            if (child instanceof javax.swing.JLabel) {
+                text.append(((javax.swing.JLabel) child).getText()).append(' ');
+            }
+            if (child instanceof java.awt.Container) {
+                text.append(textIn((java.awt.Container) child));
+            }
+        }
+        return text.toString();
     }
 
     private static BufferedImage paint(EditIcon icon, int size) {
