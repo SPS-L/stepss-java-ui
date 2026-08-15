@@ -10,7 +10,11 @@
  */
 package my.ramses;
 
+import java.awt.BorderLayout;
 import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.HeadlessException;
 import java.awt.Insets;
 import java.awt.Rectangle;
@@ -160,6 +164,201 @@ public class RamsesUI extends javax.swing.JFrame {
         styleEditButtons();
         addThemeToggle();
         applyBranding();
+        layoutTabs();
+    }
+
+    /**
+     * Replaces each tab's layout, leaving the form owning which controls exist.
+     *
+     * <p>The generated GroupLayout packed everything to the top left and let go:
+     * on a maximised window the System Data tab used the top 400px and left
+     * three quarters of the screen grey, with Clear Files stranded at the bottom
+     * on its own, about 1,250px from the rows it clears. Only the console panes
+     * grew, because only they were given a resize weight.
+     *
+     * <p>Every tab is BorderLayout now: what you set at the top, what you read
+     * in the middle carrying the weight, what you do along the bottom. That is
+     * the shape SsaResultsWindow already had, and the reason it feels current
+     * beside the rest.
+     *
+     * <p>Done here rather than in the designer because there is no NetBeans on
+     * this machine and hand-editing 196KB of generated layout across six tabs is
+     * how a week becomes a month. Setting a new layout discards the generated
+     * one along with its groups; the components are the panel's children either
+     * way, so they survive. No control is added, removed or reordered: this
+     * moves them, and the sequence a study runs in is untouched.
+     */
+    private void layoutTabs() {
+        layoutInitializationTab();
+        layoutDynamicSimulationTab();
+        layoutCodegenTab();
+        layoutSystemDataTab();
+    }
+
+    /** Console in the middle, run and inspect along the bottom. */
+    private void layoutInitializationTab() {
+        ActionBar.markPrimary(runPF);
+        JPanel bar = ActionBar.create()
+                .add(runPF)
+                .add(loadLFRESV2DAT)
+                .separate()
+                .add(loadBusOverview)
+                .add(loadGens)
+                .add(loadTrfos)
+                .add(loadPow)
+                .toTheEnd()
+                .add(clearPFCOutput)
+                .build();
+        console(jPanel6, jScrollPane3, bar);
+    }
+
+    /**
+     * The same, plus the console search, which sits at the right-hand end
+     * because it acts on what is above it rather than on the case.
+     */
+    private void layoutDynamicSimulationTab() {
+        ActionBar.markPrimary(runSimulation);
+        JPanel bar = ActionBar.create()
+                .add(runSimulation)
+                .add(stopSimulationButton)
+                .separate()
+                .add(loadOutput)
+                .add(loadContTrace)
+                .add(loadDiscTrace)
+                .add(loadDumpTraceButton)
+                .add(saveSimulOutput)
+                .toTheEnd()
+                .add(searchTextField)
+                .add(clearSimulOutput)
+                .build();
+        // The search field would otherwise stretch to fill the glue it follows.
+        searchTextField.setMaximumSize(new Dimension(220, 28));
+        console(jPanel5, jScrollPane1, bar);
+    }
+
+    /**
+     * Codegen's bar moves from the top of the tab to the bottom. It is the only
+     * one that sat above its console, and one tab disagreeing with three is the
+     * inconsistency this pass exists to remove.
+     */
+    private void layoutCodegenTab() {
+        ActionBar.markPrimary(execCodegen);
+        JPanel bar = ActionBar.create()
+                .add(loadCodegenFiles)
+                .add(execCodegen)
+                .separate()
+                .add(displayCGfiles)
+                .add(saveCGFiles)
+                .separate()
+                .add(Compile)
+                .add(savedynsim)
+                .build();
+        console(jPanel3, jScrollPane2, bar);
+    }
+
+    /** The shape the three console tabs share. */
+    private void console(JPanel tab, JScrollPane output, JPanel bar) {
+        tab.removeAll();
+        tab.setLayout(new BorderLayout());
+        tab.add(output, BorderLayout.CENTER);
+        tab.add(bar, BorderLayout.SOUTH);
+    }
+
+    /**
+     * The file rows become a column that grows with the window, each row
+     * numbered because the order they are read in is the order they are listed
+     * in, and that was previously legible only by counting.
+     *
+     * <p>Row ten carries no Load File button. That is how it arrived: the form
+     * has fileData1 through fileData10 and loadData1 through loadData9, so the
+     * last row can only be typed into or opened in an editor. The gap is kept
+     * rather than filled, because filling it would mean inventing a handler and
+     * this pass does not add behaviour.
+     */
+    private void layoutSystemDataTab() {
+        JPanel rows = new JPanel(new GridBagLayout());
+        rows.setBorder(BorderFactory.createEmptyBorder(4, 8, 8, 8));
+        JTextField[] fields = {fileData1, fileData2, fileData3, fileData4, fileData5,
+            fileData6, fileData7, fileData8, fileData9, fileData10};
+        JButton[] loaders = {loadData1, loadData2, loadData3, loadData4, loadData5,
+            loadData6, loadData7, loadData8, loadData9, null};
+        JButton[] editors = {nppData1Button, nppData2Button, nppData3Button,
+            nppData4Button, nppData5Button, nppData6Button, nppData7Button,
+            nppData8Button, nppData9Button, nppData10Button};
+
+        int row = 0;
+        rows.add(jLabel1, span(row++));
+        for (int i = 0; i < fields.length; i++) {
+            rows.add(fileRow(String.valueOf(i + 1), loaders[i], fields[i], editors[i]),
+                    stretch(row++));
+        }
+        rows.add(Box.createVerticalStrut(10), span(row++));
+        rows.add(jLabel9, span(row++));
+        rows.add(fileRow("", loadDist, fileDist, nppDstButton), stretch(row++));
+        // Absorbs the leftover height so the rows stay together at the top
+        // instead of spreading out over a tall window.
+        GridBagConstraints filler = new GridBagConstraints();
+        filler.gridy = row;
+        filler.weighty = 1.0;
+        filler.fill = GridBagConstraints.VERTICAL;
+        rows.add(Box.createGlue(), filler);
+
+        JPanel bar = ActionBar.create().toTheEnd().add(clearDataFiles).build();
+
+        jPanel2.removeAll();
+        jPanel2.setLayout(new BorderLayout());
+        JScrollPane scroller = new JScrollPane(rows,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroller.setBorder(BorderFactory.createEmptyBorder());
+        scroller.getVerticalScrollBar().setUnitIncrement(16);
+        jPanel2.add(scroller, BorderLayout.CENTER);
+        jPanel2.add(bar, BorderLayout.SOUTH);
+    }
+
+    /** One numbered file row: index, loader, path, editor. */
+    private JPanel fileRow(String index, JButton loader, JTextField field, JButton editor) {
+        JPanel line = new JPanel(new BorderLayout(6, 0));
+        line.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
+
+        JPanel lead = new JPanel(new BorderLayout(6, 0));
+        JLabel number = new JLabel(index, SwingConstants.RIGHT);
+        number.setForeground(UIManager.getColor("Label.disabledForeground"));
+        number.setPreferredSize(new Dimension(18, 1));
+        lead.add(number, BorderLayout.WEST);
+        if (loader != null) {
+            lead.add(loader, BorderLayout.CENTER);
+        } else {
+            // Keeps row ten's field aligned with the nine above it.
+            lead.add(Box.createRigidArea(
+                    new Dimension(loadData1.getPreferredSize().width, 1)),
+                    BorderLayout.CENTER);
+        }
+
+        line.add(lead, BorderLayout.WEST);
+        line.add(field, BorderLayout.CENTER);
+        line.add(editor, BorderLayout.EAST);
+        return line;
+    }
+
+    private static GridBagConstraints span(int row) {
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridy = row;
+        c.gridx = 0;
+        c.anchor = GridBagConstraints.WEST;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.weightx = 1.0;
+        c.insets = new Insets(4, 0, 2, 0);
+        return c;
+    }
+
+    private static GridBagConstraints stretch(int row) {
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridy = row;
+        c.gridx = 0;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.weightx = 1.0;
+        return c;
     }
 
     /**
