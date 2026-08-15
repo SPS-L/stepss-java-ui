@@ -11,4 +11,4 @@ if [ ! -d build/classes ]; then
     echo "build/classes not found - run 'ant compile' (or 'ant jar') first." >&2
     exit 1
 fi
-exec java -cp build/classes my.ramses.ssa.SsaHarness
+exec java -cp build/classes my.stepss.ssa.SsaHarness

@@ -13,8 +13,8 @@ fi
 # dist/lib, so the guard above already covers it.
 CP="build/classes:dist/lib/*"
 
-java -cp "$CP" my.ramses.compile.CompileHarness
+java -cp "$CP" my.stepss.compile.CompileHarness
 
 # Headless so the Swing sink checks need no display; they construct a
 # JTextArea and drain the event queue, never a window.
-java -Djava.awt.headless=true -cp "$CP" my.ramses.ConsoleSinkCheck
+java -Djava.awt.headless=true -cp "$CP" my.stepss.ConsoleSinkCheck

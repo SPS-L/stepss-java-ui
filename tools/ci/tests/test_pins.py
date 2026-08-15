@@ -128,7 +128,7 @@ class UramsesUrlTest(unittest.TestCase):
 
 
 TOOLCHAIN = """\
-package my.ramses.platform;
+package my.stepss.platform;
 
 public final class Toolchain {
     static void build() {

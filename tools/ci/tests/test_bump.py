@@ -128,7 +128,7 @@ class BumpTestCase(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.root, True)
         self.properties = os.path.join(self.root, "versions.properties")
         open(self.properties, "w").write(PROPERTIES)
-        toolchain_dir = os.path.join(self.root, "src", "my", "ramses", "platform")
+        toolchain_dir = os.path.join(self.root, "src", "my", "stepss", "platform")
         os.makedirs(toolchain_dir)
         self.toolchain = os.path.join(toolchain_dir, "Toolchain.java")
         open(self.toolchain, "w").write(TOOLCHAIN)

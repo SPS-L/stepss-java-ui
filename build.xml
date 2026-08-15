@@ -92,10 +92,10 @@
   </jar>
  </target>
 
- <!-- Runs after javac, once my.ramses.platform.Toolchain and friends are
+ <!-- Runs after javac, once my.stepss.platform.Toolchain and friends are
       compiled, and after stage-payloads (a -pre-compile dependency, so it
       has already run by the time -post-compile does) has populated
-      src/my/ramses/payload/. Catches the case versions.properties' own
+      src/my/stepss/payload/. Catches the case versions.properties' own
       header used to invite: bumping a component's version there fetches
       and stages the new asset under its new name and leaves the build
       green, but Toolchain.java's hardcoded, version-suffixed resource
@@ -104,10 +104,10 @@
       PayloadManifestCheck's class comment for the full rationale. -->
  <target name="-post-compile"
          description="Fail the build if Toolchain.java's payload manifest and the staged payload directory disagree">
-  <java classname="my.ramses.platform.PayloadManifestCheck"
+  <java classname="my.stepss.platform.PayloadManifestCheck"
         classpath="${build.classes.dir}"
         fork="true" failonerror="true">
-   <arg value="src/my/ramses/payload"/>
+   <arg value="src/my/stepss/payload"/>
   </java>
  </target>
 
@@ -256,10 +256,10 @@
        otherwise survive indefinitely and ship in the jar alongside the
        current one. Clearing it here means it always reflects exactly the
        pinned set in payload-cache/, never a superset. This only touches the
-       staged copies under src/my/ramses/payload/ - payload-cache/ itself
+       staged copies under src/my/stepss/payload/ - payload-cache/ itself
        (the download cache) is left untouched. -->
-  <delete dir="src/my/ramses/payload" quiet="true"/>
-  <mkdir dir="src/my/ramses/payload"/>
+  <delete dir="src/my/stepss/payload" quiet="true"/>
+  <mkdir dir="src/my/stepss/payload"/>
   <!-- Named one by one from versions.properties rather than matched by glob.
        payload-cache/ deliberately keeps superseded downloads so an offline
        build still works after a version bump, and a glob like "dyngraph-linux-*"
@@ -268,7 +268,7 @@
        one. The manifest check does not catch it either, since it only asserts
        that every resource Toolchain.java names is present, not that nothing
        else is. Adding a component means adding its lines here. -->
-  <copy todir="src/my/ramses/payload" flatten="true">
+  <copy todir="src/my/stepss/payload" flatten="true">
    <fileset dir="${payload.cache}">
     <include name="${ramses.windows.asset}"/>
     <include name="${ramses.linux.asset}"/>
@@ -287,11 +287,11 @@
   <mkdir dir="${build.classes.dir}"/>
   <javac srcdir="src" destdir="${build.classes.dir}" includeantruntime="false"
          source="${javac.source}" target="${javac.target}"
-         includes="my/ramses/platform/UramsesKitPack.java"/>
-  <java classname="my.ramses.platform.UramsesKitPack"
+         includes="my/stepss/platform/UramsesKitPack.java"/>
+  <java classname="my.stepss.platform.UramsesKitPack"
         classpath="${build.classes.dir}" fork="true" failonerror="true">
    <arg value="${payload.cache}/stepss-uramses-${uramses.version}.zip"/>
-   <arg value="src/my/ramses/payload/uramses-kit-v${uramses.version}.zip"/>
+   <arg value="src/my/stepss/payload/uramses-kit-v${uramses.version}.zip"/>
    <arg value="${uramses.manifest.sha256}"/>
   </java>
  </target>
@@ -299,6 +299,6 @@
  <target name="-pre-compile" depends="stage-payloads"/>
 
  <target name="-post-clean" description="Remove staged payload copies so ant clean leaves no residue">
-  <delete dir="src/my/ramses/payload" quiet="true"/>
+  <delete dir="src/my/stepss/payload" quiet="true"/>
  </target>
 </project>

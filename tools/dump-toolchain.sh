@@ -4,4 +4,4 @@
 set -e
 cd "$(dirname "$0")/.."
 ant -q jar > /dev/null
-java -cp dist/stepss.jar my.ramses.platform.ToolchainDump
+java -cp dist/stepss.jar my.stepss.platform.ToolchainDump

@@ -52,7 +52,7 @@ Compiling custom models is optional and needs a Fortran toolchain on your machin
 
 ### Refreshing the application's marks
 
-The window icon and the About lockup are PNGs in `src/my/ramses/`, rendered from the SVG sources in [stepss-docs](https://github.com/SPS-L/stepss-docs) `src/assets`, in a light and a dark variant each. They are stored rasterised so that nothing has to render vectors at runtime and no SVG library is on the classpath; the cost is that they go stale when the artwork changes, and the build does not notice. Re-export all fourteen with:
+The window icon and the About lockup are PNGs in `src/my/stepss/`, rendered from the SVG sources in [stepss-docs](https://github.com/SPS-L/stepss-docs) `src/assets`, in a light and a dark variant each. They are stored rasterised so that nothing has to render vectors at runtime and no SVG library is on the classpath; the cost is that they go stale when the artwork changes, and the build does not notice. Re-export all fourteen with:
 
 ```bash
 tools/refresh-marks.sh                       # expects ../stepss-docs/src/assets

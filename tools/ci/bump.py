@@ -16,7 +16,7 @@ import sys
 from . import pins, upstream as _upstream
 
 PAYLOAD_CACHE = "payload-cache"
-TOOLCHAIN = os.path.join("src", "my", "ramses", "platform", "Toolchain.java")
+TOOLCHAIN = os.path.join("src", "my", "stepss", "platform", "Toolchain.java")
 PROPERTIES = "versions.properties"
 
 
