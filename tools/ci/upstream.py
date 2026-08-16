@@ -89,13 +89,28 @@ def uramses_manifest_digest(archive, repo_root, run=subprocess.run):
     archive's own bytes: GitHub's generated source archives are not guaranteed
     byte-stable, so a re-compression upstream would otherwise read as tampering.
     UramsesKitPack already knows how to compute it; COMPUTE mode prints it.
+
+    COMPUTE also runs the router marker check, so an upstream release that
+    dropped the markers fails here, while deciding whether to pin it, rather
+    than later at `ant jar` with the pin already written.
+
+    -sourcepath is load-bearing: UramsesKitPack reads the marker contract off
+    RouterSplicer, in another package, and javac given a bare file path has no
+    sourcepath to resolve it through. build.xml's javac gets this for free from
+    its srcdir; this one has to say it.
     """
     workdir = tempfile.mkdtemp(prefix="uramses-manifest-")
     try:
+        src_root = os.path.join(repo_root, "src")
         source = os.path.join(
-            repo_root, "src", "my", "stepss", "platform", "UramsesKitPack.java"
+            src_root, "my", "stepss", "platform", "UramsesKitPack.java"
         )
-        run(["javac", "-d", workdir, source], check=True, capture_output=True, text=True)
+        run(
+            ["javac", "-sourcepath", src_root, "-d", workdir, source],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         result = run(
             [
                 "java", "-cp", workdir,

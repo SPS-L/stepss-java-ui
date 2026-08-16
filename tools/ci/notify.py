@@ -1,9 +1,15 @@
 """Raise a GitHub issue when a run needs a human.
 
-Nobody watches a cron job, so a run that fails - or that bumps URAMSES and
-leaves the README's known-limitation paragraph stale - has to say so somewhere
+Nobody watches an unattended run, so one that fails has to say so somewhere
 durable. Deduped on the exact title against open issues carrying the label, so
 a component that fails on every tick produces one issue, not one a day.
+
+Failure is the only caller left. The other one asked a human to re-read a
+README paragraph on every URAMSES re-pin, and kept asking for six releases
+after that paragraph was deleted: dedup is on OPEN issues, so closing the
+issue only bought one release of quiet before the next bump reopened it. A
+recurring question about whether something is still true belongs in a check
+that can answer it, not in an issue.
 """
 
 import json

@@ -1,5 +1,7 @@
 package my.stepss.platform;
 
+import my.stepss.compile.RouterSplicer;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -70,6 +72,21 @@ public final class UramsesKitPack {
                 System.exit(1);
                 return;
             }
+            List<String> unmarked = routersMissingMarkers(zip, entries);
+            if (!unmarked.isEmpty()) {
+                System.err.println("uramses kit marker check FAILED");
+                for (String problem : unmarked) {
+                    System.err.println("  " + problem);
+                }
+                System.err.println("Compile splices generated models into the routers at these"
+                        + " comments, so a kit without them cannot build custom models: the"
+                        + " GUI would accept the models and then fail at build time. Do not"
+                        + " pin this release. Restore the markers upstream in stepss-uramses"
+                        + " and cut a release that carries them.");
+                System.exit(1);
+                return;
+            }
+
             String manifest = manifestOf(zip, entries);
             String digest = hex(sha256(manifest.getBytes("UTF-8")));
 
@@ -136,6 +153,50 @@ public final class UramsesKitPack {
             }
         }
         return false;
+    }
+
+    /**
+     * One line per router that does not carry both marker comments, empty when
+     * the archive honours the contract.
+     *
+     * <p>Checked here rather than left to {@link RouterSplicer} at run time,
+     * because the manifest digest cannot catch this. The digest is recomputed
+     * and re-pinned on every bump (see {@code tools/ci/bump.py}), so it detects
+     * a changed byte in a version already pinned, never a NEW version that
+     * dropped the markers - which is exactly the regression that would ship.
+     * A whole release stops on this, unrelated component bumps included. That
+     * is deliberate: the markers are a contract stepss-uramses declared, and
+     * shipping a build whose Compile button is broken is worse than a loud
+     * halt, which the release workflow's failure path already reports.
+     *
+     * <p>The strings and the paths come from {@link RouterSplicer} rather than
+     * being spelled again here, so this check and the splice it guards cannot
+     * disagree about what the contract is.
+     */
+    static List<String> routersMissingMarkers(ZipFile zip, List<String> entries)
+            throws IOException {
+        List<String> problems = new ArrayList<String>();
+        for (String kind : RouterSplicer.KINDS) {
+            String rel = RouterSplicer.routerFor(kind);
+            if (!entries.contains(rel)) {
+                problems.add(rel + " is absent from the archive");
+                continue;
+            }
+            InputStream in = zip.getInputStream(entryFor(zip, rel));
+            String source;
+            try {
+                source = new String(readAll(in), "UTF-8");
+            } finally {
+                in.close();
+            }
+            if (source.indexOf(RouterSplicer.EXTERNALS_MARKER) < 0) {
+                problems.add(rel + " has no " + RouterSplicer.EXTERNALS_MARKER + " marker");
+            }
+            if (source.indexOf(RouterSplicer.CASES_MARKER) < 0) {
+                problems.add(rel + " has no " + RouterSplicer.CASES_MARKER + " marker");
+            }
+        }
+        return problems;
     }
 
     /** One {@code <sha256>  <path>} line per retained file, in sorted path order. */

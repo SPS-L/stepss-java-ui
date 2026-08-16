@@ -324,23 +324,17 @@ jobs:
             --notes-file notes.md \
             --latest
 
+      # A step used to sit here that asked a human, on every uramses re-pin,
+      # whether the README's Compile known-limitation paragraph still held.
+      # That paragraph was deleted in 5c9d889 once the kit started carrying the
+      # router markers, and the question outlived it by six releases, filing
+      # comments about a paragraph that no longer existed. What it was really
+      # guarding - that a newly pinned kit still carries the markers
+      # RouterSplicer needs - is asserted by UramsesKitPack at pack time now,
+      # which fails the build instead of asking.
+      #
       # Issues live in this repository, so the default GITHUB_TOKEN is enough
       # here - STEPSS_TOKEN is only needed where the component repos are.
-      - name: Flag the README's URAMSES caveat for review
-        if: steps.bump.outputs.proceed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-          bumped=$(python3 -c "import json;print(any(c['component']=='uramses' for c in json.load(open('summary.json'))['changed']))")
-          if [ "$bumped" = "True" ]; then
-            python3 -m tools.ci notify \
-              --title "Review the README's URAMSES known-limitation paragraph" \
-              --body "URAMSES was re-pinned in $VERSION. README.md's known-limitation paragraph still names the previous version while asserting that it predates the model-router marker comments. Whether that limitation still holds is a content judgement the workflow deliberately does not make - please check it." \
-              --label release-automation
-          fi
-
       - name: Report failure
         if: failure()
         env:
