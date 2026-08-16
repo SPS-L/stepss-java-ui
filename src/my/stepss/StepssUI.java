@@ -362,6 +362,7 @@ public class StepssUI extends javax.swing.JFrame {
                 .add(viewSsaResults)
                 .separate()
                 .add(saveDynJac)
+                .add(loadDynJac)
                 .build(), stretch(row++));
 
         jPanel8.removeAll();
@@ -971,6 +972,7 @@ public class StepssUI extends javax.swing.JFrame {
         saveCurrentCurveButton = new javax.swing.JButton();
         loadTrajToFileButton = new javax.swing.JButton();
         saveDynJac = new javax.swing.JButton();
+        loadDynJac = new javax.swing.JButton();
         jLabel4 = new javax.swing.JLabel();
         jLabel8 = new javax.swing.JLabel();
         ssaButton1 = new javax.swing.JButton();
@@ -2440,12 +2442,21 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         saveDynJac.setText("Save dynamic Jacobian...");
-        saveDynJac.setToolTipText("Saves the Jacobian the last analysis reduced, taken at the same instant as the eigenvalues");
+        saveDynJac.setToolTipText("Saves the last analysis as one archive: the Jacobian it reduced, taken at the same instant as the eigenvalues, and the results it produced");
         saveDynJac.setEnabled(false);
         saveDynJac.setName("saveDynJac"); // NOI18N
         saveDynJac.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 saveDynJacActionPerformed(evt);
+            }
+        });
+
+        loadDynJac.setText("Load dynamic Jacobian...");
+        loadDynJac.setToolTipText("Opens an archive saved by the button beside this one, on this machine or another");
+        loadDynJac.setName("loadDynJac"); // NOI18N
+        loadDynJac.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                loadDynJacActionPerformed(evt);
             }
         });
 
@@ -2550,7 +2561,9 @@ public class StepssUI extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(viewSsaResults)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(saveDynJac))
+                                .addComponent(saveDynJac)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(loadDynJac))
                             .addGroup(jPanel8Layout.createSequentialGroup()
                                 .addComponent(ssaBasenameLabel)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -2609,7 +2622,8 @@ public class StepssUI extends javax.swing.JFrame {
                 .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(ssaButton1)
                     .addComponent(viewSsaResults)
-                    .addComponent(saveDynJac))
+                    .addComponent(saveDynJac)
+                    .addComponent(loadDynJac))
                 .addContainerGap(657, Short.MAX_VALUE))
         );
 
@@ -3925,8 +3939,19 @@ public class StepssUI extends javax.swing.JFrame {
             // The Jacobian stays where the run wrote it. Only the results are
             // copied out automatically, because the Jacobian is large and most
             // runs never want it; the button below is the deliberate step.
-            lastJacDir = new File(myTempDir.getAbsolutePath());
-            lastJacBasename = base;
+            //
+            // Recorded here, not read off the fields when that button is
+            // pressed: the two parameters are recorded only when the engine
+            // actually accepted them, since an older one ignores the record
+            // silently and archiving the numbers anyway would put thresholds
+            // in the manifest that the run never used.
+            lastRunDir = new File(myTempDir.getAbsolutePath());
+            lastRunManifest = new my.stepss.ssa.SsaArchive.Manifest(base,
+                    Double.isNaN(engineVersion) ? null : Double.valueOf(engineVersion),
+                    Double.valueOf(analysisTime),
+                    eigParametersSupported ? Double.valueOf(realLimit) : null,
+                    eigParametersSupported ? Double.valueOf(pfThreshold) : null,
+                    getVersion());
             saveDynJac.setEnabled(true);
 
             showSsaResults(resultsDir, base);
@@ -3978,52 +4003,186 @@ public class StepssUI extends javax.swing.JFrame {
     }//GEN-LAST:event_viewSsaResultsActionPerformed
 
     private void saveDynJacActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveDynJacActionPerformed
-        // Saves the Jacobian the last analysis reduced. The same run wrote it,
-        // from a JAC record at the same instant as the EIG record, so it is
-        // necessarily the matrix behind the eigenvalues that were displayed,
-        // not one a later run might have taken from an edited case or a
-        // different time. That is why this button is enabled by a successful
-        // analysis rather than standing on its own.
-        if (lastJacDir == null) {
+        // Saves the last analysis as one file: the Jacobian it reduced, the
+        // modes, participation factors and mode shapes it produced, and a
+        // manifest naming the run. The same run wrote all of it, the Jacobian
+        // from a JAC record at the same instant as the EIG record, so the
+        // matrix in the archive is necessarily the one behind the eigenvalues
+        // that were displayed rather than one a later run might have taken
+        // from an edited case or a different time. That is why this button is
+        // enabled by a successful analysis rather than standing on its own.
+        //
+        // What is deliberately NOT in it: the data files, the solver settings
+        // and the disturbance. The archive is a record of a result, which is
+        // what the button is named after, not an input someone else can re-run.
+        if (lastRunDir == null || lastRunManifest == null) {
             return;
         }
-        fileChooser.setSelectedFile(new File(""));
-        fileChooser.setDialogTitle("Choose a directory to save the dynamic Jacobian in");
-        fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        if (fileChooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+        javax.swing.filechooser.FileFilter zip =
+                extensionFilter(my.stepss.ssa.SsaArchive.Format.ZIP);
+        javax.swing.filechooser.FileFilter tar =
+                extensionFilter(my.stepss.ssa.SsaArchive.Format.TAR_GZ);
+        fileChooser.resetChoosableFileFilters();
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        fileChooser.setDialogTitle("Save the small-signal run as one archive");
+        fileChooser.addChoosableFileFilter(zip);
+        fileChooser.addChoosableFileFilter(tar);
+        fileChooser.setFileFilter(zip);
+        fileChooser.setSelectedFile(new File(lastRunManifest.basename()
+                + my.stepss.ssa.SsaArchive.Format.ZIP.extension()));
+        int chose = fileChooser.showSaveDialog(this);
+        javax.swing.filechooser.FileFilter picked = fileChooser.getFileFilter();
+        File selected = fileChooser.getSelectedFile();
+        // Left as the rest of the window expects to find it. A chooser that
+        // keeps two archive filters would offer them to the next handler that
+        // opens a .cfg or a .trj.
+        fileChooser.resetChoosableFileFilters();
+        if (chose != JFileChooser.APPROVE_OPTION) {
             return;
         }
-        File target = fileChooser.getSelectedFile();
-        int saved = 0;
-        StringBuilder missing = new StringBuilder();
+
+        // A name that already spells a format wins over the filter: someone
+        // who typed "run.tar.gz" has said what they want more plainly than the
+        // drop-down they never touched. Otherwise the filter decides and the
+        // extension is appended, so the file always says what it is.
+        my.stepss.ssa.SsaArchive.Format format =
+                my.stepss.ssa.SsaArchive.formatOfName(selected.getName());
+        if (format == null) {
+            format = picked == tar
+                    ? my.stepss.ssa.SsaArchive.Format.TAR_GZ
+                    : my.stepss.ssa.SsaArchive.Format.ZIP;
+        }
+        File target = my.stepss.ssa.SsaArchive.named(selected, format);
+        if (target.exists() && JOptionPane.showConfirmDialog(this,
+                target + " already exists.\n\nReplace it?",
+                "Save dynamic Jacobian", JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        java.util.List<String> absent;
         try {
-            for (String suffix : my.stepss.ssa.SsaDisturbance.JACOBIAN_SUFFIXES) {
-                File srcFile = new File(lastJacDir, lastJacBasename + suffix);
-                if (srcFile.exists()) {
-                    fileOps.copyFiletoFile(srcFile, new File(target, srcFile.getName()));
-                    saved++;
-                } else {
-                    missing.append("\n    ").append(srcFile.getName());
-                }
-            }
+            absent = my.stepss.ssa.SsaArchive.save(target, format, lastRunDir,
+                    lastRunManifest);
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this,
-                    "Could not write to " + target + "\n\n" + ex.getMessage(),
+                    "Could not write " + target + "\n\n" + ex.getMessage(),
                     "Save dynamic Jacobian", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        if (missing.length() > 0) {
+        // An absent _pf or _ms is a result, not a fault: the engine writes
+        // neither when no mode passed real_limit, so a run that filtered
+        // everything is complete without them. A missing Jacobian file is a
+        // different matter, since one JAC record writes all four. Reporting
+        // both the same way would put a warning dialog in front of an entirely
+        // ordinary analysis, which is how a warning stops being read.
+        StringBuilder faults = new StringBuilder();
+        StringBuilder expected = new StringBuilder();
+        for (String name : absent) {
+            if (my.stepss.ssa.SsaArchive.isOptional(name)) {
+                expected.append(expected.length() == 0 ? "" : " and ").append(name);
+            } else {
+                faults.append("\n    ").append(name);
+            }
+        }
+        if (faults.length() > 0) {
             JOptionPane.showMessageDialog(this,
-                    "Saved " + saved + " of "
-                    + my.stepss.ssa.SsaDisturbance.JACOBIAN_SUFFIXES.length
-                    + " Jacobian files to\n" + target
-                    + "\n\nThese were not in " + lastJacDir + ":" + missing,
+                    "Saved the run \"" + lastRunManifest.basename() + "\" to\n"
+                    + target + "\n\nThese were not in " + lastRunDir
+                    + ", so they are not in the archive:" + faults,
                     "Save dynamic Jacobian", JOptionPane.WARNING_MESSAGE);
+        } else if (expected.length() > 0) {
+            banner.confirm("Saved the run \"" + lastRunManifest.basename()
+                    + "\" to " + target + ". No mode passed real_limit, so the"
+                    + " engine wrote no " + expected + " to archive.");
         } else {
-            banner.confirm("Saved the dynamic Jacobian, taken at the same instant"
-                    + " as the eigenvalues, to " + target);
+            banner.confirm("Saved the run \"" + lastRunManifest.basename()
+                    + "\" to " + target + ", Jacobian and results together.");
         }
     }//GEN-LAST:event_saveDynJacActionPerformed
+
+    /** One archive format, as the save chooser offers it. */
+    private static javax.swing.filechooser.FileFilter extensionFilter(
+            final my.stepss.ssa.SsaArchive.Format format) {
+        // Not FileNameExtensionFilter: that one matches the last dot only, so
+        // ".tar.gz" reaches it as "gz" and the description would name a format
+        // this application does not write on its own.
+        return new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(File file) {
+                return file.isDirectory() || file.getName()
+                        .toLowerCase(java.util.Locale.ROOT)
+                        .endsWith(format.extension());
+            }
+
+            @Override
+            public String getDescription() {
+                return format.description();
+            }
+        };
+    }
+
+    private void loadDynJacActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadDynJacActionPerformed
+        // The other half of the button beside this one, and the reason the
+        // archive carries a manifest at all: this opens a file that came from
+        // somewhere else, so it has to be able to tell one of ours from a
+        // holiday photo album and say which it got.
+        fileChooser.resetChoosableFileFilters();
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        fileChooser.setDialogTitle("Open a small-signal archive");
+        fileChooser.setSelectedFile(new File(""));
+        // One filter over both formats, and All Files left in the drop-down
+        // beside it. What makes a file one of ours is its first two bytes, not
+        // its name, so an archive that came back from a mail client as
+        // "archive.dat" opens perfectly well and has to remain reachable.
+        javax.swing.filechooser.FileFilter archives =
+                new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(File file) {
+                return file.isDirectory()
+                        || my.stepss.ssa.SsaArchive.formatOfName(file.getName()) != null;
+            }
+
+            @Override
+            public String getDescription() {
+                return "Small-signal archive (*.zip, *.tar.gz)";
+            }
+        };
+        fileChooser.addChoosableFileFilter(archives);
+        fileChooser.setFileFilter(archives);
+        int chose = fileChooser.showOpenDialog(this);
+        File archive = fileChooser.getSelectedFile();
+        fileChooser.resetChoosableFileFilters();
+        if (chose != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        // Unpacked under the tool directory, never over the current run: an
+        // archive of a run called "ssa" would otherwise overwrite the "ssa" on
+        // disk, and any results window already open on it would be describing
+        // files that no longer exist. toolDir is also what the exit path
+        // deletes, so nothing outlives the session.
+        //
+        // It is null only when initRamses() could not make it, which it
+        // reports and then carries on from; without this the archive would be
+        // refused by a stack trace rather than by a sentence.
+        if (toolDir == null) {
+            banner.warn("There is nowhere to unpack the archive: the toolchain"
+                    + " directory could not be created when STEPSS started.");
+            return;
+        }
+        my.stepss.ssa.SsaArchive.Loaded loaded;
+        try {
+            loaded = my.stepss.ssa.SsaArchive.load(archive, toolDir);
+        } catch (IOException ex) {
+            banner.warn(ex.getMessage());
+            return;
+        }
+
+        my.stepss.ssa.SsaResultsWindow.open(this, loaded.results());
+        banner.confirm(my.stepss.ssa.SsaArchive.describe(loaded.manifest(),
+                archive.getName(), engineVersion));
+    }//GEN-LAST:event_loadDynJacActionPerformed
 
     private void loadTrajToFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadTrajToFileButtonActionPerformed
         try {
@@ -6210,14 +6369,19 @@ public class StepssUI extends javax.swing.JFrame {
     private File toolDir = null;
     private File myTempDir = null;
     /**
-     * Where the last successful analysis left its Jacobian, and under what
-     * basename. Held so <i>Save dynamic Jacobian</i> saves the matrix that
-     * analysis reduced rather than whatever happens to be on disk now, and
-     * null until an analysis has succeeded, which is what keeps that button
-     * disabled.
+     * Where the last successful analysis left its files, and what it was.
+     * Held so <i>Save dynamic Jacobian</i> archives the matrix that analysis
+     * reduced and the results it produced, rather than whatever happens to be
+     * on disk now, and null until an analysis has succeeded, which is what
+     * keeps that button disabled.
+     *
+     * <p>The manifest is built when the run finishes rather than when the
+     * button is pressed, for the same reason: by then the user may have
+     * changed the parameter fields, or adopted a different engine, and an
+     * archive recording those would be describing a run that never happened.
      */
-    private File lastJacDir = null;
-    private String lastJacBasename = null;
+    private File lastRunDir = null;
+    private my.stepss.ssa.SsaArchive.Manifest lastRunManifest = null;
     private File selWorkDir = null;
     private File ramsesExec = null;
     private File heliosExec = null;
@@ -6247,6 +6411,11 @@ public class StepssUI extends javax.swing.JFrame {
     // every initRamses(), so an adopted Codegen build re-decides it. False
     // until then, matching the fields' disabled state in the generated block.
     private boolean eigParametersSupported = false;
+    // The engine's own banner version, NaN when it could not be read. Kept
+    // beside the flag above because the archive records it: an archive opened
+    // against a different engine build is otherwise silent about which one
+    // produced the numbers in it.
+    private double engineVersion = Double.NaN;
     private DefaultExecutor simulExecutor;
     private DefaultExecuteResultHandler simulExecutorResultHandler;
     private int highlighterIndex;
@@ -6352,6 +6521,7 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton loadDiscTrace;
     private javax.swing.JButton loadDist;
     private javax.swing.JButton loadDumpTraceButton;
+    private javax.swing.JButton loadDynJac;
     private javax.swing.JMenuItem loadExtSimButton;
     private javax.swing.JButton loadGens;
     private javax.swing.JButton loadLFRESV2DAT;
@@ -6599,6 +6769,7 @@ public class StepssUI extends javax.swing.JFrame {
      */
     private void applyEngineCapabilities() {
         double version = my.stepss.ssa.EngineVersion.parseBanner(engineBanner());
+        engineVersion = version;
         eigParametersSupported =
                 my.stepss.ssa.EngineVersion.supportsEigParameters(version);
 

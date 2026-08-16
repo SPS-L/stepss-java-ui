@@ -282,6 +282,22 @@ public final class SsaHarness {
         checkEngineVersionGuardsTheBoundary();
         checkDisturbanceCarriesParameters();
         checkDisturbanceRejectsUnreadableParameters();
+        checkManifestRoundTrip();
+        checkManifestOmitsWhatWasNotRecorded();
+        checkManifestRefusals();
+        checkArchiveMembers();
+        checkArchiveNaming();
+        checkArchiveRoundTrip(SsaArchive.Format.ZIP);
+        checkArchiveRoundTrip(SsaArchive.Format.TAR_GZ);
+        checkArchiveReportsMissingMembers();
+        checkArchiveRefusesToSaveWithoutModes();
+        checkArchiveRefusesAForeignFile();
+        checkArchiveRefusesAnArchiveOfSomethingElse();
+        checkArchiveRefusesAMissingModesFile();
+        checkArchiveRefusesAnEscapingEntry();
+        checkArchiveAcceptsAnArchiveNamingItsOwnRoot();
+        checkArchiveNamesTheEngineThatAnalysedIt();
+        checkArchiveSurvivesARenamedExtension();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -885,6 +901,508 @@ public final class SsaHarness {
             fail(what + ": no exception");
         } catch (IllegalArgumentException expected) {
             pass(what);
+        }
+    }
+
+    // ------------------------------------------------------------ archives
+    //
+    // These are the one group here that touches the filesystem, because the
+    // thing under test is a file: a manifest can be checked as a string, but
+    // "a colleague can open this on another machine" cannot. Every one of them
+    // works inside a directory it makes and removes, so a failed run leaves
+    // nothing behind either.
+
+    private static final String[] EQS_LINES = {"1 2 3", "4 5 6"};
+
+    private static SsaArchive.Manifest fixtureManifest() {
+        return new SsaArchive.Manifest("run", Double.valueOf(3.74),
+                Double.valueOf(0.001), Double.valueOf(-1.0),
+                Double.valueOf(0.05), "3.74.12");
+    }
+
+    /**
+     * Lays out one run's files, as ssa.f90 would have left them, and returns
+     * the directory. {@code _struc.dat} is deliberately absent: a run whose
+     * Jacobian was only partly written is the case the save path has to report
+     * rather than hide.
+     */
+    private static java.io.File runDirectory(java.io.File root) throws java.io.IOException {
+        java.io.File dir = new java.io.File(root, "run-dir");
+        dir.mkdirs();
+        write(new java.io.File(dir, "run_modes.dat"), modesFixture());
+        write(new java.io.File(dir, "run_pf.dat"), join(PF_LINES));
+        write(new java.io.File(dir, "run_ms.dat"), join(MS_LINES));
+        write(new java.io.File(dir, "run_eqs.dat"), join(EQS_LINES));
+        write(new java.io.File(dir, "run_var.dat"), "var\n");
+        write(new java.io.File(dir, "run_val.dat"), "val\n");
+        return dir;
+    }
+
+    private static void write(java.io.File file, String text) throws java.io.IOException {
+        java.nio.file.Files.write(file.toPath(),
+                text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private static String read(java.io.File file) throws java.io.IOException {
+        return new String(java.nio.file.Files.readAllBytes(file.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private static java.io.File scratch() throws java.io.IOException {
+        return java.nio.file.Files.createTempDirectory("ssa-harness-").toFile();
+    }
+
+    private static void checkManifestRoundTrip() {
+        try {
+            SsaArchive.Manifest written = fixtureManifest();
+            SsaArchive.Manifest read = SsaArchive.Manifest.parse(written.text());
+            expect("basename survives the manifest", "run", read.basename());
+            expect("engine version survives", Double.valueOf(3.74), read.engineVersion());
+            expect("analysis time survives", Double.valueOf(0.001), read.time());
+            expect("real_limit survives", Double.valueOf(-1.0), read.realLimit());
+            expect("pf_threshold survives", Double.valueOf(0.05), read.pfThreshold());
+            expect("the writing version survives", "3.74.12", read.savedBy());
+            // Whoever opens the archive in a file manager reads this file and
+            // nothing else, so it has to say what is and is not in there.
+            expect("the manifest says the data files are not included", true,
+                    written.text().contains("are NOT here"));
+        } catch (java.io.IOException ex) {
+            fail("manifest round trip: threw " + ex);
+        }
+    }
+
+    /**
+     * An engine older than EIG_PARAMETERS_SINCE never sees the two parameters,
+     * so the archive must record that they are unknown rather than record the
+     * zeros the disabled fields hold. The results window renders null as
+     * "not recorded", and a recorded 0.0 would be a claim about a run.
+     */
+    private static void checkManifestOmitsWhatWasNotRecorded() {
+        try {
+            SsaArchive.Manifest sparse = new SsaArchive.Manifest("run", null,
+                    Double.valueOf(0.001), null, null, null);
+            String text = sparse.text();
+            expect("an unknown real_limit is not written", false,
+                    text.contains("real_limit"));
+            expect("an unknown pf_threshold is not written", false,
+                    text.contains("pf_threshold"));
+            expect("an unread engine version is not written", false,
+                    text.contains("engine_version"));
+            SsaArchive.Manifest read = SsaArchive.Manifest.parse(text);
+            expect("an absent real_limit reads back as unknown, not zero",
+                    null, read.realLimit());
+            expect("an absent pf_threshold reads back as unknown", null,
+                    read.pfThreshold());
+            expect("an absent engine version reads back as unknown", null,
+                    read.engineVersion());
+            expect("what was recorded still is", Double.valueOf(0.001), read.time());
+        } catch (java.io.IOException ex) {
+            fail("sparse manifest: threw " + ex);
+        }
+    }
+
+    private static void checkManifestRefusals() {
+        manifestRejected("a file with no magic line is not a manifest",
+                "basename run\n");
+        // A newer STEPSS may lay the archive out differently, and opening it
+        // anyway would be a guess presented as a result.
+        manifestRejected("a newer archive format is refused",
+                SsaArchive.MAGIC_PREFIX + (SsaArchive.FORMAT_VERSION + 1)
+                        + "\nbasename run\n");
+        manifestRejected("a manifest with no basename is refused",
+                SsaArchive.MAGIC_PREFIX + "1\nt 0.001\n");
+        // The basename becomes a file name, and this one arrives from a file
+        // someone else wrote.
+        manifestRejected("a basename carrying a path separator is refused",
+                SsaArchive.MAGIC_PREFIX + "1\nbasename ../../etc/passwd\n");
+        manifestRejected("a basename carrying a space is refused",
+                SsaArchive.MAGIC_PREFIX + "1\nbasename two words\n");
+    }
+
+    private static void manifestRejected(String what, String text) {
+        try {
+            SsaArchive.Manifest.parse(text);
+            fail(what + ": no exception");
+        } catch (java.io.IOException expected) {
+            pass(what);
+        }
+    }
+
+    private static void checkArchiveMembers() {
+        String[] members = SsaArchive.members("run");
+        expect("three results and four Jacobian files", 7, members.length);
+        expect("the modes file leads, since it is the one that must be there",
+                "run_modes.dat", members[0]);
+        java.util.Set<String> unique =
+                new java.util.HashSet<String>(java.util.Arrays.asList(members));
+        expect("no member is archived twice", 7, unique.size());
+        for (String suffix : SsaDisturbance.JACOBIAN_SUFFIXES) {
+            expect("the Jacobian's " + suffix + " is a member", true,
+                    unique.contains("run" + suffix));
+        }
+    }
+
+    private static void checkArchiveNaming() {
+        expect("a .zip name is a zip", SsaArchive.Format.ZIP,
+                SsaArchive.formatOfName("run.zip"));
+        expect("a .tar.gz name is a gzipped tar", SsaArchive.Format.TAR_GZ,
+                SsaArchive.formatOfName("run.tar.gz"));
+        expect("a .tgz name is read as one too", SsaArchive.Format.TAR_GZ,
+                SsaArchive.formatOfName("run.tgz"));
+        expect("the extension is matched case insensitively",
+                SsaArchive.Format.ZIP, SsaArchive.formatOfName("RUN.ZIP"));
+        expect("a bare name spells no format", null,
+                SsaArchive.formatOfName("run"));
+        // A name that already carries the right extension keeps it, so a user
+        // who typed "run.zip" does not get "run.zip.zip".
+        expect("an extension already present is not repeated", "run.zip",
+                SsaArchive.named(new java.io.File("run.zip"),
+                        SsaArchive.Format.ZIP).getName());
+        expect("a bare name gains the format's extension", "run.tar.gz",
+                SsaArchive.named(new java.io.File("run"),
+                        SsaArchive.Format.TAR_GZ).getName());
+        // The format the user picked wins over the one the name spells, so
+        // saving "run.zip" as a tarball cannot produce a lying extension.
+        expect("a mismatched extension is corrected", "run.zip.tar.gz",
+                SsaArchive.named(new java.io.File("run.zip"),
+                        SsaArchive.Format.TAR_GZ).getName());
+    }
+
+    /**
+     * The whole feature in one check: analyse, save, hand the file over, open
+     * it somewhere else, see the same run.
+     */
+    private static void checkArchiveRoundTrip(SsaArchive.Format format) {
+        String label = format == SsaArchive.Format.ZIP ? "zip" : "tar.gz";
+        java.io.File root = null;
+        try {
+            root = scratch();
+            java.io.File dir = runDirectory(root);
+            java.io.File target = SsaArchive.named(
+                    new java.io.File(root, "handed-over"), format);
+            SsaArchive.save(target, format, dir, fixtureManifest());
+            expect(label + ": saving produces one file", true, target.isFile());
+            expect(label + ": and that file is not empty", true, target.length() > 0);
+
+            // Opened from a scratch directory that has never seen the run, the
+            // way the receiving machine will.
+            java.io.File elsewhere = new java.io.File(root, "elsewhere");
+            elsewhere.mkdirs();
+            SsaArchive.Loaded loaded = SsaArchive.load(target, elsewhere);
+            expect(label + ": the run keeps its name", "run",
+                    loaded.results().basename());
+            expect(label + ": the manifest comes back", Double.valueOf(3.74),
+                    loaded.manifest().engineVersion());
+            expect(label + ": every mode comes back", 5,
+                    loaded.results().modes().modes().size());
+            expect(label + ": the header parameters come back",
+                    Double.valueOf(-1.0), loaded.results().modes().realLimit());
+            expect(label + ": participation comes back", 3,
+                    loaded.results().participation().forMode(2).size());
+            expect(label + ": a leading blank in a device name survives the archive",
+                    " G2", loaded.results().participation().forMode(2).get(2).device);
+            expect(label + ": mode shapes come back", 2,
+                    loaded.results().shapes().forMode(2).size());
+            // The point of carrying the Jacobian at all: it has to arrive
+            // byte for byte, not merely be listed.
+            java.io.File eqs = new java.io.File(loaded.results().directory(),
+                    "run_eqs.dat");
+            expect(label + ": the Jacobian arrives", true, eqs.isFile());
+            expect(label + ": the Jacobian arrives unchanged", join(EQS_LINES),
+                    read(eqs));
+            // Unpacked under a directory named for the run, so unpacking by
+            // hand does not scatter eight files into the current directory.
+            expect(label + ": the archive holds one folder named for the run",
+                    "run", loaded.results().directory().getName());
+        } catch (java.io.IOException ex) {
+            fail(label + " round trip: threw " + ex);
+        } finally {
+            SsaArchive.deleteRecursively(root);
+        }
+    }
+
+    /**
+     * A Jacobian file the engine never wrote must be named, not silently
+     * dropped: the archive is still worth having, and the recipient has to
+     * know what is not in it.
+     */
+    private static void checkArchiveReportsMissingMembers() {
+        java.io.File root = null;
+        try {
+            root = scratch();
+            java.io.File dir = runDirectory(root);
+            java.util.List<String> absent = SsaArchive.save(
+                    new java.io.File(root, "run.zip"), SsaArchive.Format.ZIP,
+                    dir, fixtureManifest());
+            expect("exactly the missing member is reported", "[run_struc.dat]",
+                    String.valueOf(absent));
+            // A missing Jacobian file is a fault: one JAC record writes all
+            // four, so losing one means something went wrong.
+            expect("a missing Jacobian file is not written off as optional",
+                    false, SsaArchive.isOptional("run_struc.dat"));
+            // These two are absent from every run that filtered all its modes,
+            // and treating that as a fault would put a warning dialog in front
+            // of an ordinary result.
+            for (String suffix : SsaArchive.OPTIONAL_SUFFIXES) {
+                expect("an absent " + suffix + " is a result, not a fault",
+                        true, SsaArchive.isOptional("run" + suffix));
+            }
+            expect("the modes file is never optional", false,
+                    SsaArchive.isOptional("run_modes.dat"));
+        } catch (java.io.IOException ex) {
+            fail("missing member report: threw " + ex);
+        } finally {
+            SsaArchive.deleteRecursively(root);
+        }
+    }
+
+    /**
+     * Without the modes file there is nothing to load back, so the archive
+     * would be one that fails to open rather than one that opens empty.
+     */
+    private static void checkArchiveRefusesToSaveWithoutModes() {
+        java.io.File root = null;
+        try {
+            root = scratch();
+            java.io.File dir = new java.io.File(root, "empty");
+            dir.mkdirs();
+            java.io.File target = new java.io.File(root, "run.zip");
+            try {
+                SsaArchive.save(target, SsaArchive.Format.ZIP, dir, fixtureManifest());
+                fail("saving a run with no modes file is refused");
+            } catch (java.io.IOException expected) {
+                pass("saving a run with no modes file is refused");
+            }
+            expect("and writes nothing", false, target.exists());
+            expect("not even a partial file", 0,
+                    dir.getParentFile().listFiles(new java.io.FilenameFilter() {
+                        @Override
+                        public boolean accept(java.io.File d, String name) {
+                            return name.endsWith(".part");
+                        }
+                    }).length);
+        } catch (java.io.IOException ex) {
+            fail("refusing to save without modes: threw " + ex);
+        } finally {
+            SsaArchive.deleteRecursively(root);
+        }
+    }
+
+    private static void checkArchiveRefusesAForeignFile() {
+        java.io.File root = null;
+        try {
+            root = scratch();
+            java.io.File notAnArchive = new java.io.File(root, "notes.txt");
+            write(notAnArchive, "these are my notes\n");
+            loadRejected("a plain text file is refused", notAnArchive, root,
+                    "neither a zip nor a gzipped tar");
+        } catch (java.io.IOException ex) {
+            fail("refusing a foreign file: threw " + ex);
+        } finally {
+            SsaArchive.deleteRecursively(root);
+        }
+    }
+
+    /** A real zip, just not one of ours. */
+    private static void checkArchiveRefusesAnArchiveOfSomethingElse() {
+        java.io.File root = null;
+        try {
+            root = scratch();
+            java.io.File zip = new java.io.File(root, "holiday.zip");
+            writeZip(zip, new String[] {"beach.jpg", "hotel.jpg"},
+                    new String[] {"not really a jpeg", "nor this"});
+            loadRejected("a zip of something else is refused", zip, root,
+                    SsaArchive.MANIFEST_NAME);
+            // The near miss is the useful one: someone with a directory of
+            // results, no archive, and no idea there is another button.
+            java.io.File results = new java.io.File(root, "results.zip");
+            writeZip(results, new String[] {"run_modes.dat"},
+                    new String[] {modesFixture()});
+            loadRejected("a hand made zip of results points at View results",
+                    results, root, "View results...");
+        } catch (java.io.IOException ex) {
+            fail("refusing a foreign archive: threw " + ex);
+        } finally {
+            SsaArchive.deleteRecursively(root);
+        }
+    }
+
+    private static void checkArchiveRefusesAMissingModesFile() {
+        java.io.File root = null;
+        try {
+            root = scratch();
+            java.io.File zip = new java.io.File(root, "hollow.zip");
+            writeZip(zip,
+                    new String[] {SsaArchive.MANIFEST_NAME, "run_eqs.dat"},
+                    new String[] {fixtureManifest().text(), join(EQS_LINES)});
+            loadRejected("an archive with no modes file says which file is missing",
+                    zip, root, "run_modes.dat");
+        } catch (java.io.IOException ex) {
+            fail("refusing a hollow archive: threw " + ex);
+        } finally {
+            SsaArchive.deleteRecursively(root);
+        }
+    }
+
+    /**
+     * The archive is a file from someone else by design, so an entry that
+     * climbs out of the unpack directory is the attack this feature invites.
+     */
+    private static void checkArchiveRefusesAnEscapingEntry() {
+        java.io.File root = null;
+        try {
+            root = scratch();
+            java.io.File zip = new java.io.File(root, "escape.zip");
+            writeZip(zip,
+                    new String[] {SsaArchive.MANIFEST_NAME, "../../escaped.txt"},
+                    new String[] {fixtureManifest().text(), "owned\n"});
+            loadRejected("an entry that climbs out of the folder is refused",
+                    zip, root, "outside");
+            expect("and nothing is written where it aimed", false,
+                    new java.io.File(root.getParentFile(), "escaped.txt").exists());
+        } catch (java.io.IOException ex) {
+            fail("refusing an escaping entry: threw " + ex);
+        } finally {
+            SsaArchive.deleteRecursively(root);
+        }
+    }
+
+    /**
+     * The other side of the escape check, and the one that is easy to get
+     * wrong: {@code tar czf run.tar.gz .} names its own root "./", which
+     * resolves to the unpack directory itself rather than to something inside
+     * it. A guard written as "must be strictly below" refuses the commonest
+     * repacked archive there is and calls it an attack.
+     */
+    private static void checkArchiveAcceptsAnArchiveNamingItsOwnRoot() {
+        java.io.File root = null;
+        try {
+            root = scratch();
+            java.io.File zip = new java.io.File(root, "repacked.zip");
+            writeZip(zip,
+                    new String[] {"./", "./" + SsaArchive.MANIFEST_NAME,
+                        "./run_modes.dat"},
+                    new String[] {"", fixtureManifest().text(), modesFixture()});
+            java.io.File elsewhere = new java.io.File(root, "elsewhere");
+            elsewhere.mkdirs();
+            SsaArchive.Loaded loaded = SsaArchive.load(zip, elsewhere);
+            expect("an archive that names its own root still opens", "run",
+                    loaded.manifest().basename());
+            expect("and its results are read", 5,
+                    loaded.results().modes().modes().size());
+        } catch (java.io.IOException ex) {
+            fail("archive naming its own root: threw " + ex);
+        } finally {
+            SsaArchive.deleteRecursively(root);
+        }
+    }
+
+    /**
+     * The one thing a loaded archive knows that the results window does not.
+     * Its header reads t, real_limit and pf_threshold out of the modes file,
+     * but no file in the run says which engine wrote it, so an archive from
+     * another build looks exactly like one from this one.
+     */
+    private static void checkArchiveNamesTheEngineThatAnalysedIt() {
+        SsaArchive.Manifest known = fixtureManifest();
+        String same = SsaArchive.describe(known, "run.zip", 3.74);
+        expect("the run and the file are named", true,
+                same.contains("\"run\"") && same.contains("run.zip"));
+        expect("the engine that analysed it is named", true,
+                same.contains("RAMSES 3.74"));
+        expect("the same engine is not reported as a difference", false,
+                same.contains("loaded here"));
+        // The banner prints f5.2 from a single precision constant, so two
+        // readings of one build can differ by an ulp. Reporting that as two
+        // builds would cry wolf on every load.
+        expect("an ulp of difference is still the same engine", false,
+                SsaArchive.describe(known, "run.zip", 3.7400001)
+                        .contains("loaded here"));
+        String other = SsaArchive.describe(known, "run.zip", 3.80);
+        expect("a different engine is reported", true,
+                other.contains("not the 3.80 loaded here"));
+        // The archive still names its own engine when this session has none to
+        // compare against, which is the case on a machine with no licence.
+        String noEngine = SsaArchive.describe(known, "run.zip", Double.NaN);
+        expect("an unreadable local engine is not reported as a difference",
+                false, noEngine.contains("loaded here"));
+        expect("but the archive's own engine is still named", true,
+                noEngine.contains("RAMSES 3.74"));
+        String unknown = SsaArchive.describe(
+                new SsaArchive.Manifest("run", null, null, null, null, null),
+                "run.zip", 3.74);
+        expect("an archive that recorded no engine says so", true,
+                unknown.contains("does not record which engine"));
+        expect("and does not invent one", false, unknown.contains("RAMSES"));
+        // The banner is a JLabel, which renders a newline as a missing glyph.
+        for (String line : new String[] {same, other, noEngine, unknown}) {
+            expect("the sentence is one line", false, line.contains("\n"));
+        }
+    }
+
+    /**
+     * Read from the bytes, not the name. An archive that came through a mail
+     * client as "archive.dat", or one a user renamed, is still the archive it
+     * was.
+     */
+    private static void checkArchiveSurvivesARenamedExtension() {
+        java.io.File root = null;
+        try {
+            root = scratch();
+            java.io.File dir = runDirectory(root);
+            java.io.File target = new java.io.File(root, "run.tar.gz");
+            SsaArchive.save(target, SsaArchive.Format.TAR_GZ, dir, fixtureManifest());
+            java.io.File renamed = new java.io.File(root, "archive.dat");
+            expect("the archive can be renamed", true, target.renameTo(renamed));
+            java.io.File elsewhere = new java.io.File(root, "elsewhere");
+            elsewhere.mkdirs();
+            SsaArchive.Loaded loaded = SsaArchive.load(renamed, elsewhere);
+            expect("a renamed archive still opens", "run",
+                    loaded.results().basename());
+        } catch (java.io.IOException ex) {
+            fail("renamed archive: threw " + ex);
+        } finally {
+            SsaArchive.deleteRecursively(root);
+        }
+    }
+
+    /**
+     * Every refusal has to say why, and leave nothing behind: a half unpacked
+     * archive in the scratch directory is a load that changed something.
+     */
+    private static void loadRejected(String what, java.io.File archive,
+            java.io.File root, String expectedInMessage) {
+        java.io.File scratchParent = new java.io.File(root, "scratch");
+        scratchParent.mkdirs();
+        try {
+            SsaArchive.load(archive, scratchParent);
+            fail(what + ": no exception");
+        } catch (java.io.IOException expected) {
+            String message = String.valueOf(expected.getMessage());
+            expect(what, true, message.contains(expectedInMessage));
+            expect(what + ", naming the file", true,
+                    message.contains(archive.getName()));
+            String[] left = scratchParent.list();
+            expect(what + ", leaving nothing unpacked", 0,
+                    left == null ? -1 : left.length);
+        } finally {
+            SsaArchive.deleteRecursively(scratchParent);
+        }
+    }
+
+    private static void writeZip(java.io.File target, String[] names, String[] contents)
+            throws java.io.IOException {
+        java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(
+                new java.io.FileOutputStream(target));
+        try {
+            for (int i = 0; i < names.length; i++) {
+                zip.putNextEntry(new java.util.zip.ZipEntry(names[i]));
+                zip.write(contents[i].getBytes(
+                        java.nio.charset.StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
+        } finally {
+            zip.close();
         }
     }
 
