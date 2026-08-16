@@ -38,6 +38,14 @@ import javax.swing.Icon;
  *          --export-width=32 --export-height=32 icon-light.svg
  * </pre>
  *
+ * <h2>The splash card is generated, not drawn</h2>
+ *
+ * <p>{@code splash-460.png} is the light lockup composited onto a plain card by
+ * {@code tools/MakeSplash.java}. Regenerate it from the repository root with
+ * {@code java tools/MakeSplash.java} whenever the lockup changes; it is not
+ * built by Ant, because it changes about as often as the artwork does and a
+ * build step for it would run on every compile for nothing.
+ *
  * <h2>One file per display scale, rather than one file scaled</h2>
  *
  * <p>The lockup ships at {@value #LOCKUP_WIDTH}px and at two and three times
@@ -58,6 +66,12 @@ final class Branding {
 
     /** Display scales the lockup ships a rendering for. */
     private static final int[] LOCKUP_SCALES = {1, 2, 3};
+
+    /** The splash card, composited from the light lockup by tools/MakeSplash.java. */
+    static final String SPLASH = "splash-460.png";
+
+    /** Its 2x rendering, which the JDK selects by this naming convention alone. */
+    static final String SPLASH_2X = "splash-460@2x.png";
 
     /** Rasterised sizes of the square mark, smallest first. */
     private static final int[] ICON_SIZES = {16, 32, 48, 128};
@@ -110,6 +124,21 @@ final class Branding {
                 LOCKUP_WIDTH, height);
     }
 
+    /**
+     * The lockup as a plain image at one of its rasterised widths, for callers
+     * that paint rather than hand an Icon to Swing.
+     *
+     * <p>{@link #logo} returns a multi-resolution Icon, which is right for a
+     * JLabel and wrong for the splash: {@code SplashScreen.createGraphics()}
+     * is a fixed surface at a known scale, so the caller picks its width.
+     *
+     * @param width 380, 760 or 1140
+     * @return the image, or null when that rendering is not in the jar
+     */
+    static Image lockupImage(boolean dark, int width) {
+        return read("logo-" + variant(dark) + "-" + width + ".png");
+    }
+
     private static String variant(boolean dark) {
         return dark ? "dark" : "light";
     }
@@ -135,6 +164,10 @@ final class Branding {
                 names.add("logo-" + variant(dark) + "-" + (LOCKUP_WIDTH * scale) + ".png");
             }
         }
+        // Outside the loop: one light card serves both themes, and it ships in
+        // two densities rather than three.
+        names.add(SPLASH);
+        names.add(SPLASH_2X);
         return names;
     }
 
