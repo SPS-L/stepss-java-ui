@@ -1,7 +1,9 @@
 package my.stepss;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
+import javax.swing.SwingUtilities;
 
 /**
  * Headless checks for the parts of the startup update check that need no
@@ -21,6 +23,7 @@ public final class UpdateHarness {
         checkUnreadableIsSilent();
         checkNodeMigration();
         checkFirstRunKeyMigration();
+        checkBannerActionButton();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -190,6 +193,52 @@ public final class UpdateHarness {
             removeScratch();
         } catch (BackingStoreException ex) {
             System.out.println("FAIL first-run key migration threw: " + ex);
+            failures++;
+        }
+    }
+
+    /**
+     * The banner's action button must belong to the message that asked for it
+     * and to no other. A button left visible from a previous message is the
+     * fault worth guarding: it would offer "Open release page" beside an
+     * unrelated warning.
+     *
+     * <p>Runs on the EDT through invokeAndWait because InlineBanner marshals
+     * its own work there, so asserting from this thread would race it. Swing
+     * components need no display to be constructed, so this stays headless.
+     */
+    private static void checkBannerActionButton() {
+        try {
+            final InlineBanner banner = new InlineBanner();
+            final boolean[] ran = {false};
+
+            SwingUtilities.invokeAndWait(() ->
+                    banner.notice("<html>STEPSS 3.75 is available.</html>",
+                            "Open release page", () -> ran[0] = true));
+            SwingUtilities.invokeAndWait(() -> {
+                expectTrue("notice shows the banner", banner.isVisible());
+                expectTrue("action button shown", banner.actionButtonVisibleForTests());
+                expect("action button labelled", "Open release page",
+                        banner.actionButtonTextForTests());
+                banner.actionButtonClickForTests();
+            });
+            expectTrue("action runs the runnable", ran[0]);
+
+            SwingUtilities.invokeAndWait(() -> banner.warn("Something else entirely"));
+            SwingUtilities.invokeAndWait(() -> expectFalse(
+                    "a later warn drops the button",
+                    banner.actionButtonVisibleForTests()));
+
+            SwingUtilities.invokeAndWait(() -> banner.confirm("And something worked"));
+            SwingUtilities.invokeAndWait(() -> expectFalse(
+                    "a later confirm drops the button",
+                    banner.actionButtonVisibleForTests()));
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            System.out.println("FAIL banner checks interrupted");
+            failures++;
+        } catch (InvocationTargetException ex) {
+            System.out.println("FAIL banner checks threw: " + ex.getCause());
             failures++;
         }
     }
