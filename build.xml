@@ -90,6 +90,18 @@
 	<zipfileset src="dist/lib/commons-io-2.11.0.jar" excludes="META-INF/*" />
 	<zipfileset src="dist/lib/flatlaf-3.7.2.jar" excludes="META-INF/*" />
   </jar>
+  <!-- Beside the jar as well as inside it. jpackage is given an explicit
+       main-class argument, so its launchers start the class on a classpath
+       and never read the jar manifest: SplashScreen-Image reaches
+       `java -jar` and nothing else. The bundles get -splash: pointed at
+       these copies, which the input directory argument (dist) carries into
+       the application directory. -->
+  <copy todir="dist">
+   <fileset dir="src/my/stepss">
+    <include name="splash-460.png"/>
+    <include name="splash-460@2x.png"/>
+   </fileset>
+  </copy>
  </target>
 
  <!-- Runs after javac, once my.stepss.platform.Toolchain and friends are
@@ -391,6 +403,11 @@
    <arg line="--input dist"/>
    <arg line="--main-jar stepss.jar"/>
    <arg line="--main-class my.stepss.StepssUI"/>
+   <!-- $APPDIR is jpackage's own token, substituted identically on Windows,
+        macOS and Linux, so this one line is the splash on all three. The @2x
+        file beside it is picked up by the JDK's naming convention with no
+        further argument. -->
+   <arg line="--java-options -splash:$APPDIR/splash-460.png"/>
    <arg line="${bundle.icon.arg}"/>
    <arg line="--dest ${bundle.dir}"/>
    <arg line="--temp ${bundle.dir}/work"/>
