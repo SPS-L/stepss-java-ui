@@ -178,6 +178,22 @@ class UramsesManifestTest(unittest.TestCase):
         self.assertEqual("javac", run.calls[0][0])
         self.assertEqual("java", run.calls[1][0])
 
+    def test_compiles_with_a_sourcepath(self):
+        """Without it, javac cannot resolve RouterSplicer from a bare file path.
+
+        UramsesKitPack reads the marker contract off RouterSplicer, which lives
+        in another package, so this compile stops working the moment the flag
+        goes - and it would go silently, since nothing else in this call needs
+        it.
+        """
+        run = FakeRun("uramses.manifest.sha256=deadbeef\n")
+        upstream.uramses_manifest_digest("/tmp/u.zip", "/repo", run=run)
+        javac = run.calls[0]
+        self.assertIn("-sourcepath", javac)
+        self.assertEqual(
+            os.path.join("/repo", "src"), javac[javac.index("-sourcepath") + 1]
+        )
+
     def test_missing_digest_line_raises(self):
         run = FakeRun("something else entirely\n")
         with self.assertRaises(ValueError):
