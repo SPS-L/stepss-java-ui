@@ -50,6 +50,9 @@ jobs:
     outputs:
       proceed: ${{ steps.bump.outputs.proceed }}
       version: ${{ steps.version.outputs.version }}
+      # The tag this release supersedes, for the ordering guard in the deb leg.
+      # Empty on the first-ever release.
+      previous: ${{ steps.version.outputs.previous }}
     steps:
       - name: Check out
         uses: actions/checkout@v7
@@ -355,6 +358,13 @@ jobs:
   # fails, the release is already published and complete, and this job goes red
   # next to it instead of taking the release down with it. The ordering is the
   # whole point, so `needs` is not negotiable here.
+  #
+  # The Linux leg does more than the other two. It is the one whose artifact is
+  # served on by an archive rather than downloaded by hand, so it also checks
+  # the version orders, checks the package installs in a clean container, and
+  # tells stepss-apt to rebuild. All three sit in the leg itself for the reason
+  # the dispatch step spells out: fail-fast: false means a job hanging off this
+  # matrix is skipped whenever any platform fails.
   bundles:
     needs: release
     if: needs.release.outputs.proceed == 'true'
@@ -383,6 +393,38 @@ jobs:
           # and building the branch instead would package whatever has landed
           # since under the released version number.
           ref: ${{ needs.release.outputs.version }}
+
+      # apt refuses to offer an upgrade to a version that does not sort above
+      # the one already installed, and nothing about that looks like a failure:
+      # the release publishes, the .deb attaches, the archive serves it, and
+      # every existing installation quietly stops moving. tools/ci/release.py
+      # derives the version from ramses.version plus a counter, so the ordering
+      # holds only while the upstream version string stays dotted digits -
+      # pins.version_of strips a leading "v" and validates nothing else. dpkg's
+      # own comparison is the authority, because it is the program that will
+      # make this decision on every user's machine. First in the leg so a bad
+      # ordering costs no build.
+      - name: Check the version sorts above the last release
+        if: matrix.type == 'deb'
+        env:
+          NEW_VERSION: ${{ needs.release.outputs.version }}
+          PREVIOUS_VERSION: ${{ needs.release.outputs.previous }}
+        run: |
+          set -euo pipefail
+          if [ -z "$PREVIOUS_VERSION" ]; then
+            echo "No earlier tag; this is the first release and there is nothing to sort above."
+            exit 0
+          fi
+          # Without the tag's leading "v": the bare number is what the .deb
+          # carries in Version: and what apt compares.
+          new="${NEW_VERSION#v}"
+          previous="${PREVIOUS_VERSION#v}"
+          if ! dpkg --compare-versions "$new" gt "$previous"; then
+            echo "$new does not sort above $previous."
+            echo "apt would never offer it as an upgrade to anyone already on $previous."
+            exit 1
+          fi
+          echo "$new sorts above $previous."
 
       - name: Set up Java 21
         uses: actions/setup-java@v5
@@ -420,6 +462,15 @@ jobs:
       - name: Build the installer
         run: ant bundle "-Dbundle.type=--type ${{ matrix.type }}"
 
+      # Before the upload, so a package that cannot be installed is never
+      # published. Docker is on the hosted image already. See the script for why
+      # a container is the only place either of the failures it catches shows
+      # up: this runner has libgfortran and OpenBLAS for unrelated reasons, and
+      # anything that touches a desktop menu succeeds on it.
+      - name: Check the package installs and the toolchain resolves
+        if: matrix.type == 'deb'
+        run: tools/deb-harness.sh
+
       - name: Attach it to the release
         env:
           GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
@@ -430,3 +481,39 @@ jobs:
           # --clobber so a re-run of this job replaces the asset rather than
           # failing on a name that is already there.
           gh release upload "$VERSION" bundle/*.${{ matrix.type }} --clobber
+
+      # Tell the APT archive to rebuild. In this leg, and not in a job that
+      # `needs: [bundles]`: `bundles` is a fail-fast: false matrix, so its
+      # aggregate result is a failure when any single platform fails and a
+      # dependent job is skipped instead of run. v3.74.8 is the proof - it
+      # published a .deb and a .dmg and no .msi, because the Windows leg failed
+      # - and a dispatch hanging off the matrix would have skipped that release
+      # for good, since there is no schedule left here to correct it. Hung off
+      # `needs: [release]` it would be worse still: that job finishes before any
+      # installer exists, so the archive would rebuild against the release
+      # before this one, every time. Here it fires when, and only when, the
+      # artifact it is announcing is on the release.
+      #
+      # STEPSS_TOKEN, not a name of its own: one configured secret across the
+      # platform is what makes `grep -rho 'secrets\.[A-Z_]*'` answer the
+      # question "what real secrets are there" unambiguously. A fine-grained PAT
+      # scoped to a repository list has to name stepss-apt explicitly, and a
+      # dispatch under a token that cannot reach it 401s here rather than
+      # failing anywhere downstream - nothing arrives, so nothing goes red over
+      # there. That is what this step failing means; do not soften it.
+      - name: Tell the APT archive there is a new .deb
+        if: matrix.type == 'deb'
+        env:
+          GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Read from env and quoted, never interpolated into this script: see
+          # the note at the top of the file. github.ref_name is NOT the tag
+          # here - this workflow runs on repository_dispatch and
+          # workflow_dispatch against the default branch, so it is always
+          # "main".
+          gh api repos/SPS-L/stepss-apt/dispatches \
+            -f event_type=stepss-release \
+            -f "client_payload[tag]=$VERSION"
+          echo "stepss-apt asked to rebuild for $VERSION."
