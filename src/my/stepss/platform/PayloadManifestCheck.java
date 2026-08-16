@@ -35,8 +35,9 @@ public final class PayloadManifestCheck {
     }
 
     public static void main(String[] args) {
-        if (args.length != 1) {
-            System.err.println("Usage: PayloadManifestCheck <staged-payload-dir>");
+        if (args.length != 1 && args.length != 2) {
+            System.err.println("Usage: PayloadManifestCheck <staged-payload-dir>"
+                    + " [examples-descriptor]");
             System.exit(2);
             return;
         }
@@ -57,8 +58,57 @@ public final class PayloadManifestCheck {
             return;
         }
 
+        if (args.length == 2 && !checkExamples(payloadDir, new File(args[1]))) {
+            System.exit(1);
+            return;
+        }
+
         System.out.println("Payload manifest check OK: every Toolchain.java payload "
                 + "resource is present in " + payloadDir.getAbsolutePath());
+    }
+
+    /**
+     * The same assertion for the bundled examples, whose payload names live in
+     * the examples descriptor rather than in {@link Toolchain}.
+     *
+     * <p>Catches a descriptor entry added without a matching pin and
+     * {@code pack-example} line in build.xml. That combination stages nothing,
+     * leaves the build green, and then fails at run time as an entry in the
+     * dialog that cannot be opened - the same shape of bug this class was
+     * written for, one file along.
+     *
+     * @return true when every declared example payload was staged
+     */
+    private static boolean checkExamples(File payloadDir, File descriptor) {
+        List<String> absent = new ArrayList<>();
+        java.util.List<my.stepss.examples.Example> examples;
+        try (java.io.InputStream in = new java.io.FileInputStream(descriptor)) {
+            examples = my.stepss.examples.ExampleCatalog.load(in);
+        } catch (java.io.IOException ex) {
+            System.err.println("Examples payload check FAILED: could not read "
+                    + descriptor.getAbsolutePath() + ": " + ex.getMessage());
+            return false;
+        }
+        for (my.stepss.examples.Example example : examples) {
+            String name = example.payloadResource().substring(PAYLOAD_PREFIX.length());
+            if (!new File(payloadDir, name).isFile()) {
+                absent.add(example.id() + ": " + example.payloadResource());
+            }
+        }
+        if (absent.isEmpty()) {
+            return true;
+        }
+        System.err.println("Examples payload check FAILED: " + absent.size()
+                + " example(s) declared in " + descriptor.getName()
+                + " were not staged into " + payloadDir.getAbsolutePath() + ":");
+        for (String a : absent) {
+            System.err.println("  " + a);
+        }
+        System.err.println("An example was added to the descriptor without its pin in "
+                + "versions.properties and its pack-example line in build.xml. All three "
+                + "have to move together, or the dialog offers an example the jar does "
+                + "not carry.");
+        return false;
     }
 
     /** @return one description per {@code Toolchain.SPECS} resource missing from {@code payloadDir}. */

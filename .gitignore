@@ -11,6 +11,9 @@
 /build/
 /dist/
 
+# Bytecode cache from running the release tooling and its tests
+__pycache__/
+
 # jpackage output (ant bundle)
 /bundle/
 

@@ -120,6 +120,7 @@
         classpath="${build.classes.dir}"
         fork="true" failonerror="true">
    <arg value="src/my/stepss/payload"/>
+   <arg value="${examples.descriptor}"/>
   </java>
  </target>
 
@@ -129,6 +130,12 @@
       the app-image type, which is a directory that needs no installer. -->
  <property name="bundle.type" value=""/>
  <property name="payload.cache" location="payload-cache"/>
+ <!-- Names the bundled examples, the files each one is made of, and what the
+      dialog says about them. Read by ExamplesPack here and by the interface at
+      run time, so the packer and the dialog cannot disagree about what an
+      example contains. -->
+ <property name="examples.descriptor"
+           location="src/my/stepss/examples/examples.properties"/>
 
  <macrodef name="fetch-asset">
   <attribute name="repo"/>
@@ -265,6 +272,53 @@
        verbose="true" unless:set="uramses.cached"/>
  </target>
 
+ <!-- Like fetch-uramses: the example repositories are public, so this is a
+      plain HTTPS GET with no gh and no STEPSS_TOKEN. The cached name carries
+      the version, so a bump downloads afresh rather than reusing the previous
+      release's archive under the same name. No digest check here on purpose -
+      ExamplesPack verifies by content manifest, and the archive's own bytes are
+      not stable enough to check (see versions.properties). -->
+ <macrodef name="fetch-example">
+  <attribute name="id"/>
+  <attribute name="version"/>
+  <attribute name="url"/>
+  <sequential>
+   <mkdir dir="${payload.cache}"/>
+   <available file="${payload.cache}/example-@{id}-@{version}.zip"
+              property="example.@{id}.cached"/>
+   <get src="@{url}" dest="${payload.cache}/example-@{id}-@{version}.zip"
+        verbose="true" unless:set="example.@{id}.cached"/>
+  </sequential>
+ </macrodef>
+
+ <!-- Filters one example archive down to the files its descriptor entry names,
+      verifies the content manifest against the pin, and writes the payload the
+      jar ships. Fails the build, naming the file, if the pinned release stopped
+      carrying something the descriptor names: that turns a bad upstream release
+      into a red build instead of a menu entry that opens onto missing slots. -->
+ <macrodef name="pack-example">
+  <attribute name="id"/>
+  <attribute name="version"/>
+  <attribute name="sha256"/>
+  <sequential>
+   <java classname="my.stepss.examples.ExamplesPack"
+         classpath="${build.classes.dir}" fork="true" failonerror="true">
+    <arg value="${examples.descriptor}"/>
+    <arg value="@{id}"/>
+    <arg value="${payload.cache}/example-@{id}-@{version}.zip"/>
+    <arg value="src/my/stepss/payload/example-@{id}.zip"/>
+    <arg value="@{sha256}"/>
+   </java>
+  </sequential>
+ </macrodef>
+
+ <target name="fetch-examples"
+         description="Download the pinned example test system archives (public, no gh needed)">
+  <fetch-example id="kundur"   version="${kundur.version}"   url="${kundur.source.url}"/>
+  <fetch-example id="nordic"   version="${nordic.version}"   url="${nordic.source.url}"/>
+  <fetch-example id="five-bus" version="${five-bus.version}" url="${five-bus.source.url}"/>
+ </target>
+
  <!-- `init` is build-impl.xml's property-loading chain, and this target needs
       it for ${build.classes.dir}, ${javac.source} and ${javac.target}. Reached
       through -pre-compile it would already have run, but this target carries a
@@ -273,7 +327,7 @@
       payloads, copies the component ones back, and then dies on `invalid
       target release: ${javac.target}` before UramsesKitPack repacks the kit -
       leaving the tree short one payload with an error naming none of that. -->
- <target name="stage-payloads" depends="init,fetch-payloads,fetch-uramses"
+ <target name="stage-payloads" depends="init,fetch-payloads,fetch-uramses,fetch-examples"
          description="Copy verified payloads into the source tree for packaging">
   <!-- Nothing else prunes this directory, so a stale payload left over from
        a previous version pin (e.g. after bumping versions.properties) would
@@ -311,13 +365,23 @@
   <mkdir dir="${build.classes.dir}"/>
   <javac srcdir="src" destdir="${build.classes.dir}" includeantruntime="false"
          source="${javac.source}" target="${javac.target}"
-         includes="my/stepss/platform/UramsesKitPack.java"/>
+         includes="my/stepss/platform/UramsesKitPack.java,my/stepss/examples/ExamplesPack.java"/>
   <java classname="my.stepss.platform.UramsesKitPack"
         classpath="${build.classes.dir}" fork="true" failonerror="true">
    <arg value="${payload.cache}/stepss-uramses-${uramses.version}.zip"/>
    <arg value="src/my/stepss/payload/uramses-kit-v${uramses.version}.zip"/>
    <arg value="${uramses.manifest.sha256}"/>
   </java>
+  <!-- Unlike the component payloads above, these are not copied from the cache
+       by name: the packer reads the downloaded archive and writes the filtered
+       payload straight into the staged directory, so there is no cached file
+       under the shipped name that a stale copy could be mistaken for. -->
+  <pack-example id="kundur"   version="${kundur.version}"
+                sha256="${kundur.manifest.sha256}"/>
+  <pack-example id="nordic"   version="${nordic.version}"
+                sha256="${nordic.manifest.sha256}"/>
+  <pack-example id="five-bus" version="${five-bus.version}"
+                sha256="${five-bus.manifest.sha256}"/>
  </target>
 
  <target name="-pre-compile" depends="stage-payloads"/>
