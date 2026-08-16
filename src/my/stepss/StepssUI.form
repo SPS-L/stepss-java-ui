@@ -2157,6 +2157,8 @@
                                           <Component id="viewSsaResults" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
                                           <Component id="saveDynJac" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace max="-2" attributes="0"/>
+                                          <Component id="loadDynJac" min="-2" max="-2" attributes="0"/>
                                       </Group>
                                       <Group type="102" alignment="0" attributes="0">
                                           <Component id="ssaBasenameLabel" min="-2" max="-2" attributes="0"/>
@@ -2227,6 +2229,7 @@
                               <Component id="ssaButton1" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="viewSsaResults" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="saveDynJac" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="loadDynJac" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace pref="657" max="32767" attributes="0"/>
                       </Group>
@@ -2301,12 +2304,22 @@
                 <Component class="javax.swing.JButton" name="saveDynJac">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Save dynamic Jacobian..."/>
-                    <Property name="toolTipText" type="java.lang.String" value="Saves the Jacobian the last analysis reduced, taken at the same instant as the eigenvalues"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Saves the last analysis as one archive: the Jacobian it reduced, taken at the same instant as the eigenvalues, and the results it produced"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="saveDynJac" noResource="true"/>
                   </Properties>
                   <Events>
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="saveDynJacActionPerformed"/>
+                  </Events>
+                </Component>
+                <Component class="javax.swing.JButton" name="loadDynJac">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Load dynamic Jacobian..."/>
+                    <Property name="toolTipText" type="java.lang.String" value="Opens an archive saved by the button beside this one, on this machine or another"/>
+                    <Property name="name" type="java.lang.String" value="loadDynJac" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loadDynJacActionPerformed"/>
                   </Events>
                 </Component>
                 <Component class="javax.swing.JLabel" name="jLabel4">
