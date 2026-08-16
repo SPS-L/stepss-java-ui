@@ -41,9 +41,10 @@ import javax.swing.Icon;
  * <h2>The splash card is generated, not drawn</h2>
  *
  * <p>{@code splash-460.png} is the light lockup composited onto a plain card by
- * {@code tools/MakeSplash.java}. Regenerate it from the repository root with
- * {@code java tools/MakeSplash.java} whenever the lockup changes; it is not
- * built by Ant, because it changes about as often as the artwork does and a
+ * {@code tools/MakeSplash.java}. Nothing has to be run by hand for it:
+ * {@code tools/refresh-marks.sh} composites the card as its last step, from the
+ * lockups it has just exported, so one command still refreshes every mark. It is
+ * not built by Ant, because it changes about as often as the artwork does and a
  * build step for it would run on every compile for nothing.
  *
  * <h2>One file per display scale, rather than one file scaled</h2>

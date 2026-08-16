@@ -29,6 +29,10 @@ if ! command -v inkscape >/dev/null 2>&1; then
     echo "inkscape not found on PATH; it is what renders these correctly." >&2
     exit 1
 fi
+if ! command -v java >/dev/null 2>&1; then
+    echo "java not found on PATH; it is what composites the splash card." >&2
+    exit 1
+fi
 for name in logo-light logo-dark icon-light icon-dark; do
     if [ ! -f "$ASSETS/$name.svg" ]; then
         echo "Missing source: $ASSETS/$name.svg" >&2
@@ -58,6 +62,14 @@ for variant in light dark; do
         echo "icon-$variant-$s.png"
     done
 done
+
+# The splash card is a second derived asset: the light lockup composited onto a
+# plain card. It is regenerated here, from the lockups just exported, because a
+# refresh that left it behind would ship the old artwork on the startup card and
+# nothing would notice - the file still resolves, so ChromeCheck stays green.
+java tools/MakeSplash.java >/dev/null
+echo "splash-460.png"
+echo "splash-460@2x.png"
 
 echo
 echo "Re-exported into $DEST. 'ant jar' picks them up; tools/chrome-harness.sh"
