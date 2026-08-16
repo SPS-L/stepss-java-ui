@@ -140,6 +140,34 @@ final class Branding {
         return read("logo-" + variant(dark) + "-" + width + ".png");
     }
 
+    /**
+     * Which of those widths to ask for, when the lockup is laid out
+     * {@value #LOCKUP_WIDTH}px wide on a surface drawn at {@code scale} device
+     * pixels per user-space unit.
+     *
+     * <p>The narrowest rendering that still covers the device pixels, so a 2x
+     * surface gets the 760 at 1:1 rather than the 380 enlarged. A fractional
+     * scale rounds up for the same reason {@link LockupIcon} sets no
+     * interpolation hint: minifying a rendering that exists is the good case,
+     * enlarging one that is too small is the case worth avoiding. Beyond 3x the
+     * answer is the 1140, because there is no wider file to hand back.
+     *
+     * <p>Only callers that paint need this. {@link #logo} hands Swing every
+     * variant and lets the drawing pipeline choose; a splash surface cannot,
+     * because {@code SplashScreen.createGraphics()} is one fixed surface.
+     */
+    static int lockupWidthFor(double scale) {
+        int wanted = (int) Math.round(LOCKUP_WIDTH * scale);
+        int widest = LOCKUP_WIDTH * LOCKUP_SCALES[LOCKUP_SCALES.length - 1];
+        for (int factor : LOCKUP_SCALES) {
+            int width = LOCKUP_WIDTH * factor;
+            if (width >= wanted) {
+                return width;
+            }
+        }
+        return widest;
+    }
+
     private static String variant(boolean dark) {
         return dark ? "dark" : "light";
     }

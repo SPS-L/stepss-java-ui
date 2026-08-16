@@ -1,6 +1,7 @@
 package my.stepss;
 
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Image;
@@ -22,12 +23,30 @@ import java.awt.geom.Rectangle2D;
  * returns null unless the JVM was launched with a splash, which is the case
  * when the main class is run from an IDE, so {@link #open} returns null and
  * every caller treats that as "no splash" rather than as a failure.
+ *
+ * <h2>The surface says how big it is, and at what scale</h2>
+ *
+ * <p>Nothing here assumes the card is 460x250 device pixels, because on a high
+ * density display it is not. Measured on JDK 21: when the JVM picks the
+ * {@code @2x} card, {@link SplashScreen#getSize()} still reports the logical
+ * 460x250, and {@link SplashScreen#createGraphics()} hands back a
+ * {@code Graphics2D} already scaled by two. So every coordinate below is in
+ * user space and reads the same at either density, and the one thing that must
+ * change with the scale is which lockup rendering is asked for: the surface has
+ * 760 device pixels to spend across the lockup, and handing it the 380 would
+ * enlarge a small raster onto exactly the screens where that is most visible,
+ * which is what {@link Branding} ships three renderings to avoid.
  */
 final class Splash {
 
-    /** The card's logical size, matching tools/MakeSplash.java. */
-    private static final int W = 460;
-    private static final int H = 250;
+    /** The lockup's top edge, and the side margin, in user space. */
+    private static final int LOCKUP_TOP = 28;
+    private static final int MARGIN = 24;
+
+    /** Baselines and the hairline rule, measured up from the card's bottom. */
+    private static final int CREATORS_UP = 58;
+    private static final int RULE_UP = 40;
+    private static final int FOOTER_UP = 18;
 
     private final SplashScreen screen;
     private final boolean dark;
@@ -97,45 +116,10 @@ final class Splash {
             return;
         }
         try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                    RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-                    RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-
-            Color background = dark ? new Color(0x1E2227) : Color.WHITE;
-            Color ink = dark ? new Color(0xE6E9EE) : new Color(0x24292F);
-            Color quiet = dark ? new Color(0x9AA4B2) : new Color(0x6B7280);
-            Color rule = dark ? new Color(0x343A42) : new Color(0xD8DEE4);
-
-            // The whole card every time, not just the status line: the base
-            // image is the light card, so a dark launch has to cover it, and
-            // repainting one strip would leave the previous status underneath.
-            g.setColor(background);
-            g.fillRect(0, 0, W, H);
-            g.setColor(rule);
-            g.drawRect(0, 0, W - 1, H - 1);
-
-            Image lockup = Branding.lockupImage(dark, Branding.LOCKUP_WIDTH);
-            if (lockup != null) {
-                // The same 28px offset tools/MakeSplash.java uses, so the dark
-                // card and the light base image place the lockup identically.
-                g.drawImage(lockup, (W - Branding.LOCKUP_WIDTH) / 2, 28, null);
-            }
-
-            Font base = g.getFont();
-            g.setFont(base.deriveFont(Font.PLAIN, 12f));
-            g.setColor(ink);
-            centred(g, "Creators: Petros Aristidou and Thierry Van Cutsem", 192);
-
-            g.setColor(rule);
-            g.drawLine(24, 210, W - 24, 210);
-
-            g.setFont(base.deriveFont(Font.PLAIN, 11f));
-            g.setColor(quiet);
-            g.drawString(version, 24, 232);
-            int statusWidth = g.getFontMetrics().stringWidth(status);
-            g.drawString(status, W - 24 - statusWidth, 232);
-
+            // The surface, not the constants that made it: a logical size and
+            // a device scale, both taken from the thing being drawn on.
+            Dimension size = screen.getSize();
+            render(g, size.width, size.height, dark, version, status);
             screen.update();
         } catch (IllegalStateException alreadyClosed) {
             // update() races the JVM's own close for the same reason
@@ -145,8 +129,74 @@ final class Splash {
         }
     }
 
-    private static void centred(Graphics2D g, String text, int y) {
+    /**
+     * Draws the whole card into {@code g}, in user space.
+     *
+     * <p>Separate from {@link #paint} so it can be rendered into a
+     * {@link java.awt.image.BufferedImage} at a chosen scale, which is the only
+     * way to look at what this produces: a real splash surface cannot be read
+     * back.
+     *
+     * @param w      the card's width in user space
+     * @param h      its height in user space
+     * @param status the line shown bottom right, already worded
+     */
+    static void render(Graphics2D g, int w, int h, boolean dark,
+                       String version, String status) {
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+        Color background = dark ? new Color(0x1E2227) : Color.WHITE;
+        Color ink = dark ? new Color(0xE6E9EE) : new Color(0x24292F);
+        Color quiet = dark ? new Color(0x9AA4B2) : new Color(0x6B7280);
+        Color rule = dark ? new Color(0x343A42) : new Color(0xD8DEE4);
+
+        // The whole card every time, not just the status line: the base
+        // image is the light card, so a dark launch has to cover it, and
+        // repainting one strip would leave the previous status underneath.
+        g.setColor(background);
+        g.fillRect(0, 0, w, h);
+        g.setColor(rule);
+        g.drawRect(0, 0, w - 1, h - 1);
+
+        // The rendering the surface can actually show, drawn at the layout
+        // width so it lands 1:1 rather than enlarged. Falls back to the base
+        // width if a density is missing from the jar, which leaves a soft
+        // lockup rather than no lockup; ChromeCheck is what stops it happening.
+        int lockupWidth = Branding.lockupWidthFor(g.getTransform().getScaleX());
+        Image lockup = Branding.lockupImage(dark, lockupWidth);
+        if (lockup == null && lockupWidth != Branding.LOCKUP_WIDTH) {
+            lockup = Branding.lockupImage(dark, Branding.LOCKUP_WIDTH);
+        }
+        if (lockup != null) {
+            // The same 28px offset tools/MakeSplash.java uses, so the dark
+            // card and the light base image place the lockup identically.
+            int drawnHeight = Math.round(Branding.LOCKUP_WIDTH
+                    * lockup.getHeight(null) / (float) lockup.getWidth(null));
+            g.drawImage(lockup, (w - Branding.LOCKUP_WIDTH) / 2, LOCKUP_TOP,
+                    Branding.LOCKUP_WIDTH, drawnHeight, null);
+        }
+
+        Font base = g.getFont();
+        g.setFont(base.deriveFont(Font.PLAIN, 12f));
+        g.setColor(ink);
+        centred(g, w, "Creators: Petros Aristidou and Thierry Van Cutsem",
+                h - CREATORS_UP);
+
+        g.setColor(rule);
+        g.drawLine(MARGIN, h - RULE_UP, w - MARGIN, h - RULE_UP);
+
+        g.setFont(base.deriveFont(Font.PLAIN, 11f));
+        g.setColor(quiet);
+        g.drawString(version, MARGIN, h - FOOTER_UP);
+        int statusWidth = g.getFontMetrics().stringWidth(status);
+        g.drawString(status, w - MARGIN - statusWidth, h - FOOTER_UP);
+    }
+
+    private static void centred(Graphics2D g, int cardWidth, String text, int y) {
         Rectangle2D bounds = g.getFontMetrics().getStringBounds(text, g);
-        g.drawString(text, (int) ((W - bounds.getWidth()) / 2), y);
+        g.drawString(text, (int) ((cardWidth - bounds.getWidth()) / 2), y);
     }
 }

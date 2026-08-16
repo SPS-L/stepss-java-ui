@@ -430,7 +430,22 @@ needs no display, so this runs headlessly like the rest.
   build is the confirmation. A missing splash degrades to no splash, never to a
   failed start.
 - **HiDPI.** The JDK picks `splash-460@2x.png` by naming convention on both
-  routes. Verified at whatever scaling this machine offers, not at all of them.
+  routes, and picking it is what makes the surface a scaled one: measured on
+  JDK 21, a `-splash:` whose `@2x` file is present reports `getSize()` as the
+  logical 460x250 and hands back a `Graphics2D` already scaled by two, and with
+  the `@2x` removed the same launch reports scale 1.0. So the base card is
+  genuinely the high density file.
+
+  The overpaint has to match it or the `@2x` is thrown away on the first frame,
+  since `Splash.open` repaints immediately. `Splash` therefore takes its width
+  and height from `getSize()` and its lockup rendering from the graphics
+  transform's scale, rather than from constants. All of this was exercised by
+  forcing `GDK_SCALE=2`, which is the same code path a real 2x display takes but
+  is not the same as a real 2x display: **no HiDPI monitor was available**, so
+  what a user sees at 2x remains unconfirmed. What was confirmed offscreen is
+  that the 1x card is pixel-identical to before, and that the 2x card's lockup
+  matches the 760px rendering to within one count per channel instead of being
+  the 380px rendering enlarged.
 - **The preferences migration runs once and is destructive.** It calls
   `removeNode()` on `my.ramses.RamsesUI` after copying. A bug there costs a user
   their theme, window and working directory, so it is the one piece of this work
