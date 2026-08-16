@@ -74,6 +74,14 @@ It needs `jpackage`, which ships with JDK 14 and later, and it only ever builds 
 
 The bundles are a second CI job that runs *after* the release is published and attaches its installer to it. A runner failing there leaves the release intact with `stepss.jar`, which is the artifact that matters.
 
+The Linux `.deb` is the one bundle an archive serves rather than a person downloads, so `packaging/linux` overrides six of jpackage's own templates. What that buys, beyond the desktop menu entry: the RAMSES runtime libraries and gnuplot are declared as dependencies, the Fortran toolchain is a `Recommends:`, `/usr/bin/stepss` is a command you can type, and `/usr/share/doc/stepss/copyright` names each bundled component and the licence it travels under. jpackage can derive none of that, because it reads dependencies off the app image and the whole simulation toolchain is inside the jar as resources it extracts at run time.
+
+```bash
+tools/deb-harness.sh          # install the built .deb in a clean container
+```
+
+It needs Docker. Two failures are invisible without one: this machine has libgfortran and OpenBLAS installed for other reasons, and it has a desktop, so `xdg-desktop-menu` succeeds here and exits 3 on the servers, containers and WSL installs where users meet it. The harness installs the package for real, checks that `ramses` starts, and removes it again. It runs in CI before the `.deb` is attached to the release, and the package is built on Ubuntu 24.04, which is therefore the oldest release it installs on.
+
 The bundled runtime is the full JDK runtime rather than a trimmed `jlink` image. STEPSS extracts and runs native executables through Commons Exec, so what a module scan can see and what the application actually needs are different questions, and roughly 40MB is a fair price for removing a class of failure where the bundle starts and then cannot find a class.
 
 ### Releases

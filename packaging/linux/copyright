@@ -1,0 +1,105 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: STEPSS
+Upstream-Contact: SPS-Lab <stepss@sps-lab.org>
+Source: https://stepss.sps-lab.org
+
+Comment: STEPSS is an umbrella over components under different licences, and
+ this package is NOT free software taken as a whole. The user interface is
+ Apache 2.0; the simulation engines it bundles are not. In particular RAMSES
+ is proprietary, is free for non-commercial use only, and its free version is
+ capped at 1000 buses and 2 cores.
+ .
+ Each licence below is summarised, not reproduced. The verbatim texts ship
+ inside the application and are shown by Help > About, and the authoritative
+ statement of what governs what is
+ https://stepss.sps-lab.org/getting-started/license/
+
+Files: *
+Copyright: Sustainable Power Systems Laboratory, Cyprus University of Technology
+License: Apache-2.0
+ The STEPSS user interface, DYNGRAPH and the URAMSES kit are licensed under
+ the Apache License, Version 2.0. On Debian systems the complete text is in
+ /usr/share/common-licenses/Apache-2.0
+
+Files: opt/stepss/lib/app/stepss.jar
+Comment: The jar carries the simulation toolchain as embedded resources, which
+ it extracts at runtime. The stanzas below name what those are and the terms
+ each of them is distributed under. Their file names inside the jar are under
+ my/stepss/payload/, one per component and platform.
+Copyright: see the individual components below
+License: mixed
+ See the stanzas below. There is no single licence covering the payloads.
+
+Files: my/stepss/payload/ramses-*
+Copyright: University of Liege, Belgium
+License: RAMSES-proprietary
+ RAMSES, the differential-algebraic solver, is the property of the University
+ of Liege, which granted Dr Petros Aristidou and Dr Thierry Van Cutsem a
+ personal, royalty-free, limited, non-exclusive, non-transferable and
+ non-assignable licence to distribute an executable version of it free of
+ charge. Use is permitted for non-commercial purposes only, and the free
+ version is limited to 1000 buses and 2 cores. The licence is non-transferable,
+ so redistributing or mirroring this package is not covered by it. For any
+ other use, contact stepss@sps-lab.org
+ .
+ Verbatim text: Help > License Agreement in the application.
+
+Files: my/stepss/payload/stepss-helios-*
+Copyright: Sustainable Power Systems Laboratory, Cyprus University of Technology
+License: Academic-Public-License
+ Helios, the power flow and continuation engine, is distributed as a compiled
+ executable under an Academic Public License: free for academic, research and
+ educational use, with commercial use requiring a separate agreement.
+ .
+ Verbatim text: Help > About > Helios in the application.
+
+Files: my/stepss/payload/codegen-*
+Copyright: Dr Thierry Van Cutsem
+License: Academic-Public-License
+ CODEGEN, the model generator, is the property of Dr Thierry Van Cutsem and is
+ distributed as a compiled executable only, under an Academic Public License:
+ free for academic, research and educational use, with commercial use
+ requiring a separate agreement.
+ .
+ Verbatim text: Help > About > CODEGEN in the application.
+
+Files: my/stepss/payload/dyngraph-*
+Copyright: Sustainable Power Systems Laboratory, Cyprus University of Technology
+License: Apache-2.0
+ On Debian systems the complete text is in
+ /usr/share/common-licenses/Apache-2.0
+
+Comment: KLU is linked into the RAMSES executable rather than shipped as a
+ file of its own, so it has no Files: stanza.
+Files: my/stepss/KLULicense.txt
+Copyright: 2004-2013, University of Florida, Timothy A. Davis and
+           Ekanathan Palamadai
+License: LGPL-2.1+
+ KLU, part of SuiteSparse (http://www.suitesparse.com), is used by permission
+ and is free software: you may redistribute it and/or modify it under the
+ terms of the GNU Lesser General Public License as published by the Free
+ Software Foundation, either version 2.1 of the License, or (at your option)
+ any later version. On Debian systems the complete text is in
+ /usr/share/common-licenses/LGPL-2.1
+
+Comment: gnuplot is bundled for Windows only. This package depends on the
+ distribution's own gnuplot instead, but the jar is built once for every
+ platform, so the Windows build travels inside it here too.
+Files: my/stepss/gpwin.zip
+Copyright: 1986-1993, 1998, 2004, Thomas Williams, Colin Kelley
+License: gnuplot
+ Permission to use, copy, and distribute this software and its documentation
+ for any purpose with or without fee is hereby granted, provided that the
+ above copyright notice appear in all copies and that both that copyright
+ notice and this permission notice appear in supporting documentation.
+ Permission to modify the software is granted, but not the right to distribute
+ the complete modified source code. Modifications are to be distributed as
+ patches to the released version. Permission to distribute binaries produced
+ by compiling modified sources is granted, provided you keep the source code
+ available, note that the source has been modified, and provide the
+ modifications to the copyright holders.
+ .
+ This software is provided "as is" without express or implied warranty to the
+ extent permitted by applicable law.
+ .
+ Verbatim text: Help > About > gnuplot in the application.

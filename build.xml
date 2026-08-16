@@ -374,20 +374,82 @@
              value="--win-shortcut --win-menu --win-dir-chooser --win-menu-group STEPSS">
    <os family="windows"/>
   </condition>
+  <!-- What the toolchain links against, which jpackage cannot work out for
+       itself. It derives Depends: by asking which packages own the shared
+       libraries the APP IMAGE needs - the launcher, the bundled JRE and the
+       jar - and the engines are none of those: they travel as .tar.gz
+       resources inside stepss.jar and are extracted at run time. So the
+       generated list is a dependency list for Swing, and `apt install stepss`
+       used to succeed, open a window, and fail on the first simulation.
+       "objdump -p" on the extracted ramses is the source of the first three:
+
+         libopenblas.so.0  libgfortran.so.5  libgomp.so.1
+         libm.so.6  libc.so.6  libgcc_s.so.1
+
+       Only RAMSES is affected; helios, dyngraph and CODEGEN are all statically
+       linked. libc6 and libgcc-s1 are already detected from the JRE, but
+       libgcc-s1 is named here anyway rather than relied on, because that
+       detection is about the runtime and this line is about the engine.
+
+       gnuplot is the odd one out: nothing links against it, Toolchain.gnuplot()
+       resolves it from PATH on Linux, and real-time plotting and View Curves
+       both shell out to it. Not plain `gnuplot`, which is a metapackage that
+       gnuplot-nox satisfies through Provides: - a terminal-less build that
+       installs cleanly and then draws nothing. getting-started/installation.mdx
+       names gnuplot-x11, so an alternation of the two interactive builds is
+       what that documented instruction means as a dependency. -->
+  <property name="bundle.linux.deps"
+            value="libgfortran5, libgomp1, libopenblas0, libgcc-s1, gnuplot-x11 | gnuplot-qt"/>
   <condition property="bundle.platform.args"
-             value="--linux-shortcut --linux-menu-group Science --linux-package-name stepss">
+             value="--linux-shortcut --linux-menu-group Science --linux-package-name stepss --linux-app-category science --linux-package-deps '${bundle.linux.deps}'">
    <os family="unix"/>
   </condition>
   <property name="bundle.platform.args" value=""/>
 
-  <!-- Linux only, and only to add one line to the menu entry.
-       StartupWMClass is what lets the desktop tie a running window to the
-       application it installed. Java derives WM_CLASS from the main class, so
-       the window announces itself as my-stepss-StepssUI while the menu entry
-       is stepss-STEPSS.desktop; with nothing to connect them, the shell shows
-       a generic cog in the dock beside a window whose own title bar has the
-       right icon. The file is jpackage's own template with that one line
-       added, tokens and all, so everything else stays generated. -->
+  <!-- Linux only. Six of jpackage's own templates, each its original with a
+       few lines changed, so that everything else stays generated and a JDK
+       that reworks one of them conflicts in one place:
+
+       STEPSS.desktop  adds StartupWMClass. Java derives WM_CLASS from the main
+                       class, so the window announces itself as
+                       my-stepss-StepssUI while the menu entry is
+                       stepss-STEPSS.desktop; with nothing to connect them the
+                       shell shows a generic cog in the dock beside a window
+                       whose own title bar has the right icon.
+       control         sets Maintainer, and adds Recommends:, which no
+                       command-line option can express. jpackage builds
+                       Maintainer: out of the vendor option plus the
+                       linux-deb-maintainer one, giving "...Cyprus University
+                       of Technology &lt;Unknown&gt;": an address that is not
+                       one, and a vendor string that is a sentence. The vendor
+                       is shared with the Windows and macOS bundles, where the
+                       full lab name is the right thing to show, so the short
+                       form cannot come from there. Recommends: is the Fortran
+                       toolchain that CODEGEN needs to compile custom models
+                       and nothing else does - installed by default,
+                       declinable, which is exactly what
+                       getting-started/installation.mdx describes.
+       copyright       replaces a stub that read "Copyright (C) 2026 / License:
+                       Unknown" with a stanza per bundled component. An
+                       archive hands this package to people who never saw a
+                       release page, and RAMSES is proprietary and
+                       non-commercial-only.
+       postinst        add /usr/bin/stepss and the /usr/share/doc/stepss/
+       postrm          copyright link, and remove them again. Neither is
+                       owned by dpkg, because jpackage can only place files
+                       under the install directory.
+       postinst        stop xdg-desktop-menu from being fatal. It exits 3 with
+       prerm           "No writable system menu directory found" wherever
+                       there is no desktop, and both scripts run under
+                       "set -e", so installing on a server, in a container or
+                       under WSL failed outright and left dpkg holding a
+                       half-configured package - and removing it then failed
+                       the same way. A container is the only place that
+                       reproduces this; a workstation never will, which is
+                       what tools/deb-harness.sh is for.
+
+       Everything under packaging/linux is passed as one directory, so a file
+       added there is picked up by name with no change here. -->
   <condition property="bundle.resource.arg" value="--resource-dir packaging/linux">
    <and>
     <os family="unix"/>

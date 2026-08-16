@@ -1,0 +1,47 @@
+#!/bin/sh
+# postrm script for APPLICATION_PACKAGE
+#
+# see: dh_installdeb(1)
+#
+# jpackage's own template with the removal half of the two symlinks postinst
+# creates. The template's single case branch is split so those run on removal
+# only: on an upgrade dpkg calls the OLD package's postrm after the new files
+# are unpacked and before the new postinst runs, and deleting the links there
+# would leave a window with none, or drop them for good if the new postinst
+# failed.
+
+set -e
+
+# summary of how this script can be called:
+#        * <postrm> `remove'
+#        * <postrm> `purge'
+#        * <old-postrm> `upgrade' <new-version>
+#        * <new-postrm> `failed-upgrade' <old-version>
+#        * <new-postrm> `abort-install'
+#        * <new-postrm> `abort-install' <old-version>
+#        * <new-postrm> `abort-upgrade' <old-version>
+#        * <disappearer's-postrm> `disappear' <overwriter>
+#          <overwriter-version>
+# for details, see https://www.debian.org/doc/debian-policy/ or
+# the debian-policy package
+
+case "$1" in
+    purge|remove)
+    # -f, and the directory removed only if it is empty: a user who deleted
+    # either by hand must not turn `apt remove` into a failed removal that
+    # leaves the package half-configured.
+    rm -f /usr/bin/APPLICATION_PACKAGE
+    rm -f /usr/share/doc/APPLICATION_PACKAGE/copyright
+    rmdir --ignore-fail-on-non-empty /usr/share/doc/APPLICATION_PACKAGE 2>/dev/null || true
+    ;;
+
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+    ;;
+
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0
