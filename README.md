@@ -80,6 +80,8 @@ The bundled runtime is the full JDK runtime rather than a trimmed `jlink` image.
 
 Releases are cut automatically. A daily GitHub Actions run checks the five pinned components (RAMSES, Helios, DYNGRAPH, CODEGEN and URAMSES) for new releases; when one has moved, it re-pins `versions.properties` and the matching resource names in `Toolchain.java`, rebuilds, verifies that the bundled toolchain extracts correctly, and publishes a release with `stepss.jar` attached. The notes list every component's pinned version, and embed the upstream release notes of the components that actually moved, since four of the five component repos are private and cannot be linked to usefully.
 
+STEPSS checks for a newer release when it starts and says so on the banner across the top of the window, with a link to the release page. It never blocks startup on that check and says nothing when it cannot reach github.com. Turn it off under **Tools > Check for updates at startup**.
+
 Nothing is published until the build and the toolchain check have both passed. The commit that re-pins the build is pushed immediately before the release is created, and the tag is created by the same API call that creates the release, so a run that fails leaves no tag and no release behind, and re-running it publishes under the same version number. Any failure opens an issue.
 
 Release numbers follow the pinned RAMSES version, with a counter for releases driven by the other components: `v3.55`, then `v3.55.1`, `v3.55.2`, and so on until RAMSES itself moves.
