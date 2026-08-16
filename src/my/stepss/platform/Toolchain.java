@@ -133,12 +133,46 @@ public final class Toolchain {
     private static final java.util.Set<String> LAZY =
             java.util.Collections.singleton(URAMSES);
 
-    /** Extracts every tool available on this platform, except the lazy set. */
-    public void extractAll() throws IOException {
+    /**
+     * The ids {@link #extractAll} visits on this platform, in order.
+     *
+     * <p>Separated from the extraction so it can be asserted without unpacking
+     * 34MB. The splash reads the same list as it goes, so what a user sees
+     * during startup and what is pinned by CompileHarness are one thing.
+     */
+    public static java.util.List<String> extractionOrder(Platform platform) {
+        java.util.List<String> ids = new java.util.ArrayList<String>();
         for (ToolSpec spec : SPECS) {
             if (spec.availableOn(platform) && !LAZY.contains(spec.id())) {
-                resolved.put(spec.id(), ToolExtractor.extract(spec, platform, dir));
+                ids.add(spec.id());
             }
+        }
+        return ids;
+    }
+
+    /** Extracts every tool available on this platform, except the lazy set. */
+    public void extractAll() throws IOException {
+        extractAll(null);
+    }
+
+    /**
+     * Extracts every tool available on this platform, except the lazy set,
+     * naming each one before it starts.
+     *
+     * <p>The listener is called on the calling thread, which at startup is the
+     * EDT. That is deliberate and is why the splash it drives is the native
+     * one: {@code SplashScreen.update()} paints outside Swing's repaint
+     * pipeline, so it works from a thread that is too busy to process its own
+     * paint events.
+     *
+     * @param progress called with each tool's id, or null to report nothing
+     */
+    public void extractAll(java.util.function.Consumer<String> progress) throws IOException {
+        for (String id : extractionOrder(platform)) {
+            if (progress != null) {
+                progress.accept(id);
+            }
+            resolved.put(id, ToolExtractor.extract(byId(id), platform, dir));
         }
     }
 
