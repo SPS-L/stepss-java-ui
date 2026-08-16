@@ -511,6 +511,11 @@ jobs:
         if: matrix.type == 'msi'
         shell: bash
         env:
+          # Same as "Build the jar", because this re-enters `ant jar`. The
+          # payloads are cached from that step and stage-payloads skips the
+          # network when they are, so this is normally unused; without it, a
+          # cache miss would fail as a `gh` auth error rather than a download.
+          GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
           VERSION: ${{ needs.release.outputs.version }}
         run: |
           set -euo pipefail
