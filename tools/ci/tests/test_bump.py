@@ -39,6 +39,13 @@ uramses.tag=v3.55
 uramses.source.url=https://github.com/SPS-L/stepss-uramses/archive/refs/tags/v3.55.zip
 uramses.source.url.pattern=https://github.com/SPS-L/stepss-uramses/archive/refs/tags/v@VERSION@.zip
 uramses.manifest.sha256=old-manifest
+
+kundur.version=1.0.0
+kundur.repo=SPS-L/stepss-Kundur-Two-Area-System
+kundur.tag=v1.0.0
+kundur.source.url=https://github.com/SPS-L/stepss-Kundur-Two-Area-System/archive/refs/tags/v1.0.0.zip
+kundur.source.url.pattern=https://github.com/SPS-L/stepss-Kundur-Two-Area-System/archive/refs/tags/v@VERSION@.zip
+kundur.manifest.sha256=old-kundur-manifest
 """
 
 TOOLCHAIN = """\
@@ -97,6 +104,9 @@ class FakeUpstream(object):
     def uramses_manifest_digest(self, archive, repo_root):
         return "new-manifest"
 
+    def example_manifest_digest(self, archive, repo_root, example):
+        return "new-%s-manifest" % example
+
 
 RAMSES_PATTERNS = {
     "windows": "ramses-windows-x86_64-v%s.zip",
@@ -139,6 +149,7 @@ class BumpTestCase(unittest.TestCase):
         dyngraph_assets=None,
         uramses="v3.55",
         ramses_tag="v3.55",
+        kundur="v1.0.0",
     ):
         return FakeUpstream(
             {
@@ -150,6 +161,9 @@ class BumpTestCase(unittest.TestCase):
                     DYNGRAPH_1_1_0 if dyngraph_assets is None else dyngraph_assets,
                 ),
                 "SPS-L/stepss-uramses": release(uramses, []),
+                # Matches the pin by default, so the examples are inert in every
+                # test that is not about them.
+                "SPS-L/stepss-Kundur-Two-Area-System": release(kundur, []),
             }
         )
 
@@ -482,6 +496,83 @@ class DryRunTest(BumpTestCase):
         fake = self.upstream_with("v1.2.0", DYNGRAPH_1_2_0)
         bump.run(self.root, dry_run=True, up=fake)
         self.assertEqual([], fake.downloaded)
+
+
+class ExampleTest(BumpTestCase):
+    """A bundled example moving is a refresh, never a reason to publish.
+
+    release.yml derives `proceed` from `changed` alone, so everything here turns
+    on examples landing in `refreshed` instead. If they were ever folded into
+    `changed`, a typo fix in an example repository's README would cut a STEPSS
+    release, rebuild three installers and rebuild the APT archive.
+    """
+
+    def test_an_example_release_does_not_count_as_a_change(self):
+        summary = bump.run(self.root, up=self.upstream_with(kundur="v1.1.0"))
+        self.assertEqual([], summary["changed"])
+
+    def test_it_is_reported_as_refreshed(self):
+        summary = bump.run(self.root, up=self.upstream_with(kundur="v1.1.0"))
+        self.assertEqual(
+            {
+                "example": "kundur",
+                "old_version": "1.0.0",
+                "new_version": "1.1.0",
+                "new_tag": "v1.1.0",
+                "url": "https://example.invalid/v1.1.0",
+                "published": "2026-08-08",
+            },
+            summary["refreshed"][0],
+        )
+
+    def test_the_pin_is_rewritten(self):
+        bump.run(self.root, up=self.upstream_with(kundur="v1.1.0"))
+        props = pins.load(self.properties)
+        self.assertEqual("1.1.0", props["kundur.version"])
+        self.assertEqual("v1.1.0", props["kundur.tag"])
+        self.assertEqual("new-kundur-manifest", props["kundur.manifest.sha256"])
+        self.assertIn("/v1.1.0.zip", props["kundur.source.url"])
+
+    def test_toolchain_is_untouched(self):
+        """The packed payload name carries no version, so there is nothing to rewrite."""
+        original = open(self.toolchain).read()
+        bump.run(self.root, up=self.upstream_with(kundur="v1.1.0"))
+        self.assertEqual(original, open(self.toolchain).read())
+
+    def test_the_archive_lands_under_its_versioned_name(self):
+        fake = self.upstream_with(kundur="v1.1.0")
+        bump.run(self.root, up=fake)
+        self.assertEqual(["example-kundur-1.1.0.zip.part"], fake.downloaded)
+        self.assertTrue(
+            os.path.isfile(
+                os.path.join(self.root, "payload-cache", "example-kundur-1.1.0.zip")
+            )
+        )
+
+    def test_a_component_and_an_example_move_together(self):
+        summary = bump.run(
+            self.root,
+            up=self.upstream_with("v1.2.0", DYNGRAPH_1_2_0, kundur="v1.1.0"),
+        )
+        self.assertEqual("dyngraph", summary["changed"][0]["component"])
+        self.assertEqual("kundur", summary["refreshed"][0]["example"])
+        props = pins.load(self.properties)
+        self.assertEqual("1.2.0", props["dyngraph.version"])
+        self.assertEqual("1.1.0", props["kundur.version"])
+
+    def test_a_downgrade_is_refused_like_any_other(self):
+        summary = bump.run(self.root, up=self.upstream_with(kundur="v0.9.0"))
+        self.assertEqual([], summary["refreshed"])
+        self.assertEqual("kundur", summary["skipped"][0]["component"])
+        self.assertEqual("1.0.0", pins.load(self.properties)["kundur.version"])
+
+    def test_dry_run_writes_and_downloads_nothing(self):
+        original = open(self.properties).read()
+        fake = self.upstream_with(kundur="v1.1.0")
+        summary = bump.run(self.root, dry_run=True, up=fake)
+        self.assertEqual("kundur", summary["refreshed"][0]["example"])
+        self.assertEqual([], fake.downloaded)
+        self.assertEqual(original, open(self.properties).read())
 
 
 if __name__ == "__main__":

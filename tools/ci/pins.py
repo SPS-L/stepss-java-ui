@@ -7,6 +7,16 @@ own contents, so the module is fully unit-testable.
 COMPONENTS = ("ramses", "helios", "dyngraph", "codegen", "uramses")
 PLATFORMS = ("windows", "linux", "macos")
 
+# The bundled example test systems. Kept apart from COMPONENTS on purpose: an
+# example moving is REFRESHED, not CHANGED, and only `changed` sets `proceed` in
+# release.yml. Folding these into COMPONENTS would make "an example repository
+# got a typo fix in its README" publish a new STEPSS.
+#
+# They are pinned like uramses - source archive plus a content manifest - but
+# their packed payload names carry no version, so unlike every component here
+# they need no Toolchain.java rewrite and appear in no `renames` map.
+EXAMPLES = ("kundur", "nordic", "five-bus")
+
 VERSION_TOKEN = "@VERSION@"
 PAYLOAD_PREFIX = "payload/"
 
@@ -77,11 +87,20 @@ def asset_names(props, component, version):
     return names
 
 
-def uramses_url(props, version):
-    key = "uramses.source.url.pattern"
+def source_url(props, name, version):
+    """The source-archive URL `name` is pinned by, at `version`.
+
+    Shared by uramses and by every example: all of them are public repositories
+    pinned by tag on a generated source archive rather than on release assets.
+    """
+    key = "%s.source.url.pattern" % name
     if key not in props:
         raise KeyError("Missing asset pattern: " + key)
     return expand(props[key], version)
+
+
+def uramses_url(props, version):
+    return source_url(props, "uramses", version)
 
 
 def set_values(path, updates):
