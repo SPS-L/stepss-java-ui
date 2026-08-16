@@ -29,6 +29,7 @@ public final class CompileHarness {
         checkAbiParsing();
         checkCompilerSelection();
         checkExtraDirectorySearch();
+        checkMsysCandidates();
         checkKitResetMessage();
         checkGuardFailureClearsBuiltExecutable();
         checkExtractionOrder();
@@ -277,6 +278,54 @@ public final class CompileHarness {
         } finally {
             deleteRecursively(dir);
         }
+    }
+
+    /**
+     * Where STEPSS looks for MSYS2, and in what order. This is Windows-only
+     * behaviour that has to be checked on Linux, which is why
+     * {@code msysCandidates} takes the three environment values as arguments
+     * and touches no disk: the list it returns is the whole decision, and
+     * {@code msysRoots} only filters it by what exists.
+     *
+     * <p>The Scoop entries are the ones this is really guarding.
+     * {@code scoop install msys2} lands at {@code ~\scoop\apps\msys2\current},
+     * which neither of the two original locations covers, so a user who took
+     * the no-administrator-rights route installed MSYS2 and was still told
+     * MSYS2 was missing.
+     */
+    private static void checkMsysCandidates() {
+        List<String> full = FortranToolchain.msysCandidates(
+                "D:\\msys2", "E:\\scoop", "C:\\Users\\eleni");
+        expect("MSYS2_ROOT is honoured verbatim and comes first",
+                "D:\\msys2", full.get(0));
+        expect("SCOOP is next, and names the current junction rather than a version",
+                "E:\\scoop\\apps\\msys2\\current", full.get(1));
+        expect("the default Scoop location under the profile is next",
+                "C:\\Users\\eleni\\scoop\\apps\\msys2\\current", full.get(2));
+        expect("the msys2.org default is last, being a guess and not something the machine said",
+                "C:\\msys64", full.get(3));
+        expect("and there are no others", 4, full.size());
+
+        // The common case: no MSYS2_ROOT, no SCOOP, Scoop left at its default.
+        List<String> plain = FortranToolchain.msysCandidates(null, null, "C:\\Users\\eleni");
+        expect("with neither MSYS2_ROOT nor SCOOP set, the profile default is still searched",
+                "C:\\Users\\eleni\\scoop\\apps\\msys2\\current", plain.get(0));
+        expect("ahead of C:\\msys64", "C:\\msys64", plain.get(1));
+        expect("and nothing else is invented", 2, plain.size());
+
+        // Empty is what getenv gives for a variable that is set to nothing,
+        // and joining a suffix onto it would produce a bare relative path that
+        // isDirectory() could match against the working directory.
+        List<String> blank = FortranToolchain.msysCandidates("", "   ", "");
+        expect("empty and whitespace environment values are dropped, not turned into relative paths",
+                1, blank.size());
+        expect("leaving only the fallback", "C:\\msys64", blank.get(0));
+
+        // SCOOP is normally USERPROFILE\scoop, so the two forms collide on a
+        // default installation and the list must not name it twice.
+        List<String> same = FortranToolchain.msysCandidates(
+                null, "C:\\Users\\eleni\\scoop", "C:\\Users\\eleni");
+        expect("a SCOOP that is just the default location is not listed twice", 2, same.size());
     }
 
     /**

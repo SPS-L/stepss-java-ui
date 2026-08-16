@@ -430,12 +430,35 @@
 
   <!-- Menu entries and shortcuts, so an installed application is reachable
        from where the desktop keeps applications rather than only from the
-       directory it was unpacked into. -->
+       directory it was unpacked into.
+
+       None of these apply to the app-image type, which is a plain directory
+       and not an installer: jpackage rejects every windows and linux option
+       below with "not valid with type [APP_IMAGE]" and fails the build. This
+       condition is first because ant properties are immutable, so the first
+       one that matches wins over the per-platform ones underneath. -->
+  <condition property="bundle.platform.args" value="">
+   <contains string="${bundle.type}" substring="app-image"/>
+  </condition>
   <condition property="bundle.platform.args" value="">
    <os family="mac"/>
   </condition>
+  <!-- The upgrade uuid is the MSI UpgradeCode: the GUID by which Windows
+       Installer recognises two packages as the same product, one superseding
+       the other. Left unset, jpackage generates a fresh random one on every
+       build, and it is the only random GUID in the file - every other one it
+       writes is name-derived and reproducible. So each release was a distinct
+       product that installed BESIDE its predecessor rather than replacing it,
+       and nothing looked wrong from the outside: ProductCode is also supposed
+       to change per version, so the two differing GUIDs looked alike. Anyone
+       who took v3.74.9 and then v3.74.10 has both, twice over in Add or Remove
+       Programs and twice over on disk at ~200MB each.
+
+       THIS VALUE MUST NEVER CHANGE. Editing it is equivalent to renaming the
+       product: every installation already out there stops being recognised as
+       STEPSS, and the next release installs beside it exactly as before. -->
   <condition property="bundle.platform.args"
-             value="--win-shortcut --win-menu --win-dir-chooser --win-menu-group STEPSS">
+             value="--win-shortcut --win-menu --win-dir-chooser --win-menu-group STEPSS --win-upgrade-uuid 1a830fb8-fd91-4606-b544-df3f47211ce2">
    <os family="windows"/>
   </condition>
   <!-- What the toolchain links against, which jpackage cannot work out for

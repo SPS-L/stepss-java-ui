@@ -69,9 +69,9 @@ public final class FortranToolchain {
             return make;
         }
         if (p.isWindows()) {
-            File root = msysRoot();
-            if (root != null) {
-                File candidate = new File(root, "usr\\bin\\make.exe");
+            List<File> roots = msysRoots();
+            for (int i = 0; i < roots.size(); i++) {
+                File candidate = new File(roots.get(i), "usr\\bin\\make.exe");
                 if (candidate.isFile()) {
                     return candidate;
                 }
@@ -269,27 +269,79 @@ public final class FortranToolchain {
         }
     }
 
-    /** MSYS2 install root on Windows, or null. */
+    /** First MSYS2 install root that exists on Windows, or null. */
     public static File msysRoot() {
-        String env = System.getenv("MSYS2_ROOT");
-        if (env != null) {
-            File f = new File(env);
-            if (f.isDirectory()) {
-                return f;
+        List<File> roots = msysRoots();
+        return roots.isEmpty() ? null : roots.get(0);
+    }
+
+    /**
+     * Every MSYS2 install root that exists, in preference order. Plural because
+     * a machine can genuinely have two: {@code scoop install msys2} does not
+     * displace an MSYS2 already at {@code C:\msys64}, and only one of them is
+     * likely to have had {@code pacman -S mingw-w64-x86_64-gcc-fortran} run in
+     * it. Returning only the first would mean a Scoop-installed MSYS2 with no
+     * gfortran in it hid a complete toolchain sitting beside it, so
+     * {@link #extraPathEntries} searches all of them and lets the compiler
+     * probe decide.
+     */
+    static List<File> msysRoots() {
+        List<File> out = new ArrayList<File>();
+        List<String> candidates = msysCandidates(System.getenv("MSYS2_ROOT"),
+                System.getenv("SCOOP"), System.getenv("USERPROFILE"));
+        for (int i = 0; i < candidates.size(); i++) {
+            File f = new File(candidates.get(i));
+            if (f.isDirectory() && !out.contains(f)) {
+                out.add(f);
             }
         }
-        File standard = new File("C:\\msys64");
-        return standard.isDirectory() ? standard : null;
+        return out;
+    }
+
+    /**
+     * Where MSYS2 might be, most specific first, without touching the disk so
+     * that the order itself is checkable off Windows. The environment values
+     * are passed in rather than read here for the same reason.
+     *
+     * <p>{@code MSYS2_ROOT} leads because it is the one a user sets by hand to
+     * say "this one". The two Scoop locations come next: Scoop installs into
+     * the user's own profile and needs no administrator rights, which is how a
+     * student on a locked-down laptop gets a toolchain at all, and it lands at
+     * {@code ~\scoop\apps\msys2\current} where nothing here used to look, so
+     * {@code scoop install msys2} installed MSYS2 and STEPSS still reported it
+     * missing. {@code SCOOP} is set when the user has moved the root; the
+     * {@code USERPROFILE} form is the default install and covers the common
+     * case, where {@code SCOOP} is not set at all. {@code C:\msys64} is last
+     * because it is the fallback guess rather than anything the machine told
+     * us, but it is still the msys2.org installer's default and so the one
+     * most installations use.
+     */
+    static List<String> msysCandidates(String msys2Root, String scoop, String userProfile) {
+        List<String> out = new ArrayList<String>();
+        addIfSet(out, msys2Root, "");
+        addIfSet(out, scoop, "\\apps\\msys2\\current");
+        addIfSet(out, userProfile, "\\scoop\\apps\\msys2\\current");
+        out.add("C:\\msys64");
+        return out;
+    }
+
+    private static void addIfSet(List<String> out, String base, String suffix) {
+        if (base != null && base.trim().length() > 0) {
+            String path = base.trim() + suffix;
+            if (!out.contains(path)) {
+                out.add(path);
+            }
+        }
     }
 
     /** Directories prepended to PATH for the build, so MSYS2's tools are found. */
     public static List<String> extraPathEntries(Platform p) {
         List<String> out = new ArrayList<String>();
         if (p.isWindows()) {
-            File root = msysRoot();
-            if (root != null) {
-                out.add(new File(root, "mingw64\\bin").getAbsolutePath());
-                out.add(new File(root, "usr\\bin").getAbsolutePath());
+            List<File> roots = msysRoots();
+            for (int i = 0; i < roots.size(); i++) {
+                out.add(new File(roots.get(i), "mingw64\\bin").getAbsolutePath());
+                out.add(new File(roots.get(i), "usr\\bin").getAbsolutePath());
             }
         }
         return out;
@@ -300,10 +352,14 @@ public final class FortranToolchain {
             case WINDOWS_X86_64:
                 return tool + " was not found. Compiling custom models on Windows needs "
                         + "MSYS2 with the MinGW-w64 toolchain. Install MSYS2 from "
-                        + "https://www.msys2.org/ and then, in an MSYS2 shell, run:\n"
+                        + "https://www.msys2.org/, or with Scoop, which needs no "
+                        + "administrator rights:\n"
+                        + "    scoop install msys2\n"
+                        + "Either way, then run this in an MSYS2 shell:\n"
                         + "    pacman -S mingw-w64-x86_64-gcc-fortran "
                         + "mingw-w64-x86_64-openblas make\n"
-                        + "STEPSS looks for MSYS2 in C:\\msys64, or wherever MSYS2_ROOT points.";
+                        + "STEPSS looks for MSYS2 in C:\\msys64, in Scoop's apps directory, "
+                        + "or wherever MSYS2_ROOT points.";
             case MACOS_ARM64:
                 return tool + " was not found. Compiling custom models on macOS needs "
                         + "Homebrew's GCC and OpenBLAS, plus the Command Line Tools:\n"

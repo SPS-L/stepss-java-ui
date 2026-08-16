@@ -369,11 +369,13 @@ jobs:
   # next to it instead of taking the release down with it. The ordering is the
   # whole point, so `needs` is not negotiable here.
   #
-  # The Linux leg does more than the other two. It is the one whose artifact is
-  # served on by an archive rather than downloaded by hand, so it also checks
-  # the version orders, checks the package installs in a clean container, and
-  # tells stepss-apt to rebuild. All three sit in the leg itself for the reason
-  # the dispatch step spells out: fail-fast: false means a job hanging off this
+  # The Linux and Windows legs do more than the macOS one, for the same reason:
+  # each has a package manager serving its artifact rather than a person
+  # downloading it by hand. Linux checks the version orders, checks the package
+  # installs in a clean container, and tells stepss-apt to rebuild. Windows
+  # builds a second artifact, the portable app image, and tells stepss-scoop to
+  # update its manifest. All of it sits in the legs themselves for the reason
+  # the dispatch steps spell out: fail-fast: false means a job hanging off this
   # matrix is skipped whenever any platform fails.
   bundles:
     needs: release
@@ -491,6 +493,84 @@ jobs:
           # --clobber so a re-run of this job replaces the asset rather than
           # failing on a name that is already there.
           gh release upload "$VERSION" bundle/*.${{ matrix.type }} --clobber
+
+      # The second Windows artifact: the same application as the .msi, as a
+      # plain directory in a zip, which is what the Scoop bucket installs.
+      #
+      # Scoop can extract an .msi instead, and that was the first plan, but it
+      # is the route for upstreams that publish nothing else: extraction goes
+      # through lessmsi or `msiexec /a` depending on the user's own
+      # USE_LESSMSI config, and the layout an installer unpacks into is a
+      # property of how it was built rather than anything the manifest can
+      # rely on. We publish our own releases, so we can simply publish the
+      # portable build and take the route every app that has one takes.
+      #
+      # After the .msi is uploaded, not before: if this leg is going to fail,
+      # it should fail with the installer already attached.
+      - name: Build the portable app image
+        if: matrix.type == 'msi'
+        shell: bash
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          # No --win-* options reach jpackage for this type; see the condition
+          # in build.xml, which jpackage would otherwise fail the build over.
+          ant bundle "-Dbundle.type=--type app-image"
+          # STEPSS.exe already carries the icon in its own resources, and a
+          # .lnk drawn from its target would pick it up. The .ico is copied in
+          # beside it because the manifest names an icon file explicitly, and
+          # Scoop refuses to create a shortcut whose icon file is missing. That
+          # turns losing this line into a loud failure at install time rather
+          # than a generic icon nobody reports.
+          cp packaging/stepss.ico bundle/STEPSS/STEPSS.ico
+          # The STEPSS/ directory goes in at the root of the zip rather than
+          # its contents, so unzipping by hand produces one folder instead of
+          # scattering a bundled runtime across a download directory. The
+          # manifest's extract_dir names that same folder and flattens it, so
+          # the two have to agree.
+          #
+          # 7z, not Compress-Archive: this is ~230MB of app image and the
+          # PowerShell cmdlet takes minutes over it.
+          version_no_v="${VERSION#v}"
+          (cd bundle && 7z a -tzip "STEPSS-${version_no_v}-windows.zip" STEPSS >/dev/null)
+          ls -l "bundle/STEPSS-${version_no_v}-windows.zip"
+
+      # A release asset name is a contract with another repository: stepss-scoop
+      # builds a download URL out of this exact name and a version, and a
+      # renamed asset breaks the manifest for every release cut after it while
+      # leaving older tags un-resyncable. Rename it here and there in one pass
+      # or not at all.
+      - name: Attach the portable app image to the release
+        if: matrix.type == 'msi'
+        env:
+          GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
+          VERSION: ${{ needs.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$VERSION" bundle/*-windows.zip --clobber
+
+      # Tell the Scoop bucket to re-point its manifest. Same shape and the same
+      # reasoning as the APT dispatch below, including sitting inside the leg
+      # rather than in a job that needs the whole matrix, and it fires only
+      # after the asset it is announcing is actually on the release. stepss-scoop
+      # carries a weekly schedule of its own so a dropped dispatch costs a week
+      # rather than forever.
+      - name: Tell the Scoop bucket there is a new portable zip
+        if: matrix.type == 'msi'
+        env:
+          GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
+          VERSION: ${{ needs.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Read from env and quoted, never interpolated: see the note at the
+          # top of the file. github.ref_name is "main" here, not the tag.
+          gh api repos/SPS-L/stepss-scoop/dispatches \
+            -f event_type=stepss-release \
+            -f "client_payload[tag]=$VERSION"
+          echo "stepss-scoop asked to update its manifest for $VERSION."
 
       # Tell the APT archive to rebuild. In this leg, and not in a job that
       # `needs: [bundles]`: `bundles` is a fail-fast: false matrix, so its
