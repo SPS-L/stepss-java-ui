@@ -17,16 +17,16 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Rectangle;
+import java.awt.SplashScreen;
 import java.awt.event.KeyEvent;
 import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.prefs.Preferences;
@@ -62,9 +62,26 @@ public class StepssUI extends javax.swing.JFrame {
     private Rectangle pos;
 
     /**
+     * The startup card to report extraction progress on, or null when this
+     * launch has none: a first run, where the card was closed to make way for
+     * the licence, or a JVM started without one, as an IDE does.
+     */
+    private final Splash splash;
+
+    /**
      * Creates new form StepssUI
      */
     public StepssUI() {
+        this(null);
+    }
+
+    /**
+     * Creates new form StepssUI, reporting startup progress on a splash.
+     *
+     * @param splash the card {@code main} opened, or null for no reporting
+     */
+    public StepssUI(Splash splash) {
+        this.splash = splash;
         initComponents();
         applyModernChrome();
         // PlatformLauncher's launches (editor/terminal/file manager) run via
@@ -86,10 +103,11 @@ public class StepssUI extends javax.swing.JFrame {
         // a disconnected drive comes up as no directory rather than an error.
         selWorkDir = lastWorkingDirectory();
         if (prefs.getBoolean(FIRST_RUN, true)) {
-            // Shows nothing yet: the licence will be shown from main(), before
-            // this constructor runs, once the startup sequence that does that
-            // lands. Until then this only records that the flag has been dealt
-            // with, so a later launch does not treat this one as the first.
+            // Nothing is shown here. main() shows the licence before this
+            // constructor runs and exits if it is declined, so reaching this
+            // line means it was accepted. All that is left is to record that
+            // the flag has been dealt with, so a later launch does not treat
+            // this one as the first.
             prefs.putBoolean(FIRST_RUN, false);
         }
 
@@ -141,6 +159,10 @@ public class StepssUI extends javax.swing.JFrame {
             // repeat the failure without adding information.
             System.exit(1);
         }
+
+        // Last, and off the EDT: the window is what the user is waiting for,
+        // and github.com is not on its critical path.
+        checkForUpdatesAtStartup();
     }
 
     /**
@@ -165,6 +187,7 @@ public class StepssUI extends javax.swing.JFrame {
         styleEditButtons();
         styleConsoles();
         addThemeToggle();
+        addUpdateToggle();
         applyBranding();
         layoutTabs();
         addStatusBar();
@@ -729,6 +752,31 @@ public class StepssUI extends javax.swing.JFrame {
     }
 
     /**
+     * Lets a user stop the application contacting a server when it starts.
+     *
+     * <p>Added programmatically, next to the theme toggle and for the same
+     * reason: reopening StepssUI.form in the designer cannot regenerate away
+     * something the form never knew about.
+     */
+    private void addUpdateToggle() {
+        final JCheckBoxMenuItem check = new JCheckBoxMenuItem("Check for updates at startup");
+        check.setSelected(preferences().getBoolean(CHECK_UPDATES_KEY, true));
+        check.addActionListener(event -> {
+            preferences().putBoolean(CHECK_UPDATES_KEY, check.isSelected());
+            try {
+                // Preferences writes back on its own schedule, so without this
+                // a choice made and then followed by a kill or a crash is lost,
+                // and the next launch silently contradicts the menu.
+                preferences().flush();
+            } catch (java.util.prefs.BackingStoreException ex) {
+                Logger.getLogger(StepssUI.class.getName()).log(Level.WARNING,
+                        "Update check choice could not be saved", ex);
+            }
+        });
+        toolsMenu.add(check);
+    }
+
+    /**
      * Puts the working directory in the title bar, so two STEPSS windows on two
      * networks are told apart in a taskbar, in an alt-tab switcher, and in the
      * screenshot someone sends when a run will not converge. Called from
@@ -743,6 +791,11 @@ public class StepssUI extends javax.swing.JFrame {
     }
 
     private String getVersion() {
+        return getVersionFromResource();
+    }
+
+    /** The bundled version, readable before any instance exists. */
+    static String getVersionFromResource() {
         InputStream in = StepssUI.class.getResourceAsStream("version.txt");
         if (in == null) {
             return "0.0";
@@ -3567,24 +3620,10 @@ public class StepssUI extends javax.swing.JFrame {
             // Help->Changelog now opens, so the version offered here and the
             // notes describing it can no longer disagree.
             //
-            // /releases/latest redirects to /releases/tag/<tag>: the redirect
-            // names the release, so following it only to scrape the page for
-            // the same string would be wasted work. Redirects are therefore
-            // off and the Location header is read directly.
-            HttpURLConnection connection =
-                    (HttpURLConnection) new URL(RELEASES_LATEST_URL).openConnection();
-            String location;
-            try {
-                connection.setInstanceFollowRedirects(false);
-                // This runs on the EDT, as every action listener here does. An
-                // unreachable host with no timeout set freezes the window
-                // until the OS gives up, which is minutes on some networks.
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-                location = connection.getHeaderField("Location");
-            } finally {
-                connection.disconnect();
-            }
+            // The request itself lives in UpdateCheck, which the startup check
+            // uses too, so the two cannot drift apart over what they ask for or
+            // over what counts as newer.
+            String location = UpdateCheck.latestLocation(RELEASES_LATEST_URL);
             String current_version = Version.fromReleaseUrl(location);
             int[] published = current_version == null ? null : Version.key(current_version);
             int[] running = Version.key(this_version);
@@ -3627,6 +3666,54 @@ public class StepssUI extends javax.swing.JFrame {
                     "Update Manager", JOptionPane.ERROR_MESSAGE);
         }
     }//GEN-LAST:event_checkUpdateButtonActionPerformed
+
+    /**
+     * Asks github.com whether there is a newer STEPSS, and says so on the
+     * banner if there is.
+     *
+     * <p>Silent about everything else. A user who did not ask for this does
+     * not want an error about it: no network, a proxy, a redirect that names
+     * no release, all end here with nothing said and a FINE log line. The
+     * manual check under Help keeps its dialogs and its SEVERE logging,
+     * because there somebody asked.
+     *
+     * <p>A daemon thread, so a slow DNS lookup can never hold the JVM open
+     * after the user has quit, and never the EDT, so a machine with no network
+     * does not pay the connect timeout before its window appears.
+     */
+    private void checkForUpdatesAtStartup() {
+        if (!preferences().getBoolean(CHECK_UPDATES_KEY, true)) {
+            return;
+        }
+        Thread check = new Thread(() -> {
+            final String location;
+            try {
+                location = UpdateCheck.latestLocation(RELEASES_LATEST_URL);
+            } catch (IOException ex) {
+                Logger.getLogger(StepssUI.class.getName())
+                        .log(Level.FINE, "Startup update check could not reach github.com", ex);
+                return;
+            }
+            final String notice = UpdateCheck.noticeFor(this_version, location);
+            if (notice == null) {
+                return;
+            }
+            final String published = Version.fromReleaseUrl(location);
+            SwingUtilities.invokeLater(() -> {
+                banner.notice(notice, "Open release page",
+                        () -> BareBonesBrowserLaunch.openURL(location));
+                // The banner clears on the user's next click, so the About box
+                // keeps the fact after it has gone.
+                versionLabel.setText("<html><b>Version:</b> " + this_version
+                        + " (latest version available: " + published + ")</html>");
+            });
+        }, "stepss-update-check");
+        check.setDaemon(true);
+        check.start();
+    }
+
+    /** Whether to ask github.com for a newer release at startup. */
+    static final String CHECK_UPDATES_KEY = "checkUpdatesAtStartup";
 
     private void showGnupCopyrightButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showGnupCopyrightButtonActionPerformed
         try {
@@ -5826,27 +5913,102 @@ public class StepssUI extends javax.swing.JFrame {
      * @param args the command line arguments
      */
     public static void main(String args[]) {
+        final long started = System.nanoTime();
+        final SplashScreen jvmSplash = SplashScreen.getSplashScreen();
+
         boolean dark = preferences().getBoolean(DARK_THEME_KEY, false);
         installTheme(dark);
         useThemedTitleBar(dark);
 
-        /*
-         * Create and display the form
-         */
+        // The licence comes before everything, including the card the JVM has
+        // already put on screen. A first run must not show branding, or make a
+        // network call, before its user has agreed to the engine's terms.
+        if (preferences().getBoolean(FIRST_RUN, true)) {
+            if (jvmSplash != null) {
+                jvmSplash.close();
+            }
+            if (!LicenseDialog.accept(dark)) {
+                System.exit(1);
+                return;
+            }
+        }
+
+        // Null on a first run, because the card above is closed and Java's
+        // splash cannot be reopened. That launch simply has no splash, which
+        // is the trade for the licence being genuinely first.
+        final Splash splash = Splash.open(dark, getVersionFromResource());
+
+        // Counted down once the window is up, or once it is certain that it is
+        // not coming. Waiting on it below is what keeps the JVM alive in the
+        // meantime, and it is not optional: AWT shuts itself down when nothing
+        // is showing and the queue is empty, so with main already returned and
+        // the frame still hidden the reveal never fires and the process exits
+        // silently, splash and all. Verified, not assumed - that is exactly
+        // what this did before the latch was here. The launcher thread is the
+        // right one to hold: it is non-daemon by definition, it has nothing
+        // else to do, and it does not decide the timing, the timer does.
+        final CountDownLatch shown = new CountDownLatch(1);
+
         java.awt.EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
-                StepssUI StepssFrame = new StepssUI();
-                StepssFrame.setVisible(true);
-                // Maximised is still the default, and stays what happens on a
-                // first run; a window sized and placed by hand now comes back
-                // that way instead of being flattened to the screen again.
-                if (startMaximised()) {
-                    StepssFrame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                boolean scheduled = false;
+                try {
+                    final StepssUI frame = new StepssUI(splash);
+                    // Showing the first window is what dismisses the splash, so
+                    // the three second floor is enforced by delaying the window,
+                    // never by sleeping: the EDT has extraction to get on with.
+                    //
+                    // The floor exists to hold a card on screen, so a launch
+                    // without one has nothing to hold and reveals as soon as it
+                    // is ready. There are three such launches, and waiting on
+                    // any of them would buy a blank desktop and nothing else: a
+                    // first run, where the card was closed above to make way for
+                    // the licence, an IDE or classpath launch, which never had
+                    // one, and `java -jar` on a build whose manifest names no
+                    // splash image. The first run is the worst of the three,
+                    // because it lands the moment a new user clicks Accept.
+                    long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
+                    int remaining = (splash == null)
+                            ? 1 : (int) Math.max(1L, SPLASH_MINIMUM_MS - elapsedMs);
+                    javax.swing.Timer reveal = new javax.swing.Timer(remaining, event -> {
+                        try {
+                            frame.setVisible(true);
+                            // Maximised is still the default, and stays what
+                            // happens on a first run; a window sized and placed
+                            // by hand now comes back that way instead of being
+                            // flattened to the screen again.
+                            if (startMaximised()) {
+                                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                            }
+                        } finally {
+                            shown.countDown();
+                        }
+                    });
+                    reveal.setRepeats(false);
+                    reveal.start();
+                    scheduled = true;
+                } finally {
+                    // Anything thrown while building the frame or arming the
+                    // timer means no window is coming. Release the launcher
+                    // thread rather than leave it waiting for one behind a
+                    // splash that would then never come down.
+                    if (!scheduled) {
+                        shown.countDown();
+                    }
                 }
             }
         });
+
+        try {
+            shown.await();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
+
+    /** How long the splash stays up even when there is nothing left to wait for. */
+    private static final long SPLASH_MINIMUM_MS = 3000L;
 
     /** Preferences key holding the theme choice, read at startup. */
     static final String DARK_THEME_KEY = "darkTheme";
@@ -6468,7 +6630,11 @@ public class StepssUI extends javax.swing.JFrame {
                 }
             }
             toolchain = new Toolchain(platform, toolDir);
-            toolchain.extractAll();
+            toolchain.extractAll(id -> {
+                if (splash != null) {
+                    splash.status(id);
+                }
+            });
 
             myTempDir = (selWorkDir != null) ? selWorkDir : toolDir;
             updateWindowTitle();
