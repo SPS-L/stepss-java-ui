@@ -1,0 +1,76 @@
+#!/bin/sh
+# postinst script for APPLICATION_PACKAGE
+#
+# see: dh_installdeb(1)
+#
+# jpackage's own template with one block added at the end of `configure`, in
+# the same way packaging/linux/STEPSS.desktop is its .desktop template with one
+# line added. Everything above that block, tokens included, is jpackage's and
+# should stay that way so a JDK that changes the generated script only conflicts
+# in one place.
+#
+# APPLICATION_PACKAGE is substituted; the install directory is not, because no
+# token carries it. It is jpackage's default, "/opt/" plus the package name, so
+# a --install-dir passed in build.xml would have to be reflected here by hand.
+
+set -e
+
+# summary of how this script can be called:
+#        * <postinst> `configure' <most-recently-configured-version>
+#        * <old-postinst> `abort-upgrade' <new version>
+#        * <conflictor's-postinst> `abort-remove' `in-favour' <package>
+#          <new-version>
+#        * <postinst> `abort-remove'
+#        * <deconfigured's-postinst> `abort-deconfigure' `in-favour'
+#          <failed-install-package> <version> `removing'
+#          <conflicting-package> <version>
+# for details, see https://www.debian.org/doc/debian-policy/ or
+# the debian-policy package
+
+package_type=deb
+LAUNCHER_AS_SERVICE_SCRIPTS
+
+case "$1" in
+    configure)
+    # jpackage's line, in a subshell whose failure is reported rather than
+    # fatal. xdg-desktop-menu answers "No writable system menu directory found"
+    # and exits 3 on a machine with no desktop at all - a server, a container,
+    # WSL without one - and this script runs under `set -e`, so before this
+    # `apt install stepss` FAILED there: dpkg left the package half-configured
+    # and every later apt run reported it. A menu entry is not a reason to
+    # refuse the package. The launcher and /usr/bin/stepss work without one.
+    if ! (
+DESKTOP_COMMANDS_INSTALL
+    ); then
+        echo "APPLICATION_PACKAGE: no desktop menu entry was registered." >&2
+        echo "APPLICATION_PACKAGE: this machine appears to have no desktop; the application is installed and runs from the command line." >&2
+    fi
+LAUNCHER_AS_SERVICE_COMMANDS_INSTALL
+
+    # A command to type. Everything the package installs lives under
+    # /opt/APPLICATION_PACKAGE and the only other way in is the desktop menu
+    # entry, so before this a terminal user, or anyone on a machine with no
+    # desktop at all, had nothing to run. dpkg does not own these two links
+    # because jpackage can only place files under the install directory;
+    # postrm removes them again.
+    ln -sf /opt/APPLICATION_PACKAGE/bin/STEPSS /usr/bin/APPLICATION_PACKAGE
+
+    # Debian looks for the copyright file here. jpackage writes it beside the
+    # application instead, and only puts it under /usr/share/doc when the
+    # install directory is itself under /usr, which for a bundled runtime it
+    # cannot be.
+    mkdir -p /usr/share/doc/APPLICATION_PACKAGE
+    ln -sf /opt/APPLICATION_PACKAGE/share/doc/copyright \
+           /usr/share/doc/APPLICATION_PACKAGE/copyright
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0
