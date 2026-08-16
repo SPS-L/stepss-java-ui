@@ -141,6 +141,10 @@ jobs:
               print("bumped:  %s %s -> %s"
                     % (entry["component"], entry["old_version"],
                        entry["new_version"]))
+          for entry in summary.get("refreshed", []):
+              print("example: %s %s -> %s"
+                    % (entry["example"], entry["old_version"],
+                       entry["new_version"]))
           for entry in summary["skipped"]:
               print("skipped: %s pinned %s, upstream %s"
                     % (entry["component"], entry["pinned_version"],
@@ -148,6 +152,12 @@ jobs:
           if not summary["changed"] and not summary["skipped"]:
               print("No component moved.")
           PY
+          # `changed` only, deliberately: `refreshed` holds the bundled example
+          # test systems, and an example repository being tagged is not a reason
+          # to publish a new STEPSS, rebuild three installers and rebuild the
+          # APT archive. A refreshed example rides along with the next real
+          # release instead. If this ever needs to count refreshed too, the
+          # thing to change is that judgement, not this line.
           count=$(python3 -c "import json;print(len(json.load(open('summary.json'))['changed']))")
           if [ "$count" -gt 0 ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "proceed=true" >> "$GITHUB_OUTPUT"

@@ -44,6 +44,10 @@ import my.stepss.dyngraph.ObservableIndex;
 import my.stepss.dyngraph.ObservablePicker;
 import my.stepss.dyngraph.ReplayFile;
 import my.stepss.dyngraph.Selection;
+import my.stepss.examples.Example;
+import my.stepss.examples.ExampleCatalog;
+import my.stepss.examples.ExampleInstaller;
+import my.stepss.examples.ExamplesDialog;
 import my.stepss.platform.Platform;
 import my.stepss.platform.PlatformLauncher;
 import my.stepss.platform.Toolchain;
@@ -171,6 +175,7 @@ public class StepssUI extends javax.swing.JFrame {
             @Override
             public void windowOpened(java.awt.event.WindowEvent event) {
                 checkForUpdatesAtStartup();
+                showExamplesAtStartup();
             }
         });
     }
@@ -1001,6 +1006,7 @@ public class StepssUI extends javax.swing.JFrame {
         fileMenu = new javax.swing.JMenu();
         saveConfigMenuItem = new javax.swing.JMenuItem();
         loadConfigMenuItem = new javax.swing.JMenuItem();
+        openExamplesMenuItem = new javax.swing.JMenuItem();
         exitMenuItem = new javax.swing.JMenuItem();
         toolsMenu = new javax.swing.JMenu();
         saveCommandFileMenuItem = new javax.swing.JMenuItem();
@@ -2768,6 +2774,15 @@ public class StepssUI extends javax.swing.JFrame {
         });
         fileMenu.add(loadConfigMenuItem);
 
+        openExamplesMenuItem.setText("Open Examples");
+        openExamplesMenuItem.setName("openExamplesMenuItem"); // NOI18N
+        openExamplesMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                openExamplesMenuItemActionPerformed(evt);
+            }
+        });
+        fileMenu.add(openExamplesMenuItem);
+
         exitMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Q, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         exitMenuItem.setText("Exit");
         exitMenuItem.setName("exitMenuItem"); // NOI18N
@@ -3417,6 +3432,248 @@ public class StepssUI extends javax.swing.JFrame {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
         }
     }//GEN-LAST:event_loadConfigMenuItemActionPerformed
+
+    private void openExamplesMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openExamplesMenuItemActionPerformed
+        showExamples();
+    }//GEN-LAST:event_openExamplesMenuItemActionPerformed
+
+    /**
+     * Opens the examples panel on launch unless the user has turned it off.
+     *
+     * <p>From the frame's first {@code windowOpened}, beside the update check
+     * and for the same reason: the splash holds the window back for up to three
+     * seconds, and a modal dialog raised before that would sit in front of a
+     * frame nobody can see yet.
+     *
+     * <p>Queued rather than called straight, so {@code windowOpened} returns and
+     * the frame finishes painting behind the dialog instead of being blocked
+     * mid-delivery by a modal window.
+     */
+    private void showExamplesAtStartup() {
+        if (!preferences().getBoolean(SHOW_EXAMPLES_KEY, true)) {
+            return;
+        }
+        SwingUtilities.invokeLater(this::showExamples);
+    }
+
+    /**
+     * Offers the bundled test systems, and opens the one that is chosen.
+     *
+     * <p>Reached from File &gt; Open Examples and, unless the user has turned it
+     * off, once at startup. A new user otherwise has a working STEPSS and
+     * nothing to run in it: they have to know stepss-test-systems exists, find
+     * it, clone it, and work out which file goes in which of the ten slots.
+     */
+    private void showExamples() {
+        java.util.List<Example> examples;
+        try {
+            examples = ExampleCatalog.load();
+        } catch (IOException ex) {
+            // The descriptor and the payloads are both build outputs verified by
+            // ExamplesPack and PayloadManifestCheck, so this is a broken jar
+            // rather than anything the user did or can fix.
+            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE,
+                    "The bundled examples could not be read", ex);
+            JOptionPane.showMessageDialog(this,
+                    "The bundled examples could not be read.\n\n" + ex.getMessage(),
+                    "Examples unavailable", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        boolean dark = preferences().getBoolean(DARK_THEME_KEY, false);
+        ExamplesDialog.Choice choice = ExamplesDialog.show(this, examples,
+                Branding.logo(dark),
+                preferences().getBoolean(SHOW_EXAMPLES_KEY, true),
+                BareBonesBrowserLaunch::openURL);
+
+        rememberExamplesAtStartup(choice.showAtStartup());
+        if (choice.example() != null) {
+            openExample(choice.example());
+        }
+    }
+
+    /**
+     * Stores the startup checkbox.
+     *
+     * <p>Flushed here rather than on close, for the reason the theme and update
+     * toggles give: Preferences writes back on its own schedule, so a choice
+     * followed by a kill or a crash is lost and the next launch silently
+     * contradicts what the user ticked. Flushing on the way out of the dialog
+     * also means closing it with the window button honours the choice.
+     */
+    private void rememberExamplesAtStartup(boolean show) {
+        preferences().putBoolean(SHOW_EXAMPLES_KEY, show);
+        try {
+            preferences().flush();
+        } catch (java.util.prefs.BackingStoreException ex) {
+            Logger.getLogger(StepssUI.class.getName()).log(Level.WARNING,
+                    "Examples-at-startup choice could not be saved", ex);
+        }
+    }
+
+    /**
+     * Extracts one example beside its siblings and loads it as the current case.
+     *
+     * <p>Never into {@code toolDir}: that is the temporary directory the
+     * toolchain unpacks into and {@code formWindowClosing} deletes on exit, so
+     * anything the user changed would be gone without warning. The second thing
+     * a user does with an example is edit it.
+     */
+    private void openExample(Example example) {
+        File root = examplesRoot();
+        if (root == null) {
+            return;
+        }
+        File target = new File(root, example.dir());
+
+        if (target.exists()) {
+            // Never silently overwritten. Reuse is first and is the default,
+            // because an existing directory usually means the user has been
+            // working in it.
+            Object[] options = {"Reuse my copy", "Fresh copy", "Cancel"};
+            int answer = JOptionPane.showOptionDialog(this,
+                    "<html>This example is already extracted at:<br><b>"
+                    + escapeHtml(target.getAbsolutePath()) + "</b><br><br>"
+                    + "Reuse that copy, or replace it with a fresh one?<br>"
+                    + "A fresh copy deletes anything you changed there.</html>",
+                    "Example already extracted", JOptionPane.DEFAULT_OPTION,
+                    JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+            if (answer != 0 && answer != 1) {
+                return;
+            }
+            if (answer == 1 && !ExampleInstaller.deleteRecursively(target)) {
+                JOptionPane.showMessageDialog(this,
+                        "Could not remove the existing copy at\n"
+                        + target.getAbsolutePath()
+                        + "\n\nCheck that nothing else has the files open.",
+                        "Example not replaced", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (answer == 0) {
+                // Reuse, so nothing is written. A file the user deleted from
+                // their own copy would leave a slot pointing at nothing, so say
+                // so rather than let the run fail with an engine error.
+                java.util.List<String> missing =
+                        ExampleInstaller.missingFrom(example, target);
+                if (!missing.isEmpty()) {
+                    JOptionPane.showMessageDialog(this,
+                            "Your copy of this example is missing:\n\n  "
+                            + String.join("\n  ", missing)
+                            + "\n\nOpen it again and choose Fresh copy to restore it.",
+                            "Example incomplete", JOptionPane.WARNING_MESSAGE);
+                }
+                applyExample(example, target, root);
+                return;
+            }
+        }
+
+        try {
+            ExampleInstaller.install(example, target);
+        } catch (IOException ex) {
+            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this,
+                    "Could not extract " + example.name() + " to\n"
+                    + target.getAbsolutePath() + "\n\n" + ex.getMessage(),
+                    "Example not opened", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        applyExample(example, target, root);
+    }
+
+    /**
+     * Fills the case from where the example's files actually landed, and makes
+     * its directory the working directory.
+     *
+     * <p>The configuration is GENERATED here, never read from the {@code
+     * sim.cfg} each example repository ships. Those are Java Properties files of
+     * absolute paths from whoever last saved them
+     * ({@code fileData1=C:\Users\tvanc\...}), so loading one would fill this
+     * form with someone else's paths on every platform. The descriptor records
+     * which filename belongs in which slot, and the path comes from the
+     * extraction.
+     */
+    private void applyExample(Example example, File dir, File root) {
+        JTextField[] slots = {fileData1, fileData2, fileData3, fileData4, fileData5,
+            fileData6, fileData7, fileData8, fileData9, fileData10};
+        for (int i = 0; i < slots.length; i++) {
+            slots[i].setText(i < example.data().size()
+                    ? new File(dir, example.data().get(i)).getAbsolutePath()
+                    : "");
+        }
+        fileDist.setText(new File(dir, example.dist()).getAbsolutePath());
+        fileObs.setText(new File(dir, example.obs()).getAbsolutePath());
+        // What loadObsButton does once a file is chosen: an observables file
+        // with the trajectory output switched off produces nothing to plot.
+        saveOutputTrajButton.setSelected(true);
+
+        // Remembered so the next example lands beside this one rather than
+        // inside it. Stored before the working directory moves, because that is
+        // what the root would otherwise be derived from next time.
+        preferences().put(EXAMPLES_DIR, root.getAbsolutePath());
+
+        File previous = selWorkDir;
+        selWorkDir = dir;
+        if (!initRamses()) {
+            // Unlike the Select-working-directory path, this does not exit. The
+            // toolchain was already extracted successfully for this session, so
+            // a failure here is not the unusable-install case that one guards
+            // against, and quitting would throw away the user's session over an
+            // example. initRamses has already explained itself in a dialog.
+            selWorkDir = previous;
+            return;
+        }
+        try {
+            preferences().flush();
+        } catch (java.util.prefs.BackingStoreException ex) {
+            Logger.getLogger(StepssUI.class.getName()).log(Level.WARNING,
+                    "Examples directory could not be saved", ex);
+        }
+        banner.notice(example.name() + " opened in " + dir.getAbsolutePath(),
+                "Open folder", () -> {
+                    try {
+                        PlatformLauncher.openFileManager(dir);
+                    } catch (IOException ex) {
+                        Logger.getLogger(StepssUI.class.getName())
+                                .log(Level.SEVERE, null, ex);
+                    }
+                });
+    }
+
+    /**
+     * The directory examples are kept in, asking for one if there is none yet.
+     *
+     * <p>Three sources, in order: the remembered root, the current working
+     * directory, and the user. The middle one is what makes the first open on
+     * an established installation land somewhere the user already chose, and the
+     * last is for a fresh install, which has neither.
+     *
+     * @return the root, or null if the user cancelled
+     */
+    private File examplesRoot() {
+        String saved = preferences().get(EXAMPLES_DIR, "");
+        if (!saved.isEmpty() && new File(saved).isDirectory()) {
+            return new File(saved);
+        }
+        if (selWorkDir != null && selWorkDir.isDirectory()) {
+            return selWorkDir;
+        }
+        fileChooser.setSelectedFile(new File(""));
+        fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        fileChooser.setDialogTitle("Choose a directory to keep examples in");
+        int returnVal = fileChooser.showOpenDialog(this);
+        fileChooser.resetChoosableFileFilters();
+        if (returnVal != JFileChooser.APPROVE_OPTION) {
+            return null;
+        }
+        File chosen = fileChooser.getSelectedFile();
+        if (!chosen.isDirectory() && !chosen.mkdirs()) {
+            JOptionPane.showMessageDialog(this,
+                    "Could not create " + chosen.getAbsolutePath(),
+                    "Examples directory", JOptionPane.ERROR_MESSAGE);
+            return null;
+        }
+        return chosen;
+    }
 
     private void saveCommandFileMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveCommandFileMenuItemActionPerformed
         try {
@@ -6209,6 +6466,27 @@ public class StepssUI extends javax.swing.JFrame {
     static final String SESSION_DIR = "workingDirectory";
 
     /**
+     * Where extracted examples are kept, so a second one lands beside the first
+     * rather than inside it. Separate from {@link #SESSION_DIR} because opening
+     * an example moves the working directory into the example, which would
+     * otherwise make every subsequent example a child of the last one.
+     */
+    static final String EXAMPLES_DIR = "examplesDirectory";
+
+    /**
+     * Whether the examples panel opens at startup. Default true, and the key
+     * stays absent until the user unticks the box, so "has never opened the
+     * dialog" and "wants it every launch" are the same state - which is the one
+     * the feature exists for.
+     *
+     * <p>Lives in the same node as everything else, so
+     * {@link PreferenceMigration} carries it across the legacy node for free:
+     * that class copies every key rather than an enumerated list, precisely
+     * because an enumeration silently drops whatever is added later.
+     */
+    static final String SHOW_EXAMPLES_KEY = "showExamplesAtStartup";
+
+    /**
      * Where the saved preferences live: the theme, the window, the working
      * directory and the first-run flag, in one node rather than several that
      * drift.
@@ -6546,6 +6824,7 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton nppDstButton;
     private javax.swing.JButton nppObsButton;
     private javax.swing.JCheckBox observFileWizButton;
+    private javax.swing.JMenuItem openExamplesMenuItem;
     private javax.swing.JMenuItem openExplButton;
     private javax.swing.JMenuItem openNppButton;
     private javax.swing.JMenuItem openTermButton;

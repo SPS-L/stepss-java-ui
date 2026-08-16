@@ -16,6 +16,7 @@ This one is a Java (Swing) desktop application. It bundles the complete simulati
 ## Features
 
 - **Complete workflow in tabs**: System Data, Observables, Initialization, Dynamic Simulation, Analysis, and Codegen
+- **Bundled examples**: *File -> Open Examples* extracts a ready-to-run test system (Kundur two-area, IEEE Nordic, or the 5-bus tutorial) into your examples directory and fills in the case, so there is something to run on a fresh install
 - **Dynamic simulation**: runs the bundled RAMSES engine on the loaded data and disturbance files
 - **Power flow**: drives the bundled Helios power-flow engine
 - **Real-time plotting**: live curves during simulation via gnuplot (bus voltages, machine speeds, branch flows, wall time, and more)
@@ -45,6 +46,8 @@ ant jar
 The build (a NetBeans/Ant project) produces `dist/stepss.jar`, a self-contained jar with the Commons Exec, Commons IO and FlatLaf libraries merged in.
 
 Building fetches the pinned RAMSES, Helios, DYNGRAPH, and CODEGEN binaries for all three platforms (`ant fetch-payloads`, run automatically as part of `ant jar`) from their releases in the SPS-L GitHub organisation. Those component repositories are private, so the first build needs network access and the [`gh` CLI](https://cli.github.com/) authenticated with SPS-L access (`gh auth login`); downloaded archives are checksum-verified against `versions.properties` and cached in `payload-cache/`, so later builds only need network again when a pinned version changes. CI authenticates the same way, through this repository's `STEPSS_TOKEN` secret, because Actions' default `GITHUB_TOKEN` is scoped to this repo alone and cannot reach the component repos.
+
+It also fetches the pinned URAMSES kit and the three bundled example test systems (`ant fetch-uramses`, `ant fetch-examples`). Those repositories are public, so they come over plain HTTPS and need neither `gh` nor a token. Each is verified against a **content manifest** rather than the archive's own digest, because GitHub's generated source archives are not guaranteed byte-stable; the examples are additionally filtered down to the files `src/my/stepss/examples/examples.properties` names, and the build fails if a pinned release stops carrying one of them.
 
 On macOS, the current RAMSES, DYNGRAPH, and CODEGEN builds are dynamically linked against gfortran and OpenBLAS; install them first with `brew install gcc openblas`. Statically linked builds that drop this requirement are expected from those projects.
 
@@ -86,7 +89,9 @@ The bundled runtime is the full JDK runtime rather than a trimmed `jlink` image.
 
 ### Releases
 
-Releases are cut automatically. A daily GitHub Actions run checks the five pinned components (RAMSES, Helios, DYNGRAPH, CODEGEN and URAMSES) for new releases; when one has moved, it re-pins `versions.properties` and the matching resource names in `Toolchain.java`, rebuilds, verifies that the bundled toolchain extracts correctly, and publishes a release with `stepss.jar` attached. The notes list every component's pinned version, and embed the upstream release notes of the components that actually moved, since four of the five component repos are private and cannot be linked to usefully.
+Releases are cut automatically. RAMSES, Helios, DYNGRAPH and CODEGEN dispatch to this repository when they publish, and the run re-pins `versions.properties` and the matching resource names in `Toolchain.java`, rebuilds, verifies that the bundled toolchain extracts correctly, and publishes a release with `stepss.jar` attached. (URAMSES does not dispatch: it only ever releases in response to a RAMSES release under the same tag, and the RAMSES dispatch covers both.) The notes list every component's pinned version, and embed the upstream release notes of the components that actually moved, since four of the five component repos are private and cannot be linked to usefully.
+
+The bundled example test systems are re-pinned by the same run, but they never trigger one: they are reported as `refreshed` rather than `changed`, and only `changed` decides whether to publish. An example repository being tagged is not a reason to publish a new STEPSS, so a refreshed example rides along with the next release instead.
 
 STEPSS checks for a newer release when it starts and says so on the banner across the top of the window, with a link to the release page. It never blocks startup on that check and says nothing when it cannot reach github.com. Turn it off under **Tools > Check for updates at startup**.
 

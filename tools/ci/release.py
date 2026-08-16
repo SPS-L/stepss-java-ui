@@ -130,6 +130,14 @@ DISPLAY_NAMES = {
     "uramses": "URAMSES",
 }
 
+# The bundled example test systems. Public repositories, unlike four of the five
+# components, so these entries link out rather than embedding upstream notes.
+EXAMPLE_NAMES = {
+    "kundur": "Kundur two-area",
+    "nordic": "IEEE Nordic",
+    "five-bus": "5-bus tutorial",
+}
+
 
 RELEASE_COMMIT = re.compile(r"^Release v\d")
 
@@ -169,7 +177,8 @@ def repository_changes(previous_tag):
     return subjects
 
 
-def compose_notes(version, props, changed, jar_sha256, previous_tag, changes=()):
+def compose_notes(version, props, changed, jar_sha256, previous_tag, changes=(),
+                  refreshed=()):
     """The release body.
 
     Four of the five component repos are private, so a link to an upstream
@@ -236,6 +245,34 @@ def compose_notes(version, props, changed, jar_sha256, previous_tag, changes=())
         )
     lines.append("")
 
+    # Listed whether or not one moved, like the components above: what a release
+    # ships is a fact about the release, not only about what changed in it. The
+    # repositories are public, so these are linked rather than embedded - and
+    # since an example never triggers a release, an entry here is always
+    # something that rode along with a component bump or a manual run.
+    if any("%s.version" % example in props for example in pins.EXAMPLES):
+        example_published = {
+            entry["example"]: entry.get("published") for entry in refreshed
+        }
+        lines.append("## Bundled examples")
+        lines.append("")
+        lines.append("| Example | Version | Upstream release | Refreshed |")
+        lines.append("|---|---|---|---|")
+        for example in pins.EXAMPLES:
+            if "%s.version" % example not in props:
+                continue
+            lines.append(
+                "| [%s](https://github.com/%s) | %s | %s | %s |"
+                % (
+                    EXAMPLE_NAMES.get(example, example),
+                    props["%s.repo" % example],
+                    props["%s.version" % example],
+                    props["%s.tag" % example],
+                    example_published.get(example) or "&mdash;",
+                )
+            )
+        lines.append("")
+
     if changed:
         lines.append("## Upstream release notes")
         lines.append("")
@@ -292,6 +329,7 @@ def notes_main(argv):
             upstream.sha256_file(jar_path),
             previous,
             repository_changes(previous),
+            summary.get("refreshed", ()),
         )
     )
     return 0

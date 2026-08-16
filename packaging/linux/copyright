@@ -69,6 +69,24 @@ License: Apache-2.0
  On Debian systems the complete text is in
  /usr/share/common-licenses/Apache-2.0
 
+Comment: The example test systems offered by File > Open Examples. Unlike the
+ payloads above these are data rather than programs, they are the same bytes on
+ every platform, and each extracted copy carries its own LICENSE file. The
+ authoritative statement of what governs what is still
+ https://stepss.sps-lab.org/getting-started/license/
+Files: my/stepss/payload/example-*
+Copyright: Sustainable Power Systems Laboratory, Cyprus University of
+           Technology; Thierry Van Cutsem, University of Liege; and the IEEE
+           PES Task Force on Test Systems for Voltage Stability Analysis and
+           Security Assessment
+License: Apache-2.0
+ The Kundur two-area, IEEE Nordic and 5-bus test systems are each licensed
+ under the Apache License, Version 2.0 by their own repositories. On Debian
+ systems the complete text is in /usr/share/common-licenses/Apache-2.0
+ .
+ The IEEE PES technical report PES-TR19, which describes the Nordic system, is
+ (C) IEEE and is NOT redistributed here; only the RAMSES data files are.
+
 Comment: KLU is linked into the RAMSES executable rather than shipped as a
  file of its own, so it has no Files: stanza.
 Files: my/stepss/KLULicense.txt

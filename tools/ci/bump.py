@@ -37,6 +37,7 @@ def run(repo_root, dry_run=False, up=_upstream):
 
     changed = []
     skipped = []
+    refreshed = []
     updates = {}
     renames = {}
 
@@ -89,12 +90,56 @@ def run(repo_root, dry_run=False, up=_upstream):
             updates["%s.version" % component] = new_version
             updates["%s.tag" % component] = release.tag
 
-    if changed and not dry_run:
+    for example in pins.EXAMPLES:
+        repo = props.get("%s.repo" % example)
+        if repo is None:
+            continue
+        release = up.latest_release(repo)
+        new_version = pins.version_of(release.tag)
+        old_version = props["%s.version" % example]
+        if new_version == old_version:
+            continue
+
+        reason = _refusal(old_version, new_version)
+        if reason is not None:
+            skipped.append(
+                {
+                    "component": example,
+                    "pinned_version": old_version,
+                    "upstream_version": new_version,
+                    "reason": reason,
+                }
+            )
+            continue
+
+        _plan_example(
+            repo_root, cache, props, example, new_version, updates, up, dry_run,
+        )
+        refreshed.append(
+            {
+                "example": example,
+                "old_version": old_version,
+                "new_version": new_version,
+                "new_tag": release.tag,
+                "url": release.url,
+                "published": release.published,
+            }
+        )
+        if not dry_run:
+            updates["%s.version" % example] = new_version
+            updates["%s.tag" % example] = release.tag
+
+    # `refreshed` counts here but not towards `proceed`, which release.yml
+    # derives from `changed` alone. So an example moving on its own rewrites the
+    # pins and then has its commit skipped by the gated step - wasteful by one
+    # small download, and idempotent, because the next real release re-detects
+    # it. What it must never do is publish a STEPSS release of its own.
+    if (changed or refreshed) and not dry_run:
         pins.validate_toolchain(toolchain_path, renames)
         pins.set_values(properties_path, updates)
         pins.rewrite_toolchain(toolchain_path, renames)
 
-    return {"changed": changed, "skipped": skipped}
+    return {"changed": changed, "skipped": skipped, "refreshed": refreshed}
 
 
 def _refusal(old_version, new_version):
@@ -201,6 +246,36 @@ def _plan_uramses(repo_root, cache, props, new_version, updates, renames, up, dr
     updates["uramses.manifest.sha256"] = up.uramses_manifest_digest(dest, repo_root)
     old_version = props["uramses.version"]
     renames["uramses-kit-v%s.zip" % old_version] = "uramses-kit-v%s.zip" % new_version
+
+
+def _plan_example(repo_root, cache, props, example, new_version, updates, up, dry_run):
+    """Downloads one example's source archive and re-computes its manifest pin.
+
+    Shaped like _plan_uramses, including the download-to-.part-then-rename: the
+    Ant target reuses a cached archive on mere existence, so an interrupted
+    download must never leave a truncated file under a name a later build will
+    trust without checking.
+
+    Unlike _plan_uramses there is no `renames` entry, because the packed payload
+    name carries no version. An example bump touches versions.properties alone.
+
+    In dry_run there is nothing to validate - an example has no per-platform
+    asset names to check against the release - so this is a no-op, as it is
+    for uramses.
+    """
+    if dry_run:
+        return
+
+    url = pins.source_url(props, example, new_version)
+    dest = os.path.join(cache, "example-%s-%s.zip" % (example, new_version))
+    tmp_dest = dest + ".part"
+    up.download_url(url, tmp_dest)
+    os.replace(tmp_dest, dest)
+
+    updates["%s.source.url" % example] = url
+    updates["%s.manifest.sha256" % example] = up.example_manifest_digest(
+        dest, repo_root, example
+    )
 
 
 def main(argv):

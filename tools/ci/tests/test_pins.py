@@ -126,6 +126,35 @@ class UramsesUrlTest(unittest.TestCase):
             pins.uramses_url(props, "3.60"),
         )
 
+    def test_source_url_serves_any_pinned_name(self):
+        props = pins.load(write_sample())
+        self.assertEqual(
+            pins.uramses_url(props, "3.60"),
+            pins.source_url(props, "uramses", "3.60"),
+        )
+
+    def test_source_url_raises_on_an_unpinned_name(self):
+        with self.assertRaises(KeyError):
+            pins.source_url(pins.load(write_sample()), "kundur", "1.0.0")
+
+
+class ExampleSetTest(unittest.TestCase):
+    """Examples are pinned, but they are not components.
+
+    Nothing here is cosmetic: bump.run walks COMPONENTS to build `changed` and
+    EXAMPLES to build `refreshed`, and only `changed` sets `proceed` in
+    release.yml. An example that leaked into COMPONENTS would publish a STEPSS
+    release every time its repository was tagged.
+    """
+
+    def test_no_example_is_also_a_component(self):
+        self.assertEqual(
+            set(), set(pins.EXAMPLES) & set(pins.COMPONENTS)
+        )
+
+    def test_the_examples_are_the_three_bundled_ones(self):
+        self.assertEqual(("kundur", "nordic", "five-bus"), pins.EXAMPLES)
+
 
 TOOLCHAIN = """\
 package my.stepss.platform;
