@@ -253,7 +253,15 @@
        verbose="true" unless:set="uramses.cached"/>
  </target>
 
- <target name="stage-payloads" depends="fetch-payloads,fetch-uramses"
+ <!-- `init` is build-impl.xml's property-loading chain, and this target needs
+      it for ${build.classes.dir}, ${javac.source} and ${javac.target}. Reached
+      through -pre-compile it would already have run, but this target carries a
+      `description`, so `ant -p` advertises it and `ant stage-payloads` is a
+      reasonable thing to type. Without init that run deletes the staged
+      payloads, copies the component ones back, and then dies on `invalid
+      target release: ${javac.target}` before UramsesKitPack repacks the kit -
+      leaving the tree short one payload with an error naming none of that. -->
+ <target name="stage-payloads" depends="init,fetch-payloads,fetch-uramses"
          description="Copy verified payloads into the source tree for packaging">
   <!-- Nothing else prunes this directory, so a stale payload left over from
        a previous version pin (e.g. after bumping versions.properties) would
