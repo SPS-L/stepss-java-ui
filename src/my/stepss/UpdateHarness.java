@@ -24,6 +24,7 @@ public final class UpdateHarness {
         checkNodeMigration();
         checkFirstRunKeyMigration();
         checkBannerActionButton();
+        checkLicenceHtml();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -241,6 +242,34 @@ public final class UpdateHarness {
             System.out.println("FAIL banner checks threw: " + ex.getCause());
             failures++;
         }
+    }
+
+    /**
+     * The licence renders as headings and paragraphs rather than a wall.
+     *
+     * <p>Pinned because the transform is the one part of the dialog that can
+     * be wrong without looking wrong: a licence whose sections stopped being
+     * recognised would still render, just flat, and nobody would notice.
+     */
+    private static void checkLicenceHtml() {
+        String html = LicenseDialog.toHtml(
+                "RAMSES LICENSE\n"
+                + "Copyright (c) University of Liege, Belgium.\n"
+                + "\n"
+                + "1. Definitions\n"
+                + "\"Software\" means a copy of RAMSES.\n");
+        expectContains("first line is the title", html, "<h2>RAMSES LICENSE</h2>");
+        expectContains("numbered section is a heading", html, "<h3>1. Definitions</h3>");
+        expectContains("prose becomes a paragraph", html, "<p>");
+        expectContains("html is wrapped", html, "<html>");
+
+        // Angle brackets in a licence must not become markup.
+        expectContains("markup is escaped", LicenseDialog.toHtml("a <b> & c"), "&lt;b&gt;");
+
+        // Text matching no rule still renders, so a reworded licence can never
+        // come out worse than plain text would have.
+        String plain = LicenseDialog.toHtml("just one line");
+        expectContains("unmatched text survives", plain, "just one line");
     }
 
     private static Preferences freshScratch() throws BackingStoreException {

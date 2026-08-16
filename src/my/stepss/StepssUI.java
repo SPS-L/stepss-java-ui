@@ -15,7 +15,6 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.HeadlessException;
 import java.awt.Insets;
 import java.awt.Rectangle;
 import java.awt.event.KeyEvent;
@@ -763,51 +762,6 @@ public class StepssUI extends javax.swing.JFrame {
         }
     }
 
-
-    private void licenseAgreement(java.awt.event.ActionEvent evt) {
-        try {
-            InputStream in = StepssUI.class.getResourceAsStream("ramsesLicense.txt");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-            String str;
-            StringBuilder buf = new StringBuilder();
-            if (in != null) {
-                try {
-                    while ((str = reader.readLine()) != null) {
-                        buf.append(str).append("\n");
-                    }
-                    in.close();
-                } catch (IOException ex) {
-                    Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
-            JTextArea textArea = new JTextArea(buf.toString());
-            textArea.setColumns(50);
-            textArea.setRows(20);
-            textArea.setEditable(false);
-            textArea.setLineWrap(true);
-            textArea.setWrapStyleWord(true);
-            textArea.setSize(textArea.getPreferredSize().width, 1);
-            JScrollPane sp = new JScrollPane(textArea,
-                    JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
-            int response = JOptionPane.showOptionDialog(null,
-                    sp,
-                    "License Agreement",
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.INFORMATION_MESSAGE,
-                    null,
-                    new String[]{"Accept", "Decline"},
-                    "default");
-            if (response == JOptionPane.YES_OPTION) {
-            } else {
-                System.exit(1);
-            }
-        }
-        catch(HeadlessException e) {
-          e.getStackTrace();
-        }
-        
-
-    }
 
     /**
      * This method is called from within the constructor to initialize the form.
