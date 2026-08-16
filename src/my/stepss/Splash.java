@@ -82,28 +82,12 @@ final class Splash {
      * <p>Takes a tool id, as {@code Toolchain.extractAll} hands it out, and
      * does the wording here so Toolchain stays free of presentation.
      *
-     * @param toolId a tool id such as "ramses", or "" for no status at all
+     * @param toolId a tool id such as "ramses", or "" for the card's opening
+     *               line, which reads "Starting STEPSS" rather than being blank
      */
     void status(String toolId) {
         this.status = toolId.isEmpty() ? "Starting STEPSS" : "Extracting " + toolId;
         paint();
-    }
-
-    /**
-     * Dismisses the card.
-     *
-     * <p>Rarely needed: the JVM closes the splash by itself as soon as the
-     * first window is displayed, which on the normal path is the main frame.
-     * This exists for the first run, where the splash has to be gone before
-     * the licence agreement rather than behind it.
-     */
-    void close() {
-        try {
-            screen.close();
-        } catch (IllegalStateException alreadyClosed) {
-            // Closed by the JVM when a window appeared. Nothing to do, and
-            // nothing worth logging: this is the ordinary end of its life.
-        }
     }
 
     private void paint() {

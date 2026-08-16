@@ -116,13 +116,18 @@ Wraps `java.awt.SplashScreen`.
 
 ```java
 static Splash open(boolean dark, String version)   // null when there is no splash
-void status(String text)
-void close()
+void status(String toolId)
 ```
 
 `open` paints the themed card: the lockup from `Branding`, the creators line,
-the version, a hairline rule and an empty status line. `status` repaints the
-last line and calls `SplashScreen.update()`.
+the version, a hairline rule and the status line reading "Starting STEPSS".
+`status` repaints the card and calls `SplashScreen.update()`.
+
+No `close()`. The design sketched one for the first run, where the card has to
+be gone before the licence rather than behind it, but section 5 step 4 closes
+the raw `SplashScreen` handle in `main` instead, before any `Splash` exists to
+close. Nothing else needs it: the JVM dismisses the splash itself when the first
+window is shown.
 
 The property that makes this design work: `SplashScreen.update()` pushes pixels
 to a window the JVM owns, outside Swing's repaint pipeline. It therefore works
