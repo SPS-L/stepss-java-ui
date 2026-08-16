@@ -55,7 +55,23 @@ final class PreferenceMigration {
         }
         Preferences legacy = root.node(legacyName);
         for (String key : legacy.keys()) {
-            current.put(key, legacy.get(key, null));
+            // get() can return null for a key keys() just reported: a registry
+            // value of an unexpected type on Windows, a value removed by a
+            // second instance racing this one, a mangled entry from a roaming
+            // profile. Preferences.put(key, null) throws NullPointerException,
+            // which is not a BackingStoreException and would otherwise escape
+            // this method mid-copy: current would be left non-empty with the
+            // remaining keys never even attempted, and the next launch would
+            // read current.keys().length > 0 as "already migrated" and never
+            // look at legacy again. Skipping only the unreadable key instead
+            // lets every other key finish copying and legacy still gets
+            // retired below; the one value that could not be read was not
+            // recoverable by retrying anyway.
+            String value = legacy.get(key, null);
+            if (value == null) {
+                continue;
+            }
+            current.put(key, value);
         }
         // Flushed before the removal, not after: a crash between the two then
         // costs a duplicate node rather than the settings themselves.

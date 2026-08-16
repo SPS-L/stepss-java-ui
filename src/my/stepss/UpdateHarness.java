@@ -106,6 +106,43 @@ public final class UpdateHarness {
             expectInt("int key survives as an int", 1280, made.getInt("windowWidth", 0));
             expectFalse("legacy node removed", root.nodeExists("legacy"));
 
+            // Several keys move as a set, pinned by count rather than only by
+            // naming three of them: a future edit that silently drops one key
+            // out of the loop, without touching any of the three checked
+            // above, would still be caught here.
+            root = freshScratch();
+            legacy = root.node("legacy");
+            legacy.put("a", "1");
+            legacy.put("b", "2");
+            legacy.put("c", "3");
+            legacy.put("d", "4");
+            legacy.put("e", "5");
+            legacy.flush();
+            made = PreferenceMigration.node(root, "legacy", "current");
+            expectInt("every key arrives", 5, made.keys().length);
+
+            // A key that keys() reports but get() cannot read (a registry
+            // value of an unexpected type, a value removed by a second
+            // instance racing this one, a mangled roaming-profile entry) is
+            // not producible through the public Preferences API against this
+            // backing store: put(key, null) rejects the value at write time,
+            // before it is ever stored, rather than the mismatch surfacing
+            // later at read time the way it can against other backing stores.
+            // So this pins what is actually observable here - the store
+            // refuses to hold a null value in the first place - rather than
+            // the unreachable mismatch itself. PreferenceMigration's null
+            // check in the copy loop is defensive for backing stores where
+            // that mismatch can happen; it is not exercised by this harness.
+            root = freshScratch();
+            legacy = root.node("legacy");
+            boolean rejectedNullValue = false;
+            try {
+                legacy.put("nullKey", null);
+            } catch (NullPointerException expected) {
+                rejectedNullValue = true;
+            }
+            expectTrue("the backing store itself refuses a null value", rejectedNullValue);
+
             // Already migrated: the current node wins and is not overwritten.
             root = freshScratch();
             legacy = root.node("legacy");
@@ -117,6 +154,7 @@ public final class UpdateHarness {
             made = PreferenceMigration.node(root, "legacy", "current");
             expect("populated current node is left alone", "/new",
                     made.get("workingDirectory", null));
+            expectTrue("legacy node left alone", root.nodeExists("legacy"));
 
             removeScratch();
         } catch (BackingStoreException ex) {

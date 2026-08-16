@@ -87,9 +87,10 @@ public class StepssUI extends javax.swing.JFrame {
         // a disconnected drive comes up as no directory rather than an error.
         selWorkDir = lastWorkingDirectory();
         if (prefs.getBoolean(FIRST_RUN, true)) {
-            // The licence itself is shown from main(), before this constructor
-            // runs, so that it is the first thing on screen. This only records
-            // that it has been dealt with.
+            // Shows nothing yet: the licence will be shown from main(), before
+            // this constructor runs, once the startup sequence that does that
+            // lands. Until then this only records that the flag has been dealt
+            // with, so a later launch does not treat this one as the first.
             prefs.putBoolean(FIRST_RUN, false);
         }
 
@@ -5926,15 +5927,21 @@ public class StepssUI extends javax.swing.JFrame {
             Preferences root = Preferences.userRoot();
             try {
                 cachedNode = PreferenceMigration.node(root, LEGACY_NODE, PREFERENCES_NODE);
-                PreferenceMigration.firstRunKey(cachedNode);
-            } catch (java.util.prefs.BackingStoreException ex) {
-                // A preference store that cannot be read is not a reason not to
+            } catch (java.util.prefs.BackingStoreException | RuntimeException ex) {
+                // A preference store that cannot be read - or that throws
+                // something unchecked, such as a value the backing store
+                // reports but cannot actually return - is not a reason not to
                 // start. The defaults apply for this session and the next
                 // launch tries the migration again.
                 Logger.getLogger(StepssUI.class.getName()).log(Level.WARNING,
                         "Could not migrate saved preferences", ex);
                 cachedNode = root.node(PREFERENCES_NODE);
             }
+            // Outside the try: firstRunKey() declares no checked exception, and
+            // running it unconditionally means a migration failure still does
+            // not skip converting the first-run flag on whichever node startup
+            // ends up using, on either path above.
+            PreferenceMigration.firstRunKey(cachedNode);
         }
         return cachedNode;
     }
