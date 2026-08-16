@@ -86,18 +86,12 @@ public class StepssUI extends javax.swing.JFrame {
         // directory is restored only if it is still a directory, so a case on
         // a disconnected drive comes up as no directory rather than an error.
         selWorkDir = lastWorkingDirectory();
-        String ramsesFirtsTime = "";
-        if (prefs.getBoolean(ramsesFirtsTime, true)) {
-            // Unconditionally. This used to be shown only when type.txt said
-            // "Limited", which asked the interface a question it cannot
-            // answer: every bundled engine is limited until the user puts a
-            // LICENSE among their own data files, and nothing here can see
-            // that. The licence being agreed to is the engine's own, and it
-            // applies either way.
-            licenseAgreement(null);
-            prefs.putBoolean(ramsesFirtsTime, false);
+        if (prefs.getBoolean(FIRST_RUN, true)) {
+            // The licence itself is shown from main(), before this constructor
+            // runs, so that it is the first thing on screen. This only records
+            // that it has been dealt with.
+            prefs.putBoolean(FIRST_RUN, false);
         }
-//        prefs.remove(ramsesFirtsTime);
 
 //        KeyStroke ctrlGKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_G,InputEvent.CTRL_DOWN_MASK);
 //        jPanel1.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(ctrlGKeyStroke, "KILLGP");
@@ -5917,24 +5911,44 @@ public class StepssUI extends javax.swing.JFrame {
      *
      * <p>The name is a literal, not {@code getClass().getName()}, which is
      * what it used to be. That tied the node to the class name, so renaming
-     * the package from {@code my.ramses} moved every user's settings out from
-     * under them: theme and window forgotten, and the licence agreement asking
-     * to be accepted again as though the application had never been run. A
+     * the package moved every user's settings out from under them. A
      * stored-preferences key is a compatibility surface and has no business
-     * following a refactor.
+     * following a refactor on its own.
+     *
+     * <p>It did follow this one, deliberately: the node was
+     * {@code my.ramses.RamsesUI} until the package became {@code my.stepss},
+     * and {@link PreferenceMigration} is what makes the corrected name free
+     * rather than costing every user their settings. Do not remove that call.
+     * Installations that predate it still have the old node on disk.
      */
     static Preferences preferences() {
-        return Preferences.userRoot().node(PREFERENCES_NODE);
+        if (cachedNode == null) {
+            Preferences root = Preferences.userRoot();
+            try {
+                cachedNode = PreferenceMigration.node(root, LEGACY_NODE, PREFERENCES_NODE);
+                PreferenceMigration.firstRunKey(cachedNode);
+            } catch (java.util.prefs.BackingStoreException ex) {
+                // A preference store that cannot be read is not a reason not to
+                // start. The defaults apply for this session and the next
+                // launch tries the migration again.
+                Logger.getLogger(StepssUI.class.getName()).log(Level.WARNING,
+                        "Could not migrate saved preferences", ex);
+                cachedNode = root.node(PREFERENCES_NODE);
+            }
+        }
+        return cachedNode;
     }
 
-    /**
-     * The node this application has always used, and will keep using.
-     *
-     * <p>It reads as a stale name and it is deliberate. This string is what
-     * existing installations already have on disk; a prettier one buys nothing
-     * a user can see and costs every one of them their settings.
-     */
-    private static final String PREFERENCES_NODE = "my.ramses.RamsesUI";
+    private static Preferences cachedNode;
+
+    /** The node this application uses, matching the package it belongs to. */
+    private static final String PREFERENCES_NODE = "my.stepss.StepssUI";
+
+    /** The node it used before v3.74.7's package rename, migrated on first read. */
+    private static final String LEGACY_NODE = "my.ramses.RamsesUI";
+
+    /** Whether the licence agreement still has to be shown. */
+    static final String FIRST_RUN = "stepssFirstTime";
 
 
     /**
