@@ -141,10 +141,22 @@ splash closing and the window appearing. Three independent measurements here fou
 | Tight state-poll #1 | still up | appears in the *same* poll tick as the splash | below poll resolution (a few ms) |
 | Tight state-poll #2 | still up | appears in the *same* poll tick as the splash | below poll resolution (a few ms) |
 
-No visible blank gap was seen in any of the three runs on this machine. This does not contradict
-Task 8's finding - different hardware or load could easily explain 210ms that this machine's fast,
-otherwise-idle screen does not reproduce - it is simply what was actually observed here, reported
-as asked.
+Neither the poll interval nor what was polled for the two "Tight state-poll" rows was recorded at
+the time; "below poll resolution (a few ms)" is as precise as the underlying record allows, and is
+reported here rather than tightened into a number that was never captured. The screenshot-timed run
+is the one measurement in this table with a traceable, checkable pair of timestamps.
+
+No visible blank gap was seen in any of the three runs on this machine. Beyond the absence of an
+observed gap, the code gives a structural reason to expect none: `StepssUI.java:5958-5960` says
+directly that showing the first window is what dismisses the splash -
+
+> Showing the first window is what dismisses the splash, so the three second floor is enforced by
+> delaying the window, never by sleeping: the EDT has extraction to get on with.
+
+- so there is no separate step between "splash closes" and "window appears" for an unaccounted gap
+to hide in; the two are the same event by construction. This does not rule out Task 8's 210ms
+finding on different hardware or under different load, which this fast, otherwise-idle machine did
+not reproduce, but the architecture is why no gap is expected here, not just why none was seen.
 
 **Result: PASS.**
 
@@ -235,15 +247,29 @@ With the corrected invocation, `user.home` resolves correctly and the real prefe
 used, but there is genuinely no route to `github.com`:
 
 ```
-main window appears: t=3.069s   (scenario 2's runs: 3.07s-3.15s - not later)
+main window appears: t=3.069s
 stdout: (empty)      stderr: (empty)      no SEVERE anywhere
 ```
+
+That is not later than Scenario 2's screenshot-timed run, where the window appeared at 3.117s - the
+one absolute window-appear timestamp Scenario 2 records. Scenario 2's other two runs (the "tight
+state-poll" rows) were logged only as "same poll tick as the splash", with no absolute timestamp of
+their own, so they are not cited here as a point of comparison.
 
 A screenshot taken several seconds later showed no banner and no dialog. `ss -tnp | grep java` was
 also polled continuously for the run and showed no connection at any point - the daemon thread's
 `IOException` (an immediate `UnknownHostException`, since DNS itself cannot resolve here) is caught
 and logged at `Level.FINE`, which the default console handler does not print, matching "no `SEVERE`
 in the console" exactly.
+
+**What this substitute does not cover.** The network namespace produces an immediate DNS resolution
+failure, not a slow or hanging connection. `UpdateCheck.java` sets a 5 second connect timeout and a
+5 second read timeout on the HTTP connection it opens (`setConnectTimeout(5000)` /
+`setReadTimeout(5000)`); neither is exercised here, because resolution fails before a connection is
+ever attempted. The verdict is very likely unchanged either way - the check runs on a daemon thread
+(`check.setDaemon(true)` in `StepssUI.checkForUpdatesAtStartup`) regardless of how it fails, so a
+hung connection would occupy that thread for up to 5 seconds without holding up the window - but
+that path is not the one this run actually exercised.
 
 **Result: PASS.**
 
