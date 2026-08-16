@@ -67,6 +67,7 @@ first message, and on some window managers the card would paint blank.
 | Splash timing | `max(3s, window ready)` | The update check must never delay startup |
 | First run | Splash closed immediately, licence, no splash that launch | The native splash cannot be reopened once closed, and a `JWindow` after acceptance would freeze during extraction |
 | Licence dialog | Rebuilt as an owned `JDialog` with the lockup | Moving it to `main` makes it the first window a new user sees; four latent faults in it are fixed on the way through |
+| Preference names | `stepssFirstTime`, node `my.stepss.StepssUI`, both migrated | The names should match the package they belong to; the migration is what makes that free rather than costing every user their settings |
 
 ## Design
 
@@ -174,13 +175,45 @@ to the EDT. It becomes, in order:
 parent and touches no instance state (`StepssUI.java:797`), so this is a
 modifier change and a move, not a rewrite.
 
-**The key trap.** The first-run flag is read as
+**The first-run flag is renamed, and migrated.** It is read today as
 `prefs.getBoolean(ramsesFirtsTime, true)` where `ramsesFirtsTime` is the **empty
-string** (`StepssUI.java:89-90`). The preference key is therefore `""`. It stays
-`""`. Giving it a sensible name would make every existing installation look like
-a first run and re-prompt for a licence its user accepted years ago, which is
-the same class of fault the `my.ramses.RamsesUI` node comment already documents
-at `StepssUI.java:5930-5937`.
+string** (`StepssUI.java:89-90`), so the key on disk is `""`, under a
+misspelled variable. It becomes `stepssFirstTime`.
+
+A rename alone would make every existing installation look like a first run and
+re-prompt for a licence its user accepted long ago, so it comes with a one-time
+migration: if `stepssFirstTime` is absent and the legacy `""` key says the
+application has run before, write `stepssFirstTime=false` and remove `""`. The
+prompt is then never shown twice, and the legacy key does not linger.
+
+### 7a. The preferences node is renamed too, and migrated wholesale
+
+`PREFERENCES_NODE` is the literal `my.ramses.RamsesUI` (`StepssUI.java:5937`).
+The package became `my.stepss` in v3.74.7 and the node name should follow it to
+`my.stepss.StepssUI`.
+
+This one needs care, and the existing comment at `StepssUI.java:5930-5937` says
+why: the string is not a package reference, it is a **location in the user's
+preference store** - the Windows registry, `~/.java/.userPrefs` on Linux,
+`~/Library/Preferences` on macOS. Renaming it with nothing else would abandon
+every existing user's theme, window geometry, working directory and licence
+acceptance in a node nothing reads any more.
+
+So the rename carries a migration, run once from `preferences()`'s first call:
+
+1. If `my.stepss.StepssUI` already has keys, use it and do nothing else.
+2. Otherwise, if `my.ramses.RamsesUI` exists, copy every key across, then
+   `removeNode()` the old one and flush.
+3. Otherwise this is a genuine first run and the new node starts empty.
+
+Copying every key rather than an enumerated list matters: the node holds the
+theme, five window keys, the working directory and the first-run flag today, and
+an enumeration would silently drop whatever is added later.
+
+**Follow-up outside this repo:** the umbrella `CLAUDE.md` currently states the
+node is deliberately stale and must not be renamed. That paragraph is wrong once
+this lands and has to be rewritten in the same pass, to say the node was renamed
+*with* a migration and that the migration is the thing not to remove.
 
 ### 6. Startup update check
 
@@ -203,7 +236,7 @@ Two keys in the existing node, beside the theme and window state:
 | Key | Default | Set by |
 |---|---|---|
 | `checkUpdatesAtStartup` | true | Tools menu checkbox |
-| `""` (existing first-run flag) | true | unchanged, see the trap above |
+| `stepssFirstTime` | true | Licence acceptance, migrated from the legacy `""` |
 
 `addUpdateToggle()` follows `addThemeToggle()` exactly, including the
 `flush()` and its `BackingStoreException` handling, and is added
@@ -212,8 +245,7 @@ away.
 
 ### 8. Assets
 
-`manifest.mf` gains `SplashScreen-Image: my/stepss/splash-460.png`. Two files
-are committed beside the other marks:
+Two files are committed beside the other marks:
 
 | File | Size | Content |
 |---|---|---|
@@ -225,6 +257,36 @@ instant the JVM paints it, before any of our code runs. A dark launch repaints
 the whole card. Both files go into `Branding.requiredResources()` so
 `ChromeCheck` fails when one is missing, and the compositing recipe is
 documented in `Branding`'s javadoc next to the existing Inkscape recipe.
+
+### 8a. Making the splash actually appear on all three platforms
+
+There are two launch routes and they do **not** honour the same mechanism.
+
+`SplashScreen-Image` in the jar manifest is read by the `java` launcher only on
+the `-jar` path. `build.xml:393` passes jpackage `--main-class my.stepss.StepssUI`,
+so every generated launcher starts the class on a classpath instead, and the
+manifest attribute is never consulted. Left at that, `java -jar stepss.jar`
+would splash and the `.deb`, `.msi` and `.dmg` would not - on all three
+platforms, not on two of them. This is not a per-platform quirk, it is the
+bundle route being different from the jar route everywhere.
+
+So both routes are covered explicitly, and the same PNG serves both:
+
+| Route | Mechanism |
+|---|---|
+| `java -jar dist/stepss.jar` | `SplashScreen-Image: my/stepss/splash-460.png` in `manifest.mf` |
+| Every jpackage bundle | `--java-options -splash:$APPDIR/splash-460.png`, with the PNGs copied into `dist/` so `--input dist` carries them into the app directory |
+
+`$APPDIR` is jpackage's own token, substituted identically on Windows, macOS and
+Linux, and `-splash:` is a plain JVM option on all three. The `@2x` file is
+picked up by the JDK's own naming convention on either route, so HiDPI needs no
+extra argument.
+
+Two consequences worth stating: the splash PNGs now live in `dist/` beside the
+jar as well as inside it, which `-post-jar` handles alongside the jar assembly;
+and `Splash.open` must keep working when `getSplashScreen()` returns null,
+because a launch that bypasses both routes - running the class from NetBeans -
+has no splash at all and must still start.
 
 ### 9. The licence dialog, rebuilt
 
@@ -311,6 +373,11 @@ written acceptance run for what is not.
 Pins `UpdateCheck.noticeFor` across: newer, equal, older, null location,
 location naming no tag, and an unparseable segment on each side.
 
+**The preferences migration is pinned in the same harness**, against a scratch
+node root rather than the real one, across all four branches: fresh install,
+legacy node present, new node already populated, and both present. `Preferences`
+needs no display, so this runs headlessly like the rest.
+
 **`ChromeCheck`** picks up the two splash assets for free through
 `Branding.requiredResources()`.
 
@@ -328,12 +395,21 @@ location naming no tag, and an unparseable segment on each side.
 
 ## Risks and what stays unverified
 
-- **The native splash under jpackage on Windows and macOS.** `build.xml:392`
-  passes `--main-jar stepss.jar`, so the manifest attribute should apply on all
-  three, but only the Linux bundle can be run here. The `.msi` and `.dmg`
-  launchers stay unverified until someone runs one.
-- **HiDPI.** Java picks `splash-460@2x.png` by naming convention. Verified on
-  whatever scaling this machine offers, not on all.
+- **Only Linux is executed here; all three must be correct by construction.**
+  That is why the splash goes through `-splash:$APPDIR/...` rather than relying
+  on the manifest: the mechanism is then the same on all three, and verifying it
+  on the Linux bundle verifies the mechanism rather than one platform's luck.
+  What genuinely cannot be checked here is that the Windows and macOS runners
+  produce a bundle at all with the new `--java-options`, so the next release
+  build is the confirmation. A missing splash degrades to no splash, never to a
+  failed start.
+- **HiDPI.** The JDK picks `splash-460@2x.png` by naming convention on both
+  routes. Verified at whatever scaling this machine offers, not at all of them.
+- **The preferences migration runs once and is destructive.** It calls
+  `removeNode()` on `my.ramses.RamsesUI` after copying. A bug there costs a user
+  their theme, window and working directory, so it is the one piece of this work
+  with a harness case per branch: fresh install, legacy node present, new node
+  already populated, and both present.
 - **Three seconds is a floor on a fast machine.** On a warm cache the window is
   ready well before it, so the splash is padding the start by design. If that
   reads as slow in practice, the constant is one line.
@@ -352,6 +428,10 @@ location naming no tag, and an unparseable segment on each side.
 | `src/my/stepss/platform/Toolchain.java` | `extractAll(Consumer<String>)` overload |
 | `src/my/stepss/LicenseDialog.java` | New, the rebuilt agreement dialog |
 | `src/my/stepss/StepssUI.java` | `main` sequence, `licenseAgreement` becomes a static call into `LicenseDialog`, `checkForUpdatesAtStartup`, `addUpdateToggle`, manual check reads `UpdateCheck` |
-| `manifest.mf` | `SplashScreen-Image` |
+| `manifest.mf` | `SplashScreen-Image`, for the `java -jar` route |
+| `build.xml` | `--java-options -splash:$APPDIR/...` for bundles; splash PNGs copied into `dist/` |
 
 `Version.java` and `StepssUI.form` are untouched.
+
+Outside this repo, in the same pass: the umbrella `CLAUDE.md` paragraph stating
+that the preferences node is deliberately stale.
