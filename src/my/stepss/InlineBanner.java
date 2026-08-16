@@ -3,7 +3,9 @@ package my.stepss;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.event.ActionListener;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -33,8 +35,8 @@ import javax.swing.UIManager;
 final class InlineBanner extends JPanel {
 
     private final JLabel message = new JLabel();
+    private final JButton actionButton = new JButton();
     private final Timer expiry;
-
 
     InlineBanner() {
         setLayout(new BorderLayout(8, 0));
@@ -45,8 +47,19 @@ final class InlineBanner extends JPanel {
         dismiss.putClientProperty("JButton.buttonType", "borderless");
         dismiss.addActionListener(event -> clear());
 
+        actionButton.putClientProperty("JButton.buttonType", "borderless");
+        actionButton.setVisible(false);
+
+        // One panel rather than two BorderLayout slots: the action belongs
+        // beside Dismiss, in reading order, and a message with no action must
+        // leave the line looking exactly as it does today.
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        buttons.setOpaque(false);
+        buttons.add(actionButton);
+        buttons.add(dismiss);
+
         add(message, BorderLayout.CENTER);
-        add(dismiss, BorderLayout.EAST);
+        add(buttons, BorderLayout.EAST);
 
         expiry = new Timer(12000, event -> clear());
         expiry.setRepeats(false);
@@ -54,12 +67,28 @@ final class InlineBanner extends JPanel {
 
     /** Something worked. Says so, then gets out of the way. */
     void confirm(String text) {
-        show(text, UIManager.getColor("Component.accentColor"), true);
+        show(text, UIManager.getColor("Component.accentColor"), true, null, null);
     }
 
     /** Something is worth knowing but nothing is broken. */
     void warn(String text) {
-        show(text, UIManager.getColor("Component.warning.focusedBorderColor"), false);
+        show(text, UIManager.getColor("Component.warning.focusedBorderColor"),
+                false, null, null);
+    }
+
+    /**
+     * Something is worth knowing and there is one obvious thing to do about
+     * it.
+     *
+     * <p>Accented and fading, like {@link #confirm} rather than
+     * {@link #warn}, because an available update is neither a success nor a
+     * problem, and a notice nobody acts on should not become furniture.
+     *
+     * @param actionLabel the button's text
+     * @param action      what the button does, run on the EDT
+     */
+    void notice(String text, String actionLabel, Runnable action) {
+        show(text, UIManager.getColor("Component.accentColor"), true, actionLabel, action);
     }
 
     /**
@@ -94,11 +123,28 @@ final class InlineBanner extends JPanel {
         });
     }
 
-    private void show(final String text, final Color accent, final boolean fades) {
+    private void show(final String text, final Color accent, final boolean fades,
+                      final String actionLabel, final Runnable action) {
         onSwing(() -> {
             expiry.stop();
             message.setText(text);
             message.setFont(message.getFont().deriveFont(Font.PLAIN));
+            // Unconditionally, before anything is added: every message decides
+            // its own action, and a button left over from the previous one
+            // would offer to do something unrelated to what is now on the line.
+            for (ActionListener listener : actionButton.getActionListeners()) {
+                actionButton.removeActionListener(listener);
+            }
+            if (actionLabel == null) {
+                actionButton.setVisible(false);
+            } else {
+                actionButton.setText(actionLabel);
+                actionButton.addActionListener(event -> {
+                    clear();
+                    action.run();
+                });
+                actionButton.setVisible(true);
+            }
             Color edge = accent != null ? accent : UIManager.getColor("Label.foreground");
             // A rule down the leading edge rather than a filled panel: the
             // window already has a tab strip and a status bar competing for
@@ -123,5 +169,20 @@ final class InlineBanner extends JPanel {
         } else {
             SwingUtilities.invokeLater(work);
         }
+    }
+
+    // Package-private windows into the action button, for UpdateHarness. The
+    // button is otherwise private, and a test that reached it by walking
+    // getComponents() would pass while asserting nothing about the contract.
+    boolean actionButtonVisibleForTests() {
+        return actionButton.isVisible();
+    }
+
+    String actionButtonTextForTests() {
+        return actionButton.getText();
+    }
+
+    void actionButtonClickForTests() {
+        actionButton.doClick();
     }
 }

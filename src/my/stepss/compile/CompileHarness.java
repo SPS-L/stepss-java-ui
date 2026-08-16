@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import my.stepss.platform.Platform;
+import my.stepss.platform.Toolchain;
 
 /**
  * Headless checks for the parts of the compile pipeline that need neither a
@@ -29,6 +31,7 @@ public final class CompileHarness {
         checkExtraDirectorySearch();
         checkKitResetMessage();
         checkGuardFailureClearsBuiltExecutable();
+        checkExtractionOrder();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -390,6 +393,26 @@ public final class CompileHarness {
             }
             deleteRecursively(toolDir);
         }
+    }
+
+    /**
+     * What extractAll() visits, per platform, without extracting anything.
+     *
+     * <p>Pinned because the splash names each tool as it goes, so this list is
+     * what a user reads during startup, and because gnuplot ships on Windows
+     * only while uramses is deliberately lazy on all three.
+     */
+    private static void checkExtractionOrder() {
+        expect("linux extraction order", "[ramses, helios, dyngraph, codegen]",
+                Toolchain.extractionOrder(Platform.LINUX_X86_64).toString());
+        expect("macos extraction order", "[ramses, helios, dyngraph, codegen]",
+                Toolchain.extractionOrder(Platform.MACOS_ARM64).toString());
+        expect("windows extraction order carries gnuplot",
+                "[ramses, helios, dyngraph, codegen, gnuplot]",
+                Toolchain.extractionOrder(Platform.WINDOWS_X86_64).toString());
+        expect("uramses stays lazy on every platform", "false",
+                String.valueOf(Toolchain.extractionOrder(Platform.LINUX_X86_64)
+                        .contains("uramses")));
     }
 
     private static void deleteRecursively(java.io.File f) {

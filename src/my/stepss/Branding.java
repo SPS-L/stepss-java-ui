@@ -38,6 +38,15 @@ import javax.swing.Icon;
  *          --export-width=32 --export-height=32 icon-light.svg
  * </pre>
  *
+ * <h2>The splash card is generated, not drawn</h2>
+ *
+ * <p>{@code splash-460.png} is the light lockup composited onto a plain card by
+ * {@code tools/MakeSplash.java}. Nothing has to be run by hand for it:
+ * {@code tools/refresh-marks.sh} composites the card as its last step, from the
+ * lockups it has just exported, so one command still refreshes every mark. It is
+ * not built by Ant, because it changes about as often as the artwork does and a
+ * build step for it would run on every compile for nothing.
+ *
  * <h2>One file per display scale, rather than one file scaled</h2>
  *
  * <p>The lockup ships at {@value #LOCKUP_WIDTH}px and at two and three times
@@ -58,6 +67,12 @@ final class Branding {
 
     /** Display scales the lockup ships a rendering for. */
     private static final int[] LOCKUP_SCALES = {1, 2, 3};
+
+    /** The splash card, composited from the light lockup by tools/MakeSplash.java. */
+    static final String SPLASH = "splash-460.png";
+
+    /** Its 2x rendering, which the JDK selects by this naming convention alone. */
+    static final String SPLASH_2X = "splash-460@2x.png";
 
     /** Rasterised sizes of the square mark, smallest first. */
     private static final int[] ICON_SIZES = {16, 32, 48, 128};
@@ -110,6 +125,49 @@ final class Branding {
                 LOCKUP_WIDTH, height);
     }
 
+    /**
+     * The lockup as a plain image at one of its rasterised widths, for callers
+     * that paint rather than hand an Icon to Swing.
+     *
+     * <p>{@link #logo} returns a multi-resolution Icon, which is right for a
+     * JLabel and wrong for the splash: {@code SplashScreen.createGraphics()}
+     * is a fixed surface at a known scale, so the caller picks its width.
+     *
+     * @param width 380, 760 or 1140
+     * @return the image, or null when that rendering is not in the jar
+     */
+    static Image lockupImage(boolean dark, int width) {
+        return read("logo-" + variant(dark) + "-" + width + ".png");
+    }
+
+    /**
+     * Which of those widths to ask for, when the lockup is laid out
+     * {@value #LOCKUP_WIDTH}px wide on a surface drawn at {@code scale} device
+     * pixels per user-space unit.
+     *
+     * <p>The narrowest rendering that still covers the device pixels, so a 2x
+     * surface gets the 760 at 1:1 rather than the 380 enlarged. A fractional
+     * scale rounds up for the same reason {@link LockupIcon} sets no
+     * interpolation hint: minifying a rendering that exists is the good case,
+     * enlarging one that is too small is the case worth avoiding. Beyond 3x the
+     * answer is the 1140, because there is no wider file to hand back.
+     *
+     * <p>Only callers that paint need this. {@link #logo} hands Swing every
+     * variant and lets the drawing pipeline choose; a splash surface cannot,
+     * because {@code SplashScreen.createGraphics()} is one fixed surface.
+     */
+    static int lockupWidthFor(double scale) {
+        int wanted = (int) Math.round(LOCKUP_WIDTH * scale);
+        int widest = LOCKUP_WIDTH * LOCKUP_SCALES[LOCKUP_SCALES.length - 1];
+        for (int factor : LOCKUP_SCALES) {
+            int width = LOCKUP_WIDTH * factor;
+            if (width >= wanted) {
+                return width;
+            }
+        }
+        return widest;
+    }
+
     private static String variant(boolean dark) {
         return dark ? "dark" : "light";
     }
@@ -135,6 +193,10 @@ final class Branding {
                 names.add("logo-" + variant(dark) + "-" + (LOCKUP_WIDTH * scale) + ".png");
             }
         }
+        // Outside the loop: one light card serves both themes, and it ships in
+        // two densities rather than three.
+        names.add(SPLASH);
+        names.add(SPLASH_2X);
         return names;
     }
 

@@ -116,13 +116,18 @@ Wraps `java.awt.SplashScreen`.
 
 ```java
 static Splash open(boolean dark, String version)   // null when there is no splash
-void status(String text)
-void close()
+void status(String toolId)
 ```
 
 `open` paints the themed card: the lockup from `Branding`, the creators line,
-the version, a hairline rule and an empty status line. `status` repaints the
-last line and calls `SplashScreen.update()`.
+the version, a hairline rule and the status line reading "Starting STEPSS".
+`status` repaints the card and calls `SplashScreen.update()`.
+
+No `close()`. The design sketched one for the first run, where the card has to
+be gone before the licence rather than behind it, but section 5 step 4 closes
+the raw `SplashScreen` handle in `main` instead, before any `Splash` exists to
+close. Nothing else needs it: the JVM dismisses the splash itself when the first
+window is shown.
 
 The property that makes this design work: `SplashScreen.update()` pushes pixels
 to a window the JVM owns, outside Swing's repaint pipeline. It therefore works
@@ -169,7 +174,8 @@ to the EDT. It becomes, in order:
    `javax.swing.Timer` for the remainder rather than sleeping. Displaying the
    first window is what dismisses the native splash, so delaying the window is
    how the three second floor is enforced.
-8. The update check starts at the end of the constructor and is never waited on.
+8. The update check starts when that frame is shown, and is never waited on.
+   See section 6 for why it is not the end of the constructor.
 
 `licenseAgreement` becomes `static`. It already passes `null` as its dialog
 parent and touches no instance state (`StepssUI.java:797`), so this is a
@@ -217,7 +223,8 @@ this lands and has to be rewritten in the same pass, to say the node was renamed
 
 ### 6. Startup update check
 
-At the end of the constructor, `checkForUpdatesAtStartup()`:
+`checkForUpdatesAtStartup()` runs from the frame's first `windowOpened`, which
+step 7 above is what delivers. It:
 
 - Returns immediately when the new preference is off.
 - Otherwise one **daemon** thread. Daemon so that a slow DNS lookup can never
@@ -228,6 +235,30 @@ At the end of the constructor, `checkForUpdatesAtStartup()`:
   `checkUpdateButtonActionPerformed` already does at `StepssUI.java:3660`.
 - Every failure returns without a word, logged at `Level.FINE`. The manual check
   keeps logging at `SEVERE` and keeps its dialogs: there, someone asked.
+
+**Not the end of the constructor**, which is where this section first put it.
+That was written before step 7 existed, and once the reveal timer landed the
+constructor stopped being the end of startup: it now finishes up to three
+seconds before the window is on screen. Two things broke, quietly.
+
+`InlineBanner` holds one message. `initRamses()` raises "gnuplot was not found,
+so real-time plotting is disabled" on it during that same constructor, so on a
+machine with no gnuplot on `PATH` where an update is also available, the update
+notice replaced that warning before either had ever been seen. The combination
+could not arise before this design, because the check only ran when the user
+asked for it under Help.
+
+And the banner's twelve second expiry starts at `notice()`, not at first paint,
+so a notice raised at the end of the constructor was actually on screen for
+about nine seconds.
+
+The frame therefore registers a `WindowAdapter` on itself and starts the check
+from `windowOpened`, rather than `main` calling it after `frame.setVisible(true)`.
+Both would fix the timing; only this one survives a `StepssUI` built by anything
+other than this `main`, such as running the class from an IDE, and `windowOpened`
+is delivered exactly once, so no path can start two checks. The daemon thread and
+"nothing ever waits on it" are unchanged: startup is over by the time the check
+begins.
 
 ### 7. Preferences
 
@@ -404,7 +435,22 @@ needs no display, so this runs headlessly like the rest.
   build is the confirmation. A missing splash degrades to no splash, never to a
   failed start.
 - **HiDPI.** The JDK picks `splash-460@2x.png` by naming convention on both
-  routes. Verified at whatever scaling this machine offers, not at all of them.
+  routes, and picking it is what makes the surface a scaled one: measured on
+  JDK 21, a `-splash:` whose `@2x` file is present reports `getSize()` as the
+  logical 460x250 and hands back a `Graphics2D` already scaled by two, and with
+  the `@2x` removed the same launch reports scale 1.0. So the base card is
+  genuinely the high density file.
+
+  The overpaint has to match it or the `@2x` is thrown away on the first frame,
+  since `Splash.open` repaints immediately. `Splash` therefore takes its width
+  and height from `getSize()` and its lockup rendering from the graphics
+  transform's scale, rather than from constants. All of this was exercised by
+  forcing `GDK_SCALE=2`, which is the same code path a real 2x display takes but
+  is not the same as a real 2x display: **no HiDPI monitor was available**, so
+  what a user sees at 2x remains unconfirmed. What was confirmed offscreen is
+  that the 1x card is pixel-identical to before, and that the 2x card's lockup
+  matches the 760px rendering to within one count per channel instead of being
+  the 380px rendering enlarged.
 - **The preferences migration runs once and is destructive.** It calls
   `removeNode()` on `my.ramses.RamsesUI` after copying. A bug there costs a user
   their theme, window and working directory, so it is the one piece of this work
