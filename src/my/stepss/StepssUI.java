@@ -160,9 +160,19 @@ public class StepssUI extends javax.swing.JFrame {
             System.exit(1);
         }
 
-        // Last, and off the EDT: the window is what the user is waiting for,
-        // and github.com is not on its critical path.
-        checkForUpdatesAtStartup();
+        // Not from here, and not from main either: from the window actually
+        // appearing. This constructor stopped being the end of startup when
+        // the reveal timer arrived, and a check started here raises a banner
+        // into a frame that is still up to three seconds from being shown.
+        // WINDOW_OPENED is delivered once, the first time the frame is made
+        // visible, whoever made it visible, so no construction path loses the
+        // check and no path can run it twice. See checkForUpdatesAtStartup.
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowOpened(java.awt.event.WindowEvent event) {
+                checkForUpdatesAtStartup();
+            }
+        });
     }
 
     /**
@@ -3679,7 +3689,20 @@ public class StepssUI extends javax.swing.JFrame {
      *
      * <p>A daemon thread, so a slow DNS lookup can never hold the JVM open
      * after the user has quit, and never the EDT, so a machine with no network
-     * does not pay the connect timeout before its window appears.
+     * does not pay the connect timeout before its window appears. Nothing
+     * waits on it: startup is finished by the time it is even started.
+     *
+     * <p>Started from the frame's first {@code windowOpened}, not from the
+     * constructor, and the difference is two bugs rather than a preference.
+     * The splash holds the window back for up to three seconds, so a check
+     * started at the end of the constructor runs against a frame nobody can
+     * see yet. {@link InlineBanner} holds one message, and {@code initRamses()}
+     * puts the "gnuplot was not found" warning on it during that same
+     * constructor, so on a machine with no gnuplot and an update available the
+     * notice replaced the warning before either had ever been on screen. And
+     * the banner's twelve second expiry runs from the call, not from first
+     * paint, so an early notice spent a quarter of its life behind a hidden
+     * window. Both go away once the check begins after the window is up.
      */
     private void checkForUpdatesAtStartup() {
         if (!preferences().getBoolean(CHECK_UPDATES_KEY, true)) {
@@ -5973,6 +5996,11 @@ public class StepssUI extends javax.swing.JFrame {
                             ? 1 : (int) Math.max(1L, SPLASH_MINIMUM_MS - elapsedMs);
                     javax.swing.Timer reveal = new javax.swing.Timer(remaining, event -> {
                         try {
+                            // This line is also what starts the update check:
+                            // the frame listens for its own windowOpened. It
+                            // is deliberately not called from here, so that a
+                            // StepssUI built by anything other than this main
+                            // still gets one.
                             frame.setVisible(true);
                             // Maximised is still the default, and stays what
                             // happens on a first run; a window sized and placed
