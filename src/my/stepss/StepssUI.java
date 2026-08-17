@@ -5787,14 +5787,34 @@ public class StepssUI extends javax.swing.JFrame {
         }
     }
 
+    // This and the three below it, loadGens, loadTrfos and loadPow, each clear
+    // pfcPane and fill it from one of helios' .res exports. None of them backs
+    // the pane up first, and none of them should.
+    //
+    // All four used to open output.trace and write pfcPane into it, pasted from
+    // the Dynamic Simulation console's own save-and-restore where the same block
+    // belongs. output.trace is that console's file: loadOutputActionPerformed is
+    // the only thing that reads it, savedOutputBool is the only thing that says
+    // whether it is current, and clearSimulOutput lists it as a file it owns.
+    // Nothing on this tab ever read it back, so the copy served no purpose here
+    // and each press overwrote the last one anyway.
+    //
+    // What kept that harmless was the one line the paste dropped: these four
+    // never set savedOutputBool, so the flag stayed false, and a false flag is
+    // what lets the simulation console overwrite the file with its own text
+    // before ever reading it. Adding `savedOutputBool = true` here to make the
+    // four consistent with their seven siblings looks like an obvious tidy-up
+    // and is the bug: it would leave power-flow text in output.trace with the
+    // flag claiming it is the simulation console's, and the next Load output
+    // would print helios' log into the simulation pane. Deleting the blocks is
+    // what removes that, so do not put them back.
+    //
+    // The four .res files survive in myTempDir until the next run, so every
+    // table here can be shown again at will. Only helios' run log is lost when
+    // the pane is cleared, because it is streamed straight into pfcPane and
+    // written nowhere; Run power flow is what brings it back.
     private void loadBusOverviewActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadBusOverviewActionPerformed
         try {
-            if (!savedOutputBool) {
-                File outfile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "output.trace");
-                FileWriter outwriter = new FileWriter(outfile);
-                outwriter.write(pfcPane.getText());
-                outwriter.close();
-            }
             pfcPane.setText("");
             File traceFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "in_net.res");
             BufferedReader traceFileBufReader = new BufferedReader(new FileReader(traceFile));
@@ -5811,12 +5831,6 @@ public class StepssUI extends javax.swing.JFrame {
 
     private void loadGensActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadGensActionPerformed
         try {
-            if (!savedOutputBool) {
-                File outfile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "output.trace");
-                FileWriter outwriter = new FileWriter(outfile);
-                outwriter.write(pfcPane.getText());
-                outwriter.close();
-            }
             pfcPane.setText("");
 
             File traceFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "in_gen.res");
@@ -5852,12 +5866,6 @@ public class StepssUI extends javax.swing.JFrame {
 
     private void loadTrfosActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadTrfosActionPerformed
         try {
-            if (!savedOutputBool) {
-                File outfile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "output.trace");
-                FileWriter outwriter = new FileWriter(outfile);
-                outwriter.write(pfcPane.getText());
-                outwriter.close();
-            }
             pfcPane.setText("");
 
             File traceFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "in_trfo.res");
@@ -5876,12 +5884,6 @@ public class StepssUI extends javax.swing.JFrame {
 
     private void loadPowActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadPowActionPerformed
         try {
-            if (!savedOutputBool) {
-                File outfile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "output.trace");
-                FileWriter outwriter = new FileWriter(outfile);
-                outwriter.write(pfcPane.getText());
-                outwriter.close();
-            }
             pfcPane.setText("");
 
             File traceFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "in_bal.res");
