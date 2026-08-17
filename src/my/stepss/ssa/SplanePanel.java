@@ -50,7 +50,6 @@ public final class SplanePanel extends JPanel {
 
     public SplanePanel() {
         setPreferredSize(new Dimension(460, 360));
-        setBackground(java.awt.Color.WHITE);
         setToolTipText("");
         addMouseListener(new MouseAdapter() {
             @Override
@@ -64,6 +63,25 @@ public final class SplanePanel extends JPanel {
                 }
             }
         });
+    }
+
+    /**
+     * The plot ground, re-resolved on every look-and-feel change because that
+     * is what the theme toggle triggers. Set here rather than once in the
+     * constructor: an explicitly set background is exactly what a LAF switch
+     * leaves alone, which is how these two panels stayed white in a dark
+     * window while everything around them re-themed.
+     *
+     * <p>Table.background rather than Panel.background, so the plot keeps
+     * sitting on the same content surface the modes table beside it uses:
+     * white against light grey as before, and a slightly raised panel in dark
+     * rather than melting into the window.
+     */
+    @Override
+    public void updateUI() {
+        super.updateUI();
+        java.awt.Color ground = javax.swing.UIManager.getColor("Table.background");
+        setBackground(ground != null ? ground : java.awt.Color.WHITE);
     }
 
     public void addSelectionListener(Listener listener) {
@@ -97,7 +115,8 @@ public final class SplanePanel extends JPanel {
         Graphics2D g = (Graphics2D) graphics.create();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
-        render(new SwingSink(g), shown, selected, getWidth(), getHeight());
+        render(new SwingSink(g, PlotStyle.isDark(getBackground())), shown, selected,
+                getWidth(), getHeight());
         g.dispose();
     }
 

@@ -343,7 +343,7 @@ public final class SsaResultsWindow extends JFrame {
                         ((Double) value).doubleValue()));
             }
             if (!selected) {
-                boolean dark = isDark(t.getBackground());
+                boolean dark = PlotStyle.isDark(t.getBackground());
                 c.setForeground(mode.zeta < 0.0
                         ? (dark ? UNSTABLE_ON_DARK : UNSTABLE_ON_LIGHT)
                         : !mode.simple
@@ -358,28 +358,19 @@ public final class SsaResultsWindow extends JFrame {
         // ground. The two flag colours cannot follow it, because they carry
         // meaning: crimson is the same crimson the s-plane draws its stability
         // boundary in, so they are lightened for a dark ground rather than
-        // dropped. The s-plane and mode-shape panels themselves stay on white
-        // in both themes: PlotStyle is the one source of truth behind both the
-        // on-screen and the SVG renderer, and an exported figure belongs on
-        // white whatever the application is wearing.
+        // dropped. UNSTABLE_ON_DARK is literally PlotStyle's dark crimson, and
+        // the two are meant to stay equal.
+        //
+        // The panels used to stay on white in both themes, on the grounds that
+        // PlotStyle was one palette serving both the screen and the SVG and an
+        // exported figure belongs on white. The second half of that is still
+        // true and the first is not: PlotStyle now carries a light and a dark
+        // column, SwingSink takes the theme's and SvgSink always takes the
+        // light one, so the export is unchanged and the window no longer has
+        // two white rectangles in it.
         private static final java.awt.Color UNSTABLE_ON_LIGHT = new java.awt.Color(0xdc, 0x14, 0x3c);
         private static final java.awt.Color UNSTABLE_ON_DARK = new java.awt.Color(0xff, 0x6b, 0x83);
         private static final java.awt.Color DEGENERATE_ON_LIGHT = new java.awt.Color(0xb0, 0x7d, 0x1a);
         private static final java.awt.Color DEGENERATE_ON_DARK = new java.awt.Color(0xdf, 0xa5, 0x3a);
-
-        /**
-         * Whether text on this background wants light ink. Measured off the
-         * colour rather than asked of the look and feel, so it stays right
-         * under the system fallback too.
-         */
-        private static boolean isDark(java.awt.Color background) {
-            if (background == null) {
-                return false;
-            }
-            double luminance = (0.299 * background.getRed()
-                    + 0.587 * background.getGreen()
-                    + 0.114 * background.getBlue()) / 255.0;
-            return luminance < 0.5;
-        }
     }
 }

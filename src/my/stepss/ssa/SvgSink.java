@@ -4,6 +4,13 @@ package my.stepss.ssa;
  * A PlotSink that emits SVG written to be edited afterwards: real text
  * elements, semantic groups, and a style block of named classes so changing
  * one hex value restyles every element of a kind at once.
+ *
+ * <p>Always the light palette, whatever theme the application is in. A saved
+ * figure ends up in a report or on a printed page rather than on screen, so
+ * it is drawn for that ground; a file whose colours depended on a menu
+ * setting made at the moment of export would also be a file that two people
+ * cannot reproduce from the same results. The on-screen panels follow the
+ * theme, and {@link SwingSink} is where that happens.
  */
 final class SvgSink implements PlotSink {
 
@@ -102,7 +109,8 @@ final class SvgSink implements PlotSink {
                 .append(height).append("\" ")
                 .append("font-family=\"sans-serif\">\n");
         out.append("  <style>\n").append(buildStyleBlock()).append("  </style>\n");
-        out.append("  <rect width=\"100%\" height=\"100%\" fill=\"#ffffff\"/>\n");
+        out.append("  <rect width=\"100%\" height=\"100%\" fill=\"")
+                .append(PlotStyle.EXPORT_BACKGROUND).append("\"/>\n");
         out.append(body);
         out.append("</svg>\n");
         return out.toString();
@@ -118,12 +126,12 @@ final class SvgSink implements PlotSink {
 
             if (entry.fontPx != null) {
                 // Text class: use fill and font-size
-                sb.append("fill: ").append(entry.hex).append("; ");
+                sb.append("fill: ").append(entry.lightHex).append("; ");
                 sb.append("font-size: ").append(entry.fontPx).append("px; ");
                 sb.append("stroke: none; ");
             } else {
                 // Stroke class: use stroke, stroke-width, and fill
-                sb.append("stroke: ").append(entry.hex).append("; ");
+                sb.append("stroke: ").append(entry.lightHex).append("; ");
                 sb.append("stroke-width: ");
                 if (entry.width == (int) entry.width) {
                     sb.append((int) entry.width);
