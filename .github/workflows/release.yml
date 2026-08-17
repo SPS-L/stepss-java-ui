@@ -53,6 +53,10 @@ jobs:
       # The tag this release supersedes, for the ordering guard in the deb leg.
       # Empty on the first-ever release.
       previous: ${{ steps.version.outputs.previous }}
+      # The pin commit the release points at. The legs build THIS, because a
+      # draft release has no tag to check out: GitHub creates the tag only when
+      # the release is published, which is the whole point of the draft.
+      sha: ${{ steps.commit.outputs.sha }}
     steps:
       - name: Check out
         uses: actions/checkout@v7
@@ -315,7 +319,7 @@ jobs:
           # one commit behind the versions.properties it actually shipped.
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Publish the release
+      - name: Create the release as a draft
         if: steps.bump.outputs.proceed == 'true'
         env:
           GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
@@ -330,12 +334,35 @@ jobs:
           # a re-run would skip to v3.55.1 with no v3.55 release. One API call
           # creates the tag and the release together or neither, so a failed
           # publish is recoverable by re-running with the same number.
+          #
+          # --draft, and the promote job below is what clears it. A published
+          # release is a promise that every platform is there, and this job
+          # finishes before a single installer has been built: three legs then
+          # rebuild the jar on their own runners and can each fail on their
+          # own. v3.74.17 is the proof - it went out carrying Windows assets
+          # and no .deb or .dmg, because two legs hit a transient API 500 while
+          # fetching pinned payloads, and apt served the previous version while
+          # the release page advertised a new one. A draft creates no tag, is
+          # invisible to users, and costs nothing to throw away.
+          #
+          # An earlier attempt at this same version can have left its draft
+          # behind, because the discard step tolerates a failed delete rather
+          # than masking the real error. Creating the release would then fail
+          # on a tag that already exists, and the version number would be
+          # stuck. Remove that draft first, and only ever a draft: `isDraft`
+          # is checked because a published release under this number must
+          # never be deleted by a re-run.
+          if [ "$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" \
+                    --json isDraft --jq .isDraft 2>/dev/null)" = "true" ]; then
+            echo "Removing an abandoned draft for $VERSION from an earlier attempt."
+            gh release delete "$VERSION" --repo "$GITHUB_REPOSITORY" --yes
+          fi
           gh release create "$VERSION" \
             dist/stepss.jar \
             --target "$TARGET_SHA" \
             --title "STEPSS $VERSION" \
             --notes-file notes.md \
-            --latest
+            --draft
 
       # A step used to sit here that asked a human, on every uramses re-pin,
       # whether the README's Compile known-limitation paragraph still held.
@@ -375,8 +402,9 @@ jobs:
   # installs in a clean container, and tells stepss-apt to rebuild. Windows
   # builds a second artifact, the portable app image, and tells stepss-scoop to
   # update its manifest. All of it sits in the legs themselves for the reason
-  # the dispatch steps spell out: fail-fast: false means a job hanging off this
-  # matrix is skipped whenever any platform fails.
+  # the promote job spells out. The dispatches used to live in these legs so a
+  # partial release still reached the package managers; they are in promote
+  # now, because a partial release is no longer published at all.
   bundles:
     needs: release
     if: needs.release.outputs.proceed == 'true'
@@ -398,13 +426,15 @@ jobs:
             type: dmg
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Check out the released tag
+      - name: Check out the commit the release points at
         uses: actions/checkout@v7
         with:
-          # The tag, not the branch: the release was cut from the pin commit,
-          # and building the branch instead would package whatever has landed
-          # since under the released version number.
-          ref: ${{ needs.release.outputs.version }}
+          # The pin commit, not the branch and not the tag. Not the branch,
+          # because that would package whatever has landed since under the
+          # released version number. Not the tag, because the release is still
+          # a draft at this point and GitHub creates the tag only on publish -
+          # this is the same commit the draft names as its target.
+          ref: ${{ needs.release.outputs.sha }}
 
       # apt refuses to offer an upgrade to a version that does not sort above
       # the one already installed, and nothing about that looks like a failure:
@@ -556,48 +586,59 @@ jobs:
           set -euo pipefail
           gh release upload "$VERSION" bundle/*-windows.zip --clobber
 
-      # Tell the Scoop bucket to re-point its manifest. Same shape and the same
-      # reasoning as the APT dispatch below, including sitting inside the leg
-      # rather than in a job that needs the whole matrix, and it fires only
-      # after the asset it is announcing is actually on the release. stepss-scoop
-      # carries a weekly schedule of its own so a dropped dispatch costs a week
-      # rather than forever.
-      - name: Tell the Scoop bucket there is a new portable zip
-        if: matrix.type == 'msi'
+  # Nothing is public until every platform is in. The draft the release job
+  # created carries no tag and is invisible to users; this job is the only
+  # thing that turns it into a release, and it runs only when all three legs
+  # succeeded, because a plain `needs:` is skipped when any dependency fails.
+  #
+  # This reverses the arrangement the dispatch steps used to describe, and the
+  # reasoning that justified it. It was true that hanging a dispatch off
+  # `needs: [bundles]` skips it whenever one platform fails, and v3.74.8
+  # published a .deb and a .dmg and no .msi on the strength of that argument.
+  # The conclusion drawn then was to fire each dispatch from inside its own
+  # leg so a partial release still reached the package managers. The
+  # conclusion now is that a partial release should not exist: v3.74.17 went
+  # out with Windows assets and no .deb or .dmg, so apt kept serving the
+  # previous version while the release page advertised a new one, and the
+  # release had to be repaired by hand. Skipping a dispatch is the correct
+  # behaviour when there is nothing worth announcing.
+  #
+  # The weekly schedules in stepss-apt and stepss-scoop stay: they cost a week
+  # rather than forever if a dispatch is dropped, and both runs are idempotent.
+  promote:
+    needs: [release, bundles]
+    if: needs.release.outputs.proceed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      # The draft names the tag but the tag does not exist until this call, so
+      # --verify-tag would fail here. Publishing is what creates it, which is
+      # also what keeps a failed run recoverable under the same number: no tag
+      # is burnt by a release that never happened.
+      - name: Publish the draft
+        id: publish
         env:
           GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
           VERSION: ${{ needs.release.outputs.version }}
-        shell: bash
         run: |
           set -euo pipefail
           # Read from env and quoted, never interpolated: see the note at the
-          # top of the file. github.ref_name is "main" here, not the tag.
-          gh api repos/SPS-L/stepss-scoop/dispatches \
-            -f event_type=stepss-release \
-            -f "client_payload[tag]=$VERSION"
-          echo "stepss-scoop asked to update its manifest for $VERSION."
+          # top of the file.
+          gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" \
+            --draft=false --latest
+          echo "$VERSION is published with every platform artifact attached."
 
-      # Tell the APT archive to rebuild. In this leg, and not in a job that
-      # `needs: [bundles]`: `bundles` is a fail-fast: false matrix, so its
-      # aggregate result is a failure when any single platform fails and a
-      # dependent job is skipped instead of run. v3.74.8 is the proof - it
-      # published a .deb and a .dmg and no .msi, because the Windows leg failed
-      # - and a dispatch hanging off the matrix would have skipped that release
-      # for good, since there is no schedule left here to correct it. Hung off
-      # `needs: [release]` it would be worse still: that job finishes before any
-      # installer exists, so the archive would rebuild against the release
-      # before this one, every time. Here it fires when, and only when, the
-      # artifact it is announcing is on the release.
+      # Both dispatches, now that there is a published release to announce.
+      # Ordered apt first only because its rebuild is the slower of the two;
+      # neither depends on the other.
       #
       # STEPSS_TOKEN, not a name of its own: one configured secret across the
       # platform is what makes `grep -rho 'secrets\.[A-Z_]*'` answer the
-      # question "what real secrets are there" unambiguously. A fine-grained PAT
-      # scoped to a repository list has to name stepss-apt explicitly, and a
-      # dispatch under a token that cannot reach it 401s here rather than
+      # question "what real secrets are there" unambiguously. A fine-grained
+      # PAT scoped to a repository list has to name each target explicitly, and
+      # a dispatch under a token that cannot reach one 401s here rather than
       # failing anywhere downstream - nothing arrives, so nothing goes red over
       # there. That is what this step failing means; do not soften it.
       - name: Tell the APT archive there is a new .deb
-        if: matrix.type == 'deb'
         env:
           GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
           VERSION: ${{ needs.release.outputs.version }}
@@ -612,3 +653,56 @@ jobs:
             -f event_type=stepss-release \
             -f "client_payload[tag]=$VERSION"
           echo "stepss-apt asked to rebuild for $VERSION."
+
+      - name: Tell the Scoop bucket there is a new portable zip
+        env:
+          GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh api repos/SPS-L/stepss-scoop/dispatches \
+            -f event_type=stepss-release \
+            -f "client_payload[tag]=$VERSION"
+          echo "stepss-scoop asked to update its manifest for $VERSION."
+
+      # A draft that never got published is invisible but not free: it holds
+      # the version number's assets and shows up in the repository's release
+      # list for maintainers. Discarding it makes a failed run leave nothing
+      # at all behind, so re-running reuses the same number cleanly.
+      # `steps.publish.outcome`, not a bare failure(): once the draft is
+      # published the release is real and must survive. A dispatch failing
+      # after that point is a red run and a re-runnable step, not a reason to
+      # delete a release users may already have downloaded.
+      - name: Discard the draft if publishing failed
+        if: failure() && steps.publish.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release delete "$VERSION" --repo "$GITHUB_REPOSITORY" --yes || true
+          echo "Draft $VERSION discarded; no tag was created."
+
+  # The bundles matrix is fail-fast: false, so one platform failing still lets
+  # the other two finish and attach. That is worth keeping even though a
+  # partial set is never published now: it means one run tells you about every
+  # platform that is broken, rather than only the first.
+  #
+  # This job exists because `promote` is SKIPPED rather than failed when a leg
+  # fails, and a skipped job is not a red run. Without it a release that never
+  # happened would look green.
+  discard:
+    needs: [release, bundles]
+    if: always() && needs.release.outputs.proceed == 'true' && needs.bundles.result != 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discard the draft
+        env:
+          GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release delete "$VERSION" --repo "$GITHUB_REPOSITORY" --yes || true
+          echo "At least one platform failed to build, so $VERSION was not published."
+          echo "The draft is discarded and no tag was created; re-run to retry the same number."
+          exit 1
