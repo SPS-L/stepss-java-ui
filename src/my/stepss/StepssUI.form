@@ -1632,22 +1632,6 @@
                 </Container>
                 <Component class="javax.swing.JComboBox" name="runtimeObsType">
                   <Properties>
-                    <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-                      <StringArray count="12">
-                        <StringItem index="0" value="Bus Voltage"/>
-                        <StringItem index="1" value="Machine Speed"/>
-                        <StringItem index="2" value="Omega-delta of machine"/>
-                        <StringItem index="3" value="Active power-delta of machine"/>
-                        <StringItem index="4" value="Center of Intertia"/>
-                        <StringItem index="5" value="Wall Time"/>
-                        <StringItem index="6" value="Latency"/>
-                        <StringItem index="7" value="Branch Active Power Origin"/>
-                        <StringItem index="8" value="Branch Active Power Extremity"/>
-                        <StringItem index="9" value="Branch Rective Power Origin"/>
-                        <StringItem index="10" value="Branch Rective Power Extremity"/>
-                        <StringItem index="11" value="Injector Observable"/>
-                      </StringArray>
-                    </Property>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to choose the kind of observable you want to see in run-time during the simulation&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="runtimeObsType" noResource="true"/>
                   </Properties>
@@ -1689,22 +1673,6 @@
                 </Component>
                 <Component class="javax.swing.JComboBox" name="runtimeObsType1">
                   <Properties>
-                    <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-                      <StringArray count="12">
-                        <StringItem index="0" value="Bus Voltage"/>
-                        <StringItem index="1" value="Machine Speed"/>
-                        <StringItem index="2" value="Omega-delta of machine"/>
-                        <StringItem index="3" value="Active power-delta of machine"/>
-                        <StringItem index="4" value="Center of Intertia"/>
-                        <StringItem index="5" value="Wall Time"/>
-                        <StringItem index="6" value="Latency"/>
-                        <StringItem index="7" value="Branch Active Power Origin"/>
-                        <StringItem index="8" value="Branch Active Power Extremity"/>
-                        <StringItem index="9" value="Branch Rective Power Origin"/>
-                        <StringItem index="10" value="Branch Rective Power Extremity"/>
-                        <StringItem index="11" value="Injector Observable"/>
-                      </StringArray>
-                    </Property>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to choose the kind of observable you want to see in run-time during the simulation&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="runtimeObsType1" noResource="true"/>
                   </Properties>
@@ -1717,22 +1685,6 @@
                 </Component>
                 <Component class="javax.swing.JComboBox" name="runtimeObsType2">
                   <Properties>
-                    <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-                      <StringArray count="12">
-                        <StringItem index="0" value="Bus Voltage"/>
-                        <StringItem index="1" value="Machine Speed"/>
-                        <StringItem index="2" value="Omega-delta of machine"/>
-                        <StringItem index="3" value="Active power-delta of machine"/>
-                        <StringItem index="4" value="Center of Intertia"/>
-                        <StringItem index="5" value="Wall Time"/>
-                        <StringItem index="6" value="Latency"/>
-                        <StringItem index="7" value="Branch Active Power Origin"/>
-                        <StringItem index="8" value="Branch Active Power Extremity"/>
-                        <StringItem index="9" value="Branch Rective Power Origin"/>
-                        <StringItem index="10" value="Branch Rective Power Extremity"/>
-                        <StringItem index="11" value="Injector Observable"/>
-                      </StringArray>
-                    </Property>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to choose the kind of observable you want to see in run-time during the simulation&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="runtimeObsType2" noResource="true"/>
                   </Properties>

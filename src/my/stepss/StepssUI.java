@@ -24,6 +24,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
@@ -63,6 +65,49 @@ import org.apache.commons.io.output.TeeOutputStream;
  */
 public class StepssUI extends javax.swing.JFrame {
 
+    /**
+     * The one observable type that names no equipment, so it is written even
+     * with the name field blank and its line is "RT RT" rather than the
+     * keyword followed by whatever the field holds.
+     */
+    private static final String WALL_TIME = "Wall Time";
+
+    /**
+     * Every runtime observable type, in the order the Observables tab lists
+     * them, mapped to the keyword RAMSES reads for it in the command file.
+     *
+     * <p>Read from both ends: {@link #fillObservableTypes()} builds the three
+     * dropdowns out of the labels, {@link #writeObservable} turns the label
+     * the user picked back into its keyword. That used to be six independent
+     * copies of the same twelve strings, the array literal generated once per
+     * dropdown into {@code initComponents()} and the labels again as the cases
+     * of three copied switches, which is how "Center of Intertia" and "Branch
+     * Rective Power" lasted as long as they did.
+     *
+     * <p>The duplication was worse than the typos it hid. The two halves had
+     * to agree character for character, and a label corrected in a dropdown
+     * but not in its switch matches no case, so the row falls through to the
+     * failure return and the observable is dropped rather than plotted.
+     */
+    private static final Map<String, String> OBSERVABLE_TYPES = observableTypes();
+
+    private static Map<String, String> observableTypes() {
+        Map<String, String> types = new LinkedHashMap<>();
+        types.put("Bus Voltage", "BV");
+        types.put("Machine Speed", "MS");
+        types.put("Omega-delta of machine", "o-d");
+        types.put("Active power-delta of machine", "P-d");
+        types.put("Center of Inertia", "COI");
+        types.put(WALL_TIME, "RT");
+        types.put("Latency", "LAT");
+        types.put("Branch Active Power Origin", "BPO");
+        types.put("Branch Active Power Extremity", "BPE");
+        types.put("Branch Reactive Power Origin", "BQO");
+        types.put("Branch Reactive Power Extremity", "BQE");
+        types.put("Injector Observable", "ON");
+        return Collections.unmodifiableMap(types);
+    }
+
     private Rectangle pos;
 
     /**
@@ -87,6 +132,7 @@ public class StepssUI extends javax.swing.JFrame {
     public StepssUI(Splash splash) {
         this.splash = splash;
         initComponents();
+        fillObservableTypes();
         applyModernChrome();
         // PlatformLauncher's launches (editor/terminal/file manager) run via
         // Commons Exec's async execute(), which hands a launch failure (e.g.
@@ -400,6 +446,27 @@ public class StepssUI extends javax.swing.JFrame {
         block.add(label, BorderLayout.NORTH);
         block.add(new javax.swing.JSeparator(), BorderLayout.CENTER);
         return block;
+    }
+
+    /**
+     * Fills the three runtime observable dropdowns from
+     * {@link #OBSERVABLE_TYPES}.
+     *
+     * <p>The dropdowns carry no model of their own in {@code StepssUI.form}
+     * any more, so this is the only thing that puts anything in them. Letting
+     * the form own the list stored the twelve labels three times over in the
+     * form and generated them three times into {@code initComponents()}, in a
+     * block a person is not supposed to edit, where the code that has to
+     * recognise those exact labels could not reach them.
+     *
+     * <p>One array for the three models is safe: {@code DefaultComboBoxModel}
+     * copies the items it is handed rather than keeping the array.
+     */
+    private void fillObservableTypes() {
+        String[] labels = OBSERVABLE_TYPES.keySet().toArray(new String[0]);
+        runtimeObsType.setModel(new DefaultComboBoxModel(labels));
+        runtimeObsType1.setModel(new DefaultComboBoxModel(labels));
+        runtimeObsType2.setModel(new DefaultComboBoxModel(labels));
     }
 
     /** One runtime observable: what kind, and which one. */
@@ -1961,7 +2028,6 @@ public class StepssUI extends javax.swing.JFrame {
         gridBagConstraints.gridy = 4;
         jPanel7.add(allInjCheckBox, gridBagConstraints);
 
-        runtimeObsType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Bus Voltage", "Machine Speed", "Omega-delta of machine", "Active power-delta of machine", "Center of Intertia", "Wall Time", "Latency", "Branch Active Power Origin", "Branch Active Power Extremity", "Branch Rective Power Origin", "Branch Rective Power Extremity", "Injector Observable" }));
         runtimeObsType.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType.setName("runtimeObsType"); // NOI18N
 
@@ -1987,14 +2053,12 @@ public class StepssUI extends javax.swing.JFrame {
         saveDiscTrace.setToolTipText("<html>Activate to save the initialization information. Useful for debugging reasons.</html>");
         saveDiscTrace.setName("saveDiscTrace"); // NOI18N
 
-        runtimeObsType1.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Bus Voltage", "Machine Speed", "Omega-delta of machine", "Active power-delta of machine", "Center of Intertia", "Wall Time", "Latency", "Branch Active Power Origin", "Branch Active Power Extremity", "Branch Rective Power Origin", "Branch Rective Power Extremity", "Injector Observable" }));
         runtimeObsType1.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType1.setName("runtimeObsType1"); // NOI18N
 
         runtimeObsName1.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName1.setName("runtimeObsName1"); // NOI18N
 
-        runtimeObsType2.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Bus Voltage", "Machine Speed", "Omega-delta of machine", "Active power-delta of machine", "Center of Intertia", "Wall Time", "Latency", "Branch Active Power Origin", "Branch Active Power Extremity", "Branch Rective Power Origin", "Branch Rective Power Extremity", "Injector Observable" }));
         runtimeObsType2.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType2.setName("runtimeObsType2"); // NOI18N
 
@@ -3071,136 +3135,18 @@ public class StepssUI extends javax.swing.JFrame {
                 loadDiscTrace.setEnabled(false);
             }
 
-            if ((!runtimeObsName.getText().equals("") || runtimeObsType.getSelectedItem().toString().equals("Wall Time")) && !ssa) {
-                switch (runtimeObsType.getSelectedItem().toString()) {
-                    case "Bus Voltage":
-                        out.append("BV " + runtimeObsName.getText());
-                        break;
-                    case "Center of Intertia":
-                        out.append("COI " + runtimeObsName.getText());
-                        break;
-                    case "Machine Speed":
-                        out.append("MS " + runtimeObsName.getText());
-                        break;
-                    case "Omega-delta of machine":
-                        out.append("o-d " + runtimeObsName.getText());
-                        break;
-                    case "Active power-delta of machine":
-                        out.append("P-d " + runtimeObsName.getText());
-                        break;
-                    case "Wall Time":
-                        out.append("RT RT");
-                        break;
-                    case "Latency":
-                        out.append("LAT " + runtimeObsName.getText());
-                        break;
-                    case "Branch Active Power Origin":
-                        out.append("BPO " + runtimeObsName.getText());
-                        break;
-                    case "Branch Active Power Extremity":
-                        out.append("BPE " + runtimeObsName.getText());
-                        break;
-                    case "Branch Rective Power Origin":
-                        out.append("BQO " + runtimeObsName.getText());
-                        break;
-                    case "Branch Rective Power Extremity":
-                        out.append("BQE " + runtimeObsName.getText());
-                        break;    
-                    case "Injector Observable":
-                        out.append("ON " + runtimeObsName.getText());
-                        break;
-                    default:
-                        return "The command file could not be written.";
+            if (!ssa) {
+                String failure = writeObservable(out, runtimeObsType, runtimeObsName);
+                if (failure == null) {
+                    failure = writeObservable(out, runtimeObsType1, runtimeObsName1);
                 }
-                out.newLine();
-            }
-
-            if ((!runtimeObsName1.getText().equals("") || runtimeObsType1.getSelectedItem().toString().equals("Wall Time")) && !ssa) {
-                switch (runtimeObsType1.getSelectedItem().toString()) {
-                    case "Bus Voltage":
-                        out.append("BV " + runtimeObsName1.getText());
-                        break;
-                    case "Center of Intertia":
-                        out.append("COI " + runtimeObsName1.getText());
-                        break;
-                    case "Machine Speed":
-                        out.append("MS " + runtimeObsName1.getText());
-                        break;
-                    case "Omega-delta of machine":
-                        out.append("o-d " + runtimeObsName.getText());
-                        break;
-                    case "Active power-delta of machine":
-                        out.append("P-d " + runtimeObsName.getText());
-                        break;
-                    case "Wall Time":
-                        out.append("RT RT");
-                        break;
-                    case "Latency":
-                        out.append("LAT " + runtimeObsName1.getText());
-                        break;
-                    case "Branch Active Power Origin":
-                        out.append("BPO " + runtimeObsName1.getText());
-                        break;
-                    case "Branch Active Power Extremity":
-                        out.append("BPE " + runtimeObsName1.getText());
-                        break;
-                    case "Branch Rective Power Origin":
-                        out.append("BQO " + runtimeObsName1.getText());
-                        break;
-                    case "Branch Rective Power Extremity":
-                        out.append("BQE " + runtimeObsName1.getText());
-                        break;    
-                    case "Injector Observable":
-                        out.append("ON " + runtimeObsName1.getText());
-                        break;
-                    default:
-                        return "The command file could not be written.";
+                if (failure == null) {
+                    failure = writeObservable(out, runtimeObsType2, runtimeObsName2);
                 }
-                out.newLine();
-            }
-
-            if ((!runtimeObsName2.getText().equals("") || runtimeObsType2.getSelectedItem().toString().equals("Wall Time")) && !ssa) {
-                switch (runtimeObsType2.getSelectedItem().toString()) {
-                    case "Bus Voltage":
-                        out.append("BV " + runtimeObsName2.getText());
-                        break;
-                    case "Center of Intertia":
-                        out.append("COI " + runtimeObsName2.getText());
-                        break;
-                    case "Machine Speed":
-                        out.append("MS " + runtimeObsName2.getText());
-                        break;
-                    case "Omega-delta of machine":
-                        out.append("o-d " + runtimeObsName.getText());
-                        break;
-                    case "Active power-delta of machine":
-                        out.append("P-d " + runtimeObsName.getText());
-                        break;
-                    case "Wall Time":
-                        out.append("RT RT");
-                        break;
-                    case "Latency":
-                        out.append("LAT " + runtimeObsName2.getText());
-                        break;
-                    case "Branch Active Power Origin":
-                        out.append("BPO " + runtimeObsName2.getText());
-                        break;
-                    case "Branch Active Power Extremity":
-                        out.append("BPE " + runtimeObsName2.getText());
-                        break;
-                    case "Branch Rective Power Origin":
-                        out.append("BQO " + runtimeObsName2.getText());
-                        break;
-                    case "Branch Rective Power Extremity":
-                        out.append("BQE " + runtimeObsName2.getText());
-                        break;    
-                    case "Injector Observable":
-                        out.append("ON " + runtimeObsName2.getText());
-                        break;
-                    default:
-                        return "The command file could not be written.";
+                if (failure != null) {
+                    out.close();
+                    return failure;
                 }
-                out.newLine();
             }
 
             out.newLine();
@@ -3210,6 +3156,38 @@ public class StepssUI extends javax.swing.JFrame {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
             return "The command file could not be written.";
         }
+        return null;
+    }
+
+    /**
+     * Writes one runtime observable row into the command file and returns
+     * null, or returns why it could not be, on the same convention as
+     * {@link #createCommandFile()}.
+     *
+     * <p>A blank name is how a row says it is unused, so a blank row writes
+     * nothing at all. Wall Time is the exception on both counts: it names no
+     * equipment, so it is written whether the field is filled or not, and its
+     * line is a fixed "RT RT".
+     *
+     * <p>One method for what were three copies, one per row. They had already
+     * drifted: the second and third read the <em>first</em> row's name field
+     * for the two delta observables, so picking "Omega-delta of machine" on
+     * row two plotted whichever machine row one named, or wrote a bare keyword
+     * when row one was empty. Taking the field as an argument is what stops
+     * that happening again.
+     */
+    private String writeObservable(BufferedWriter out, JComboBox type, JTextField name) throws IOException {
+        String label = String.valueOf(type.getSelectedItem());
+        boolean wallTime = WALL_TIME.equals(label);
+        if (name.getText().isEmpty() && !wallTime) {
+            return null;
+        }
+        String keyword = OBSERVABLE_TYPES.get(label);
+        if (keyword == null) {
+            return "The command file could not be written.";
+        }
+        out.append(wallTime ? keyword + " RT" : keyword + " " + name.getText());
+        out.newLine();
         return null;
     }
 
