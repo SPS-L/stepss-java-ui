@@ -346,6 +346,23 @@ public class StepssUI extends javax.swing.JFrame {
      * <p>jPanel7, the inline picker the wizard checkbox reveals, keeps its own
      * layout and takes the centre, so it has room when it is shown and costs
      * nothing while it is not.
+     *
+     * <p>The four recording checkboxes share one row. They are four independent
+     * toggles of equal weight, so the 2 x 2 they used to sit in was claiming a
+     * pairing that is not there, and the second row was far wider than the
+     * first. Fitting them on one line is what shortened the last label:
+     * "Save settings, comments and initialization data" measured 303px on its
+     * own and put the row at 779px, and {@code leftRow} is a FlowLayout, which
+     * wraps of its own accord once the row is wider than the panel. The wrap is
+     * not merely ugly. This panel sits in BorderLayout.NORTH, so its height is
+     * fixed at the one row GridBagLayout asked for, and whatever wraps onto a
+     * second line is drawn outside that height and clipped away entirely: below
+     * about 780px the fourth checkbox simply was not there. "Save initialization
+     * data" brings the row to 632px, under the 679px the Analysis tab's SSA row
+     * already needs and far under the 1,355px its own action bar does, so the
+     * row cannot be the thing that runs out of width first. Lengthening any of
+     * the four labels again is what would undo that, and the detail belongs in
+     * the tooltip, which is where it went.
      */
     private void layoutObservablesTab() {
         JPanel settings = new JPanel(new GridBagLayout());
@@ -357,8 +374,8 @@ public class StepssUI extends javax.swing.JFrame {
         settings.add(observableRow(runtimeObsType2, runtimeObsName2), stretch(row++));
 
         settings.add(heading(new JLabel("Recording to file")), span(row++));
-        settings.add(leftRow(saveContTrace, saveDiscTrace), span(row++));
-        settings.add(leftRow(saveOutputTrajButton, saveDumpButton), span(row++));
+        settings.add(leftRow(saveContTrace, saveDiscTrace, saveOutputTrajButton,
+                saveDumpButton), span(row++));
 
         settings.add(heading(jLabel10), span(row++));
         settings.add(fileRow("", loadObsButton, fileObs, nppObsButton), stretch(row++));
@@ -1659,8 +1676,8 @@ public class StepssUI extends javax.swing.JFrame {
         jLabel10.setText("<html><b>Observables file</b> (required when a trajectory is saved)</html>");
         jLabel10.setName("jLabel10"); // NOI18N
 
-        saveDumpButton.setText("Save settings, comments and initialization data");
-        saveDumpButton.setToolTipText("<html>Activate to save the initialization information. Useful for debugging reasons.</html>");
+        saveDumpButton.setText("Save initialization data");
+        saveDumpButton.setToolTipText("<html>Activate to write the settings, the comments and the initialization data to dump.trace. <br>\nUseful for debugging reasons.</html>");
         saveDumpButton.setName("saveDumpButton"); // NOI18N
 
         observFileWizButton.setText("Show observable dialog");
@@ -2042,12 +2059,12 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         saveContTrace.setText("Save continuous trace");
-        saveContTrace.setToolTipText("<html>Activate to save the initialization information. Useful for debugging reasons.</html>");
+        saveContTrace.setToolTipText("<html>Activate to record how the Newton solver converged at each step, in cont.trace. <br>\nUseful for debugging, and it can slow the simulation down.</html>");
         saveContTrace.setName("saveContTrace"); // NOI18N
 
         saveDiscTrace.setSelected(true);
         saveDiscTrace.setText("Save discrete trace");
-        saveDiscTrace.setToolTipText("<html>Activate to save the initialization information. Useful for debugging reasons.</html>");
+        saveDiscTrace.setToolTipText("<html>Activate to record the discrete events in disc.trace: the switching in the disturbance file, <br>\nthe discrete controllers, and the discrete variables of injector, torque, exciter and two-port models.</html>");
         saveDiscTrace.setName("saveDiscTrace"); // NOI18N
 
         runtimeObsType1.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");

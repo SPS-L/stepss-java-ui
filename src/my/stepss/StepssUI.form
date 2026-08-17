@@ -1161,8 +1161,8 @@
                 </Component>
                 <Component class="javax.swing.JCheckBox" name="saveDumpButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Save settings, comments and initialization data"/>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Activate to save the initialization information. Useful for debugging reasons.&lt;/html&gt;"/>
+                    <Property name="text" type="java.lang.String" value="Save initialization data"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Activate to write the settings, the comments and the initialization data to dump.trace. &lt;br&gt;&#xa;Useful for debugging reasons.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="saveDumpButton" noResource="true"/>
                   </Properties>
                 </Component>
@@ -1653,7 +1653,7 @@
                 <Component class="javax.swing.JCheckBox" name="saveContTrace">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Save continuous trace"/>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Activate to save the initialization information. Useful for debugging reasons.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Activate to record how the Newton solver converged at each step, in cont.trace. &lt;br&gt;&#xa;Useful for debugging, and it can slow the simulation down.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="saveContTrace" noResource="true"/>
                   </Properties>
                 </Component>
@@ -1661,7 +1661,7 @@
                   <Properties>
                     <Property name="selected" type="boolean" value="true"/>
                     <Property name="text" type="java.lang.String" value="Save discrete trace"/>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Activate to save the initialization information. Useful for debugging reasons.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Activate to record the discrete events in disc.trace: the switching in the disturbance file, &lt;br&gt;&#xa;the discrete controllers, and the discrete variables of injector, torque, exciter and two-port models.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="saveDiscTrace" noResource="true"/>
                   </Properties>
                 </Component>
