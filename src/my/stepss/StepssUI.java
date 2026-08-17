@@ -39,6 +39,7 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
+import javax.swing.text.Utilities;
 import my.stepss.compile.ModelCompiler;
 import my.stepss.config.Scenario;
 import my.stepss.config.ScenarioBinding;
@@ -4856,8 +4857,7 @@ public class StepssUI extends javax.swing.JFrame {
             if (highlighterIndex >= 0) {
                 highlighterLen = searchTextField.getText().length();
                 highlighter.addHighlight(highlighterIndex, highlighterIndex + highlighterLen, DefaultHighlighter.DefaultPainter);
-                simulationOutput.setCaretPosition(simulationOutput.getLineOfOffset(highlighterIndex));
-                RXTextUtilities.gotoFirstWordOnLine(simulationOutput, simulationOutput.getLineOfOffset(highlighterIndex) + 1);
+                caretToFirstWordOfLine(highlighterIndex);
             } else {
                 if (highlighterLen == 0) {
                     banner.warn("\"" + searchTextField.getText() + "\" is not in the output.");
@@ -4874,6 +4874,31 @@ public class StepssUI extends javax.swing.JFrame {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
         }
     }//GEN-LAST:event_searchTextFieldActionPerformed
+
+    /**
+     * Puts the caret on the first word of the line holding {@code offset},
+     * which is what scrolls that line into view: the highlight the search has
+     * just painted is of no use to anyone while it sits off-screen.
+     *
+     * <p>The caret lands on the line's first non-blank character where the
+     * line has one, and on the line start otherwise. {@code getNextWord}
+     * reports "there is no next word" by throwing, which is what a match
+     * inside the trailing whitespace of the output produces, and the line
+     * start is the right place to stop there rather than something the caller
+     * should be logging as a fault.
+     */
+    private void caretToFirstWordOfLine(int offset) throws BadLocationException {
+        int lineStart = simulationOutput.getLineStartOffset(simulationOutput.getLineOfOffset(offset));
+        simulationOutput.setCaretPosition(lineStart);
+        if (lineStart < simulationOutput.getDocument().getLength()
+                && Character.isWhitespace(simulationOutput.getText(lineStart, 1).charAt(0))) {
+            try {
+                simulationOutput.setCaretPosition(Utilities.getNextWord(simulationOutput, lineStart));
+            } catch (BadLocationException noNextWord) {
+                // Nothing to move to; the caret stays where the line starts.
+            }
+        }
+    }
 
     private void searchTextFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_searchTextFieldFocusLost
         if ("".equals(searchTextField.getText())) {
