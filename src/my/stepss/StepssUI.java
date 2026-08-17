@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -41,6 +40,9 @@ import javax.swing.text.DefaultCaret;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
 import my.stepss.compile.ModelCompiler;
+import my.stepss.config.Scenario;
+import my.stepss.config.ScenarioBinding;
+import my.stepss.config.ScenarioFile;
 import my.stepss.dyngraph.DyngraphRunner;
 import my.stepss.dyngraph.ObservableIndex;
 import my.stepss.dyngraph.ObservablePicker;
@@ -118,6 +120,20 @@ public class StepssUI extends javax.swing.JFrame {
     private final Splash splash;
 
     /**
+     * The controls Save and Load configuration persist, named once.
+     *
+     * <p>Field references, handed over at construction. Both handlers used to
+     * find their controls by walking {@code jPanel2} and {@code jPanel4} for
+     * direct children and matching on {@code getName()}, which tied the file
+     * format to the layout: {@code applyModernChrome()} reparents every one of
+     * those controls into a scroll pane or a wrapper panel, so from the day it
+     * arrived the walk matched none of the twenty-four and Save configuration
+     * wrote a file holding nothing but a date comment. Naming the set is what
+     * makes the next relayout a non-event.
+     */
+    private final ScenarioBinding scenarioBinding;
+
+    /**
      * Creates new form StepssUI
      */
     public StepssUI() {
@@ -133,6 +149,7 @@ public class StepssUI extends javax.swing.JFrame {
         this.splash = splash;
         initComponents();
         fillObservableTypes();
+        scenarioBinding = bindScenario();
         applyModernChrome();
         // PlatformLauncher's launches (editor/terminal/file manager) run via
         // Commons Exec's async execute(), which hands a launch failure (e.g.
@@ -482,6 +499,29 @@ public class StepssUI extends javax.swing.JFrame {
         runtimeObsType.setModel(new DefaultComboBoxModel(labels));
         runtimeObsType1.setModel(new DefaultComboBoxModel(labels));
         runtimeObsType2.setModel(new DefaultComboBoxModel(labels));
+    }
+
+    /**
+     * The one place that says which controls a saved scenario is made of.
+     *
+     * <p>The set is not a judgement call: it is exactly what
+     * {@link #createCommandFile()} and {@link #createPFCCommandFile()} read to
+     * write {@code cmd.txt} and {@code PFCcmd.txt}, so a scenario that
+     * round-trips is a run that reproduces. Adding a control to either writer
+     * without adding it here is how a scenario silently stops describing the
+     * run it came from, and this call is the only thing to keep in step.
+     *
+     * <p>Runs before {@code applyModernChrome()} and would work just as well
+     * after it. That is the point.
+     */
+    private ScenarioBinding bindScenario() {
+        return new ScenarioBinding(
+                new JTextField[]{fileData1, fileData2, fileData3, fileData4, fileData5,
+                    fileData6, fileData7, fileData8, fileData9, fileData10},
+                fileDist, fileObs, observFileWizButton,
+                new JComboBox<?>[]{runtimeObsType, runtimeObsType1, runtimeObsType2},
+                new JTextField[]{runtimeObsName, runtimeObsName1, runtimeObsName2},
+                saveOutputTrajButton, saveContTrace, saveDiscTrace, saveDumpButton);
     }
 
     /** One runtime observable: what kind, and which one. */
@@ -3330,100 +3370,154 @@ public class StepssUI extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_formWindowClosing
 
+    /**
+     * Writes the current case to a {@code .cfg} the user chooses.
+     *
+     * <p>No {@code fileData10.setText("")} here, and none anywhere in this
+     * path. It used to run before the chooser's return value was checked, so
+     * merely opening Save configuration and pressing Cancel emptied data row
+     * ten, which is the row Add Helios results to data fills with
+     * in_volt_trfo.dat. The next run then wrote a valid cmd.txt with the
+     * power-flow initialisation file silently missing from it. Saving reads
+     * the form and never writes to it.
+     */
     private void saveConfigMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveConfigMenuItemActionPerformed
-        try {
-            fileChooser.setSelectedFile(new File(""));
-            fileChooser.setDialogTitle("Choose File");
-            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-            FileNameExtensionFilter filter = new FileNameExtensionFilter("Ramses Config File", "cfg");
-            fileChooser.setFileFilter(filter);
-            int returnVal = fileChooser.showSaveDialog(this);
-            fileChooser.resetChoosableFileFilters();
-            // No fileData10.setText("") here. It ran before this check, so
-            // merely opening Save configuration and pressing Cancel emptied
-            // data row ten, which is the row Add Helios results to data fills
-            // with in_volt_trfo.dat. The next run then wrote a valid cmd.txt
-            // with the power-flow initialisation file silently missing from
-            // it. Whatever it was meant to keep out of the .cfg belongs in
-            // the property set below, not in the live form.
-            if (returnVal == JFileChooser.APPROVE_OPTION) {
-                File file = fileChooser.getSelectedFile();
-                String filePath = file.getPath();
-                if (!filePath.toLowerCase().endsWith(".cfg")) {
-                    file = new File(filePath + ".cfg");
-                }
-                if (file.exists()) {
-                    int response = JOptionPane.showConfirmDialog(null, "Overwrite existing file?", "Confirm Overwrite", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-                    if (response == JOptionPane.CANCEL_OPTION) {
-                        return;
-                    }
-                }
-                Properties properties = new Properties();
-                for (Component c : jPanel2.getComponents()) {
-                    if (c instanceof JTextField) {
-                        properties.setProperty(((JTextField) c).getName(), ((JTextField) c).getText());
-                    } else if (c instanceof JCheckBox) {
-                        properties.setProperty(((JCheckBox) c).getName(), new Boolean(((JCheckBox) c).isSelected()).toString());
-                    }
-                }
-                for (Component c : jPanel4.getComponents()) {
-                    if (c instanceof JFormattedTextField) {
-                        properties.setProperty(((JFormattedTextField) c).getName(), ((JFormattedTextField) c).getText());
-                    } else if (c instanceof JCheckBox) {
-                        properties.setProperty(((JCheckBox) c).getName(), new Boolean(((JCheckBox) c).isSelected()).toString());
-                    } else if (c instanceof JTextField) {
-                        properties.setProperty(((JTextField) c).getName(), ((JTextField) c).getText());
-                    } else if (c instanceof JComboBox) {
-                        properties.setProperty(((JComboBox) c).getName(), new Integer(((JComboBox) c).getSelectedIndex()).toString());
-                    }
-                }
-                properties.store(new FileOutputStream(file), null);
+        Scenario scenario = scenarioBinding.read();
+        if (scenario.isEmpty()) {
+            banner.warn("There is no case to save yet. Add system data files on the"
+                    + " System Data tab first.");
+            return;
+        }
+        fileChooser.setSelectedFile(new File(""));
+        fileChooser.setDialogTitle("Save configuration");
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        fileChooser.setFileFilter(new FileNameExtensionFilter("STEPSS configuration", "cfg"));
+        int returnVal = fileChooser.showSaveDialog(this);
+        fileChooser.resetChoosableFileFilters();
+        if (returnVal != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        File file = fileChooser.getSelectedFile();
+        if (!file.getPath().toLowerCase(java.util.Locale.ROOT).endsWith(".cfg")) {
+            file = new File(file.getPath() + ".cfg");
+        }
+        if (file.exists()) {
+            int response = JOptionPane.showConfirmDialog(this, "Overwrite existing file?",
+                    "Confirm Overwrite", JOptionPane.OK_CANCEL_OPTION,
+                    JOptionPane.QUESTION_MESSAGE);
+            if (response != JOptionPane.OK_OPTION) {
+                return;
             }
+        }
+        try {
+            // myTempDir, not the .cfg's directory: it is the base the engines
+            // resolve against, so it is what a hand-typed relative path in a
+            // form field already means.
+            ScenarioFile.save(scenario, file, myTempDir, this_version);
         } catch (IOException ex) {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this,
+                    "Could not write " + file.getAbsolutePath() + "\n\n" + ex.getMessage(),
+                    "Configuration not saved", JOptionPane.ERROR_MESSAGE);
+            return;
         }
-
+        final File written = file;
+        banner.notice("Configuration saved to " + written.getAbsolutePath(),
+                "Open folder", () -> {
+                    try {
+                        PlatformLauncher.openFileManager(written.getParentFile());
+                    } catch (IOException ex) {
+                        Logger.getLogger(StepssUI.class.getName())
+                                .log(Level.SEVERE, null, ex);
+                    }
+                });
     }//GEN-LAST:event_saveConfigMenuItemActionPerformed
 
+    /**
+     * Fills the case from a {@code .cfg} the user chooses.
+     *
+     * <p>Everything that can go wrong is said out loud. A file this build
+     * cannot interpret at all - one from before the format existed, one from a
+     * newer STEPSS - is refused in a dialog naming the reason; anything
+     * smaller, such as a key nobody knows or a file the scenario names that is
+     * no longer there, is applied as far as it can be and then listed. The
+     * handler this replaces reported neither: it caught IOException alone,
+     * while its own {@code new Integer(properties.getProperty(name))} threw
+     * NumberFormatException on a missing key and IllegalArgumentException on a
+     * stale index.
+     */
     private void loadConfigMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadConfigMenuItemActionPerformed
-
-        try {
-            fileChooser.setSelectedFile(new File(""));
-            fileChooser.setDialogTitle("Choose File");
-            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-            FileNameExtensionFilter filter = new FileNameExtensionFilter("Ramses Config File", "cfg");
-            fileChooser.setFileFilter(filter);
-            int returnVal = fileChooser.showOpenDialog(this);
-            fileChooser.resetChoosableFileFilters();
-            if (returnVal == JFileChooser.APPROVE_OPTION) {
-                File file = fileChooser.getSelectedFile();
-                FileInputStream inStream = new FileInputStream(file);
-                Properties properties = new Properties();
-                properties.load(inStream);
-                for (Component c : jPanel2.getComponents()) {
-                    if (c instanceof JTextField) {
-                        ((JTextField) c).setText(properties.getProperty(((JTextField) c).getName()));
-                    } else if (c instanceof JCheckBox) {
-                        ((JCheckBox) c).setSelected(Boolean.parseBoolean(properties.getProperty(((JCheckBox) c).getName())));
-                    }
-                }
-                for (Component c : jPanel4.getComponents()) {
-                    if (c instanceof JFormattedTextField) {
-                        ((JFormattedTextField) c).setText(properties.getProperty(((JFormattedTextField) c).getName()));
-                    } else if (c instanceof JCheckBox) {
-                        ((JCheckBox) c).setSelected(Boolean.parseBoolean(properties.getProperty(((JCheckBox) c).getName())));
-                    } else if (c instanceof JTextField) {
-                        ((JTextField) c).setText(properties.getProperty(((JTextField) c).getName()));
-                    } else if (c instanceof JComboBox) {
-                        ((JComboBox) c).setSelectedIndex(new Integer(properties.getProperty(((JComboBox) c).getName())));
-                    }
-                }
-                observFileWizButtonActionPerformed(evt);
-            }
-        } catch (IOException ex) {
-            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
+        fileChooser.setSelectedFile(new File(""));
+        fileChooser.setDialogTitle("Load configuration");
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        fileChooser.setFileFilter(new FileNameExtensionFilter("STEPSS configuration", "cfg"));
+        int returnVal = fileChooser.showOpenDialog(this);
+        fileChooser.resetChoosableFileFilters();
+        if (returnVal != JFileChooser.APPROVE_OPTION) {
+            return;
         }
+        File file = fileChooser.getSelectedFile();
+        ScenarioFile.Loaded loaded;
+        try {
+            loaded = ScenarioFile.load(file);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(),
+                    "Configuration not loaded", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        java.util.List<String> problems = new ArrayList<>(loaded.problems());
+        problems.addAll(scenarioBinding.apply(loaded.scenario()));
+        // Set directly rather than through observFileWizButtonActionPerformed,
+        // which also flips saveOutputTrajButton and would overwrite the value
+        // just restored from the file.
+        jPanel7.setVisible(observFileWizButton.isSelected());
+        // The observable dialog's five picker lists are session state, not part
+        // of the scenario, so a case saved with the dialog in use comes back
+        // with it ticked over five empty lists. Left unsaid, the next run would
+        // write a customObs.txt of blank lines and plot nothing.
+        if (observFileWizButton.isSelected() && noObservablesPicked()) {
+            problems.add("Show observable dialog is on, but no observables are"
+                    + " selected. Add them on the Observables tab before running.");
+        }
+        if (problems.isEmpty()) {
+            banner.confirm(file.getName() + " loaded.");
+            return;
+        }
+        JOptionPane.showMessageDialog(this,
+                file.getName() + " was loaded, with " + problems.size()
+                + (problems.size() == 1 ? " problem:\n\n" : " problems:\n\n")
+                + listed(problems),
+                "Configuration loaded", JOptionPane.WARNING_MESSAGE);
     }//GEN-LAST:event_loadConfigMenuItemActionPerformed
+
+    /**
+     * The problems, as many as fit in a dialog somebody will read.
+     *
+     * <p>Capped because the count is not bounded by anything the user did: a
+     * file that is not a scenario at all but still carries a plausible
+     * {@code stepss.format} contributes one line per key it holds, and
+     * {@code JOptionPane} grows to fit its message, so a few hundred of them
+     * produce a dialog taller than the screen with its buttons off the bottom
+     * edge and no way to dismiss it.
+     */
+    private static String listed(java.util.List<String> problems) {
+        int shown = Math.min(problems.size(), 10);
+        String text = String.join("\n\n", problems.subList(0, shown));
+        if (shown < problems.size()) {
+            text += "\n\nand " + (problems.size() - shown) + " more.";
+        }
+        return text;
+    }
+
+    /** True when the observable dialog would contribute nothing to a run. */
+    private boolean noObservablesPicked() {
+        return !allBusCheckBox.isSelected() && !allSyncCheckBox.isSelected()
+                && !allShuntCheckBox.isSelected() && !allBranchCheckBox.isSelected()
+                && !allInjCheckBox.isSelected()
+                && busObsList.getItemCount() == 0 && syncObsList.getItemCount() == 0
+                && shuntObsList.getItemCount() == 0 && branchObsList.getItemCount() == 0
+                && injObsList.getItemCount() == 0;
+    }
 
     private void openExamplesMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openExamplesMenuItemActionPerformed
         showExamples();
@@ -3577,12 +3671,19 @@ public class StepssUI extends javax.swing.JFrame {
      * its directory the working directory.
      *
      * <p>The configuration is GENERATED here, never read from the {@code
-     * sim.cfg} each example repository ships. Those are Java Properties files of
+     * sim.cfg} each example repository ships. Those are pre-rewrite files of
      * absolute paths from whoever last saved them
      * ({@code fileData1=C:\Users\tvanc\...}), so loading one would fill this
      * form with someone else's paths on every platform. The descriptor records
      * which filename belongs in which slot, and the path comes from the
      * extraction.
+     *
+     * <p>{@link my.stepss.config.ScenarioFile} now refuses those files outright
+     * rather than leaving it to this method to know better, so the reasoning
+     * above is enforced on the Load configuration path too. Regenerating them
+     * in the current format would not change anything here: the paths would
+     * still be whoever's machine packed the example, and the descriptor would
+     * still be the better source.
      */
     private void applyExample(Example example, File dir, File root) {
         JTextField[] slots = {fileData1, fileData2, fileData3, fileData4, fileData5,
