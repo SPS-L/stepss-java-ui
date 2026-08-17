@@ -1040,10 +1040,6 @@
                                           <Component id="runtimeObsType2" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
                                           <Component id="runtimeObsName2" min="-2" pref="337" max="-2" attributes="0"/>
-                                          <EmptySpace max="-2" attributes="0"/>
-                                          <Component id="jLabel31" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace max="-2" attributes="0"/>
-                                          <Component id="GP_REFRESH_RATE" min="-2" pref="50" max="-2" attributes="0"/>
                                           <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                                       </Group>
                                   </Group>
@@ -1096,8 +1092,6 @@
                           <Group type="103" groupAlignment="3" attributes="0">
                               <Component id="runtimeObsName2" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="runtimeObsType2" alignment="3" min="-2" max="-2" attributes="0"/>
-                              <Component id="GP_REFRESH_RATE" alignment="3" min="-2" max="-2" attributes="0"/>
-                              <Component id="jLabel31" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace type="unrelated" min="-2" max="-2" attributes="0"/>
                           <Group type="103" groupAlignment="3" attributes="0">
@@ -1694,20 +1688,6 @@
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Here you clarify the name of the equipment you want to observe. For example:&lt;br&gt;&#xa;1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.&lt;br&gt;&#xa;2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.&lt;br&gt;&#xa;3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.&lt;br&gt;&lt;br&gt;&#xa;Additionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / &lt;br&gt;&#xa;Such commands might be:&lt;br&gt;&lt;br&gt;&#xa;set yrange[0.9:1.1]&lt;br&gt;&lt;br&gt;&#xa;which will set the range of the y-axes between these values.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="runtimeObsName2" noResource="true"/>
                   </Properties>
-                </Component>
-                <Component class="javax.swing.JTextField" name="GP_REFRESH_RATE">
-                  <Properties>
-                    <Property name="name" type="java.lang.String" value="GP_REFRESH_RATE" noResource="true"/>
-                  </Properties>
-                </Component>
-                <Component class="javax.swing.JLabel" name="jLabel31">
-                  <Properties>
-                    <Property name="text" type="java.lang.String" value="Plot refresh interval (sec):"/>
-                    <Property name="name" type="java.lang.String" value="jLabel31" noResource="true"/>
-                  </Properties>
-                  <AuxValues>
-                    <AuxValue name="JavaCodeGenerator_InitCodePost" type="java.lang.String" value="jLabel31.setToolTipText(&quot;&lt;html&gt;A small refresh interval would slow down the simulation.&lt;/html&gt;&quot;);"/>
-                  </AuxValues>
                 </Component>
               </SubComponents>
             </Container>

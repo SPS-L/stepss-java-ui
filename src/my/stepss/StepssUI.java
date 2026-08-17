@@ -355,7 +355,6 @@ public class StepssUI extends javax.swing.JFrame {
         settings.add(observableRow(runtimeObsType, runtimeObsName), stretch(row++));
         settings.add(observableRow(runtimeObsType1, runtimeObsName1), stretch(row++));
         settings.add(observableRow(runtimeObsType2, runtimeObsName2), stretch(row++));
-        settings.add(leftRow(jLabel31, GP_REFRESH_RATE), span(row++));
 
         settings.add(heading(new JLabel("Recording to file")), span(row++));
         settings.add(leftRow(saveContTrace, saveDiscTrace), span(row++));
@@ -1012,8 +1011,6 @@ public class StepssUI extends javax.swing.JFrame {
         runtimeObsName1 = new javax.swing.JTextField();
         runtimeObsType2 = new javax.swing.JComboBox();
         runtimeObsName2 = new javax.swing.JTextField();
-        GP_REFRESH_RATE = new javax.swing.JTextField();
-        jLabel31 = new javax.swing.JLabel();
         jPanel6 = new javax.swing.JPanel();
         jScrollPane3 = new javax.swing.JScrollPane();
         pfcPane = new javax.swing.JTextArea();
@@ -2065,12 +2062,6 @@ public class StepssUI extends javax.swing.JFrame {
         runtimeObsName2.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName2.setName("runtimeObsName2"); // NOI18N
 
-        GP_REFRESH_RATE.setName("GP_REFRESH_RATE"); // NOI18N
-
-        jLabel31.setText("Plot refresh interval (sec):");
-        jLabel31.setName("jLabel31"); // NOI18N
-        jLabel31.setToolTipText("<html>A small refresh interval would slow down the simulation.</html>");
-
         javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
         jPanel4.setLayout(jPanel4Layout);
         jPanel4Layout.setHorizontalGroup(
@@ -2100,10 +2091,6 @@ public class StepssUI extends javax.swing.JFrame {
                                 .addComponent(runtimeObsType2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(runtimeObsName2, javax.swing.GroupLayout.PREFERRED_SIZE, 337, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(jLabel31)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(GP_REFRESH_RATE, javax.swing.GroupLayout.PREFERRED_SIZE, 50, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addGap(0, 0, Short.MAX_VALUE)))
                         .addContainerGap())
                     .addGroup(jPanel4Layout.createSequentialGroup()
@@ -2142,9 +2129,7 @@ public class StepssUI extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(runtimeObsName2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(runtimeObsType2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(GP_REFRESH_RATE, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel31))
+                    .addComponent(runtimeObsType2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(saveOutputTrajButton)
@@ -6745,7 +6730,6 @@ public class StepssUI extends javax.swing.JFrame {
     private JFileChooser mfileChooser = new JFileChooser();
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton Compile;
-    private javax.swing.JTextField GP_REFRESH_RATE;
     private javax.swing.JDialog aboutBox;
     private javax.swing.JButton addBranchButton;
     private javax.swing.JButton addBusButton;
@@ -6798,7 +6782,6 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel28;
     private javax.swing.JLabel jLabel29;
     private javax.swing.JLabel jLabel30;
-    private javax.swing.JLabel jLabel31;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel8;
