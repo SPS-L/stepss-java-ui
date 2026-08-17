@@ -493,8 +493,7 @@ public final class SsaArchive {
                 // through the inline banner, which is a JLabel and renders a
                 // newline as a missing glyph rather than a line break.
                 throw new IOException("it carries no " + MANIFEST_NAME
-                        + ", so it was not written by STEPSS. A plain directory"
-                        + " of results opens with View results... instead.");
+                        + ", so it was not written by STEPSS.");
             }
             Manifest manifest = Manifest.parse(new String(
                     Files.readAllBytes(manifestFile.toPath()), StandardCharsets.UTF_8));

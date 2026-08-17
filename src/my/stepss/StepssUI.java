@@ -426,7 +426,6 @@ public class StepssUI extends javax.swing.JFrame {
         content.add(ssaEngineNote, span(row++));
         content.add(ActionBar.create()
                 .add(ssaButton1)
-                .add(viewSsaResults)
                 .separate()
                 .add(saveDynJac)
                 .add(loadDynJac)
@@ -1064,7 +1063,6 @@ public class StepssUI extends javax.swing.JFrame {
         ssaButton1 = new javax.swing.JButton();
         ssaDirectory = new javax.swing.JTextField();
         loadSSADir = new javax.swing.JButton();
-        viewSsaResults = new javax.swing.JButton();
         ssaBasenameLabel = new javax.swing.JLabel();
         ssaBasename = new javax.swing.JTextField();
         ssaTimeLabel = new javax.swing.JLabel();
@@ -2558,15 +2556,6 @@ public class StepssUI extends javax.swing.JFrame {
             }
         });
 
-        viewSsaResults.setText("View results...");
-        viewSsaResults.setToolTipText("Open small-signal results already on disk, without re-running the analysis");
-        viewSsaResults.setName("viewSsaResults"); // NOI18N
-        viewSsaResults.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                viewSsaResultsActionPerformed(evt);
-            }
-        });
-
         ssaBasenameLabel.setText("Results basename");
         ssaBasenameLabel.setName("ssaBasenameLabel"); // NOI18N
 
@@ -2631,8 +2620,6 @@ public class StepssUI extends javax.swing.JFrame {
                             .addGroup(jPanel8Layout.createSequentialGroup()
                                 .addComponent(ssaButton1)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(viewSsaResults)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(saveDynJac)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(loadDynJac))
@@ -2693,7 +2680,6 @@ public class StepssUI extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(ssaButton1)
-                    .addComponent(viewSsaResults)
                     .addComponent(saveDynJac)
                     .addComponent(loadDynJac))
                 .addContainerGap(657, Short.MAX_VALUE))
@@ -4244,36 +4230,6 @@ public class StepssUI extends javax.swing.JFrame {
                     "Small-signal results", JOptionPane.ERROR_MESSAGE);
         }
     }
-
-    private void viewSsaResultsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_viewSsaResultsActionPerformed
-        fileChooser.setSelectedFile(new File(""));
-        fileChooser.setDialogTitle("Choose a directory containing small-signal results");
-        fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        if (fileChooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
-            return;
-        }
-        File dir = fileChooser.getSelectedFile();
-        java.util.List<String> found = my.stepss.ssa.SsaResults.basenames(dir);
-        if (found.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    "No small-signal results in " + dir + "\n\n"
-                    + "Looking for a file named <basename>_modes.dat.",
-                    "Small-signal results", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        String chosen = found.get(0);
-        if (found.size() > 1) {
-            Object picked = JOptionPane.showInputDialog(this,
-                    "That directory holds more than one run. Which one?",
-                    "Small-signal results", JOptionPane.QUESTION_MESSAGE, null,
-                    found.toArray(), found.get(0));
-            if (picked == null) {
-                return;
-            }
-            chosen = (String) picked;
-        }
-        showSsaResults(dir, chosen);
-    }//GEN-LAST:event_viewSsaResultsActionPerformed
 
     private void saveDynJacActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveDynJacActionPerformed
         // Saves the last analysis as one file: the Jacobian it reduced, the
@@ -6924,7 +6880,6 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JLabel versionLabel1;
     private javax.swing.JLabel versionLabel2;
     private javax.swing.JButton viewCurvesButton;
-    private javax.swing.JButton viewSsaResults;
     private javax.swing.JLabel webpageLabel;
     // End of variables declaration//GEN-END:variables
 

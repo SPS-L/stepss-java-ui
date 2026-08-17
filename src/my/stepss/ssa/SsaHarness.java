@@ -1213,13 +1213,16 @@ public final class SsaHarness {
                     new String[] {"not really a jpeg", "nor this"});
             loadRejected("a zip of something else is refused", zip, root,
                     SsaArchive.MANIFEST_NAME);
-            // The near miss is the useful one: someone with a directory of
-            // results, no archive, and no idea there is another button.
+            // The near miss is the useful one: a zip holding the results
+            // themselves but none of the manifest that makes it ours. It is
+            // refused for the same stated reason as the holiday photos, which
+            // is the whole point: what makes an archive loadable is the
+            // manifest, not the presence of something that parses.
             java.io.File results = new java.io.File(root, "results.zip");
             writeZip(results, new String[] {"run_modes.dat"},
                     new String[] {modesFixture()});
-            loadRejected("a hand made zip of results points at View results",
-                    results, root, "View results...");
+            loadRejected("a hand made zip of results is refused too",
+                    results, root, SsaArchive.MANIFEST_NAME);
         } catch (java.io.IOException ex) {
             fail("refusing a foreign archive: threw " + ex);
         } finally {

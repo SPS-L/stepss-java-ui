@@ -44,10 +44,64 @@ public final class SsaResultsWindow extends JFrame {
     private final JCheckBox emOnly =
             new JCheckBox("electromechanical only (0.1 to 2.5 Hz)", true);
 
+    /**
+     * How many of these are on screen. Kept so the next one can be stepped
+     * clear of them rather than landing exactly on top, and counted down again
+     * as they close so a long session does not walk off the screen edge.
+     * Touched only from the event dispatch thread, which is where both the Run
+     * and the Load handlers call in from.
+     */
+    private static int onScreen;
+
+    /** Enough of an offset to see the window underneath, and its title. */
+    private static final int CASCADE_STEP = 30;
+
+    /** Where the cascade returns to the top left rather than marching on. */
+    private static final int CASCADE_WRAP = 8;
+
+    /**
+     * Opens one run in a window of its own. Every call makes a new window on
+     * purpose: running the analysis again, or loading a second archive, is
+     * nearly always done to compare the two, and each window holds its own
+     * parsed copy of the results, so a later run overwriting the files on disk
+     * leaves the earlier window intact.
+     */
     public static void open(Component parent, SsaResults results) {
         SsaResultsWindow window = new SsaResultsWindow(results);
         window.setLocationRelativeTo(parent);
+        window.cascade();
         window.setVisible(true);
+        onScreen++;
+    }
+
+    /**
+     * Steps this window down and to the right of the ones already up. Without
+     * it every window is centred on the main frame, so the second lands exactly
+     * over the first and pressing Run again looks like it did nothing.
+     *
+     * <p>Clamped to the screen the window is on, because a window whose title
+     * bar is past the bottom edge cannot be moved back.
+     */
+    private void cascade() {
+        int rank = onScreen % CASCADE_WRAP;
+        if (rank == 0) {
+            return;
+        }
+        java.awt.Rectangle screen = screenBounds();
+        int shift = rank * CASCADE_STEP;
+        int x = Math.min(getX() + shift, screen.x + screen.width - getWidth());
+        int y = Math.min(getY() + shift, screen.y + screen.height - getHeight());
+        setLocation(Math.max(screen.x, x), Math.max(screen.y, y));
+    }
+
+    /** The screen this window is on, or the default one before it has a peer. */
+    private java.awt.Rectangle screenBounds() {
+        java.awt.GraphicsConfiguration config = getGraphicsConfiguration();
+        if (config == null) {
+            config = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
+                    .getDefaultScreenDevice().getDefaultConfiguration();
+        }
+        return config.getBounds();
     }
 
     public SsaResultsWindow(SsaResults results) {
@@ -59,6 +113,15 @@ public final class SsaResultsWindow extends JFrame {
         this.table = new JTable(model);
 
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        // Counts this one back out of the cascade. Without it the offset only
+        // ever grows, so opening and closing windows all afternoon eventually
+        // puts a new one against the screen edge with nothing beneath it.
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosed(java.awt.event.WindowEvent event) {
+                onScreen = Math.max(0, onScreen - 1);
+            }
+        });
         setLayout(new BorderLayout());
         add(header(), BorderLayout.NORTH);
 

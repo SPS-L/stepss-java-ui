@@ -49,7 +49,7 @@ an aborted run can make the next run fail in a way that looks unrelated.
    the simulation to that time with no events first and linearises there
    instead, which is useful when the initialisation has a slow transient to
    settle. With no disturbance in between, both give the same spectrum.
-4. Press **Perform small signal stability analysis**.
+4. Press **Run small-signal stability analysis**.
 5. A results window opens on the run. It lists the modes with their damping
    ratios and frequencies, and for the mode you select shows the participation
    factors, a mode-shape dial and an s-plane. Its header names the directory
@@ -66,9 +66,16 @@ an aborted run can make the next run fail in a way that looks unrelated.
 Swap `dyn.dat` for `dyn_noPSS.dat` and repeat to get the unstable variant.
 Change the basename between runs and both sets can live in one directory.
 
-**View results...** on the same tab reopens any directory holding a
-`<basename>_modes.dat` without re-running the analysis, which also reaches runs
-made from a terminal or in an earlier session.
+Each run opens its own results window and leaves the ones already up alone, so
+running the stabilised and unstabilised cases one after the other puts the two
+spectra side by side. Each window holds the results it was opened on, so the
+second run overwriting the files on disk does not disturb the first window.
+
+To come back to a run in a later session, **Save dynamic Jacobian...** writes it
+as an archive and **Load dynamic Jacobian...** opens it again, in a window of
+its own like any other. The archive is the way back: results sitting loose in a
+directory, from a run made at a terminal for instance, are not something the
+interface opens.
 
 ## What to expect
 

@@ -2095,8 +2095,6 @@
                                       <Group type="102" alignment="0" attributes="0">
                                           <Component id="ssaButton1" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace max="-2" attributes="0"/>
-                                          <Component id="viewSsaResults" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
                                           <Component id="saveDynJac" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace max="-2" attributes="0"/>
                                           <Component id="loadDynJac" min="-2" max="-2" attributes="0"/>
@@ -2168,7 +2166,6 @@
                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
                           <Group type="103" groupAlignment="3" attributes="0">
                               <Component id="ssaButton1" alignment="3" min="-2" max="-2" attributes="0"/>
-                              <Component id="viewSsaResults" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="saveDynJac" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="loadDynJac" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
@@ -2298,16 +2295,6 @@
                   </Properties>
                   <Events>
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loadSSADirActionPerformed"/>
-                  </Events>
-                </Component>
-                <Component class="javax.swing.JButton" name="viewSsaResults">
-                  <Properties>
-                    <Property name="text" type="java.lang.String" value="View results..."/>
-                    <Property name="toolTipText" type="java.lang.String" value="Open small-signal results already on disk, without re-running the analysis"/>
-                    <Property name="name" type="java.lang.String" value="viewSsaResults" noResource="true"/>
-                  </Properties>
-                  <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="viewSsaResultsActionPerformed"/>
                   </Events>
                 </Component>
                 <Component class="javax.swing.JLabel" name="ssaBasenameLabel">
