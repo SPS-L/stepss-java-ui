@@ -691,9 +691,19 @@ jobs:
   # This job exists because `promote` is SKIPPED rather than failed when a leg
   # fails, and a skipped job is not a red run. Without it a release that never
   # happened would look green.
+  #
+  # `result == 'failure' || 'cancelled'`, and not `!= 'success'`: skipped is
+  # the third value, and `bundles` is skipped when the release job itself
+  # failed before any platform ran. The first form of this condition caught
+  # that case and announced "at least one platform failed to build" over a
+  # `release not found`, which is a false diagnosis of a run that had already
+  # gone red for a different reason. There is nothing to discard then, because
+  # the draft is created after the jar is built.
   discard:
     needs: [release, bundles]
-    if: always() && needs.release.outputs.proceed == 'true' && needs.bundles.result != 'success'
+    if: >-
+      always() && needs.release.outputs.proceed == 'true'
+      && (needs.bundles.result == 'failure' || needs.bundles.result == 'cancelled')
     runs-on: ubuntu-latest
     steps:
       - name: Discard the draft
