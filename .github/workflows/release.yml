@@ -57,6 +57,10 @@ jobs:
       # draft release has no tag to check out: GitHub creates the tag only when
       # the release is published, which is the whole point of the draft.
       sha: ${{ steps.commit.outputs.sha }}
+      # The draft's numeric id. Every attach, the publish and both discards
+      # address the release by this, never by tag: the tag does not exist
+      # until promote publishes.
+      release_id: ${{ steps.draft.outputs.release_id }}
     steps:
       - name: Check out
         uses: actions/checkout@v7
@@ -320,6 +324,7 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Create the release as a draft
+        id: draft
         if: steps.bump.outputs.proceed == 'true'
         env:
           GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
@@ -349,20 +354,44 @@ jobs:
           # behind, because the discard step tolerates a failed delete rather
           # than masking the real error. Creating the release would then fail
           # on a tag that already exists, and the version number would be
-          # stuck. Remove that draft first, and only ever a draft: `isDraft`
-          # is checked because a published release under this number must
-          # never be deleted by a re-run.
-          if [ "$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" \
-                    --json isDraft --jq .isDraft 2>/dev/null)" = "true" ]; then
+          # stuck. Remove that draft first, and only ever a draft: `.draft` is
+          # checked because a published release under this number must never be
+          # deleted by a re-run. This is the one lookup-by-tag left in the
+          # workflow, it runs once, and it is allowed to find nothing.
+          abandoned="$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq 'map(select(.tag_name == env.VERSION and .draft)) | .[0].id // empty' \
+            2>/dev/null || true)"
+          if [ -n "$abandoned" ]; then
             echo "Removing an abandoned draft for $VERSION from an earlier attempt."
-            gh release delete "$VERSION" --repo "$GITHUB_REPOSITORY" --yes
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/$abandoned" --silent
           fi
-          gh release create "$VERSION" \
-            dist/stepss.jar \
-            --target "$TARGET_SHA" \
-            --title "STEPSS $VERSION" \
-            --notes-file notes.md \
-            --draft
+
+          # Created through the REST API rather than `gh release create`, for
+          # the release id it hands back. Everything downstream addresses the
+          # release by that id, so nothing ever has to resolve a tag that does
+          # not exist yet - see tools/attach-asset.sh for what that cost when
+          # the legs looked it up by tag instead.
+          #
+          # jq builds the body so that notes.md, which carries verbatim
+          # upstream release text, is JSON-escaped by a tool rather than by
+          # hand.
+          release_id="$(jq -n \
+              --arg tag "$VERSION" \
+              --arg target "$TARGET_SHA" \
+              --arg name "STEPSS $VERSION" \
+              --rawfile body notes.md \
+              '{tag_name: $tag, target_commitish: $target, name: $name,
+                body: $body, draft: true}' \
+            | gh api --method POST "repos/$GITHUB_REPOSITORY/releases" \
+                --input - --jq .id)"
+          if [ -z "$release_id" ]; then
+            echo "The draft was not created; no id came back."
+            exit 1
+          fi
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+          echo "Draft $VERSION created as release $release_id (no tag yet)."
+
+          bash tools/attach-asset.sh "$release_id" dist/stepss.jar
 
       # A step used to sit here that asked a human, on every uramses re-pin,
       # whether the README's Compile known-limitation paragraph still held.
@@ -516,13 +545,14 @@ jobs:
       - name: Attach it to the release
         env:
           GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
-          VERSION: ${{ needs.release.outputs.version }}
+          RELEASE_ID: ${{ needs.release.outputs.release_id }}
         shell: bash
         run: |
           set -euo pipefail
-          # --clobber so a re-run of this job replaces the asset rather than
-          # failing on a name that is already there.
-          gh release upload "$VERSION" bundle/*.${{ matrix.type }} --clobber
+          # By release id, not by tag: the release is still a draft here and
+          # has none. The helper also replaces an asset of the same name, so a
+          # re-run of this leg is safe. See tools/attach-asset.sh.
+          bash tools/attach-asset.sh "$RELEASE_ID" bundle/*.${{ matrix.type }}
 
       # The second Windows artifact: the same application as the .msi, as a
       # plain directory in a zip, which is what the Scoop bucket installs.
@@ -580,11 +610,11 @@ jobs:
         if: matrix.type == 'msi'
         env:
           GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
-          VERSION: ${{ needs.release.outputs.version }}
+          RELEASE_ID: ${{ needs.release.outputs.release_id }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release upload "$VERSION" bundle/*-windows.zip --clobber
+          bash tools/attach-asset.sh "$RELEASE_ID" bundle/*-windows.zip
 
   # Nothing is public until every platform is in. The draft the release job
   # created carries no tag and is invisible to users; this job is the only
@@ -619,12 +649,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
           VERSION: ${{ needs.release.outputs.version }}
+          RELEASE_ID: ${{ needs.release.outputs.release_id }}
         run: |
           set -euo pipefail
           # Read from env and quoted, never interpolated: see the note at the
           # top of the file.
-          gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" \
-            --draft=false --latest
+          # By id, and this is the call that creates the tag: GitHub tags
+          # target_commitish at the moment a draft stops being a draft.
+          # make_latest is the API's string field, not a boolean.
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
+            -F draft=false -f make_latest=true --silent
           echo "$VERSION is published with every platform artifact attached."
 
       # Both dispatches, now that there is a published release to announce.
@@ -678,9 +712,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
           VERSION: ${{ needs.release.outputs.version }}
+          RELEASE_ID: ${{ needs.release.outputs.release_id }}
         run: |
           set -euo pipefail
-          gh release delete "$VERSION" --repo "$GITHUB_REPOSITORY" --yes || true
+          gh api --method DELETE \
+            "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" --silent || true
           echo "Draft $VERSION discarded; no tag was created."
 
   # The bundles matrix is fail-fast: false, so one platform failing still lets
@@ -710,9 +746,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
           VERSION: ${{ needs.release.outputs.version }}
+          RELEASE_ID: ${{ needs.release.outputs.release_id }}
         run: |
           set -euo pipefail
-          gh release delete "$VERSION" --repo "$GITHUB_REPOSITORY" --yes || true
+          gh api --method DELETE \
+            "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" --silent || true
           echo "At least one platform failed to build, so $VERSION was not published."
           echo "The draft is discarded and no tag was created; re-run to retry the same number."
           exit 1
