@@ -3038,7 +3038,7 @@ public class StepssUI extends javax.swing.JFrame {
             BufferedWriter out = new BufferedWriter(ryt);
             out.write("");
             out.flush();
-            if (fileData1.getText().equals("") && fileData2.getText().equals("") && fileData3.getText().equals("") && fileData4.getText().equals("")) {
+            if (noSystemDataLoaded()) {
                 out.close();
                 return "No system data files are loaded. Add at least one on the System Data tab.";
             }
@@ -3160,6 +3160,26 @@ public class StepssUI extends javax.swing.JFrame {
     }
 
     /**
+     * True when every system data row is empty, which is the one thing both
+     * command files refuse to be written without.
+     *
+     * <p>Over all ten rows, because the loop that writes them does. This was
+     * a hand-unrolled test of rows one to four sitting three lines above a
+     * {@code for} over {@code dataFileList}, so a case loaded into row five or
+     * later was refused with "No system data files are loaded" while the row
+     * plainly showed its path. Add Helios results to data writes row ten and
+     * nothing else, so it could produce that refusal on its own.
+     */
+    private boolean noSystemDataLoaded() {
+        for (JTextField s : dataFileList) {
+            if (!s.getText().isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Writes one runtime observable row into the command file and returns
      * null, or returns why it could not be, on the same convention as
      * {@link #createCommandFile()}.
@@ -3207,7 +3227,7 @@ public class StepssUI extends javax.swing.JFrame {
             BufferedWriter out = new BufferedWriter(ryt);
             out.write("");
             out.flush();
-            if (fileData1.getText().equals("") && fileData2.getText().equals("") && fileData3.getText().equals("") && fileData4.getText().equals("")) {
+            if (noSystemDataLoaded()) {
                 out.close();
                 return "No system data files are loaded. Add at least one on the System Data tab.";
             }
@@ -3331,7 +3351,13 @@ public class StepssUI extends javax.swing.JFrame {
             fileChooser.setFileFilter(filter);
             int returnVal = fileChooser.showSaveDialog(this);
             fileChooser.resetChoosableFileFilters();
-            fileData10.setText("");
+            // No fileData10.setText("") here. It ran before this check, so
+            // merely opening Save configuration and pressing Cancel emptied
+            // data row ten, which is the row Add Helios results to data fills
+            // with in_volt_trfo.dat. The next run then wrote a valid cmd.txt
+            // with the power-flow initialisation file silently missing from
+            // it. Whatever it was meant to keep out of the .cfg belongs in
+            // the property set below, not in the live form.
             if (returnVal == JFileChooser.APPROVE_OPTION) {
                 File file = fileChooser.getSelectedFile();
                 String filePath = file.getPath();
@@ -3674,14 +3700,24 @@ public class StepssUI extends javax.swing.JFrame {
                 }
                 File srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "cmd.txt");
                 String content = IOUtils.toString(new FileInputStream(srcFile), "UTF-8");
+                // Pattern.quote, not Matcher.quoteReplacement. replaceAll
+                // takes a regex first and a replacement second, and these had
+                // them the other way round: quoteReplacement escapes only \
+                // and $, so myTempDir went in as a pattern. myTempDir is the
+                // working directory the user chose, so a case kept in
+                // "Nordic32 (v2)" or "case+1" stripped nothing at all and the
+                // saved file kept absolute paths into a directory that does
+                // not survive the session. It failed silently, and unbalanced
+                // brackets would have thrown PatternSyntaxException past the
+                // IOException catch below.
                 String file_str = myTempDir.getAbsolutePath() + System.getProperty("file.separator");
-                content = content.replaceAll(Matcher.quoteReplacement(file_str), "");
+                content = content.replaceAll(Pattern.quote(file_str), "");
                 IOUtils.write(content, new FileOutputStream(dstFile), "UTF-8");
 
                 srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "customObs.txt");
                 if (srcFile.exists()) {
                     content = IOUtils.toString(new FileInputStream(srcFile), "UTF-8");
-                    content = content.replaceAll(Matcher.quoteReplacement(file_str), "");
+                    content = content.replaceAll(Pattern.quote(file_str), "");
                     IOUtils.write(content, new FileOutputStream(srcFile), "UTF-8");
                     fileOps.copyFiletoDir(srcFile, dstFile.getAbsoluteFile());
                 }
@@ -4471,7 +4507,8 @@ public class StepssUI extends javax.swing.JFrame {
                     String content = IOUtils.toString(srcFileIn, "UTF-8");
                     IOUtils.closeQuietly(srcFileIn);
                     String file_str = myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut.cur";
-                    content = content.replaceAll(Matcher.quoteReplacement(file_str), fileChooser.getSelectedFile().getName() + ".cur");
+                    content = content.replaceAll(Pattern.quote(file_str),
+                            Matcher.quoteReplacement(fileChooser.getSelectedFile().getName() + ".cur"));
                     FileOutputStream srcFileOut = new FileOutputStream(srcFile);
                     IOUtils.write(content, srcFileOut, "UTF-8");
                     IOUtils.closeQuietly(srcFileOut);
@@ -5168,7 +5205,12 @@ public class StepssUI extends javax.swing.JFrame {
         if (!syncObsField.getText().equals("")) {
             for (int i = 0; i < syncObsList.getItemCount(); i++) {
                 if (syncObsField.getText().equals((syncObsList.getItemAt(i).toString()))) {
-                    busObsField.setText("Already in List!");
+                    // syncObsField, not busObsField: this is the one of the
+                    // five copies of this handler that was never re-pointed
+                    // after being pasted, so a duplicate machine name put the
+                    // notice in the Bus row and overwrote whatever was typed
+                    // there, while the Sync row said nothing at all.
+                    syncObsField.setText("Already in List!");
                     return;
                 }
             }
@@ -5237,7 +5279,13 @@ public class StepssUI extends javax.swing.JFrame {
 
     private void clearObsFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearObsFileButtonActionPerformed
         fileObs.setText("");
+        // All three rows. The loop below walks jPanel7, the wizard panel, and
+        // the runtime observable rows are not in it, so clearing row one alone
+        // left rows two and three still naming equipment and the next run
+        // still plotting them, right after the user pressed Clear.
         runtimeObsName.setText("");
+        runtimeObsName1.setText("");
+        runtimeObsName2.setText("");
         for (Component c : jPanel7.getComponents()) {
             if (c instanceof JTextField) {
                 ((JTextField) c).setText("");
@@ -5503,8 +5551,15 @@ public class StepssUI extends javax.swing.JFrame {
 
         //        simulationOutput.setText("");
         fileData10.setText("");
-        loadOutputActionPerformed(evt);
-        savedOutputBool = false;
+
+        // No loadOutputActionPerformed / savedOutputBool here. That pair was
+        // pasted from runSimulationActionPerformed, where it belongs: both act
+        // on the Dynamic Simulation console and its output.trace backup, which
+        // a power-flow run has nothing to do with. It meant pressing Run power
+        // flow rewrote output.trace with the simulation console's text, and,
+        // once the user had loaded a trace, silently refilled the simulation
+        // console from the old run on a tab they were not looking at. This
+        // tab's own reset is clearPFCOutputActionPerformed, below.
 
         // helios exits 0 even when it fails to converge, and can abort before
         // its final VT export; without this, a leftover .res/.dat file from
