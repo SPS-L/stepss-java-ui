@@ -3301,12 +3301,8 @@ public class StepssUI extends javax.swing.JFrame {
      * <p>Static and returning a string so the harness can check it without a
      * live frame, which is the same reason {@code describeHeliosExit} is
      * separable from the run that calls it.
-     *
-     * <p>Public for the same reason {@link HeliosLog#isProgressLine} is:
-     * {@code my.stepss.diagram.DiagramCheck} is a different package from
-     * {@code my.stepss} and cannot reach a package-private member.
      */
-    public static String diagramCommands(String templatePath, String outputName) {
+    static String diagramCommands(String templatePath, String outputName) {
         return "1\n" + templatePath + "\n" + outputName + "\n";
     }
 
@@ -5682,8 +5678,8 @@ public class StepssUI extends javax.swing.JFrame {
         try {
             PlatformLauncher.openInDefaultApplication(target);
         } catch (IOException ex) {
-            banner.warn("Could not open " + target.getAbsolutePath()
-                    + "\n\n" + ex.getMessage());
+            banner.warn("<html>Could not open " + target.getAbsolutePath()
+                    + "<br><br>" + ex.getMessage() + "</html>");
         }
     }
 
@@ -5970,9 +5966,9 @@ public class StepssUI extends javax.swing.JFrame {
      * docs/api-reference.md#shared-status-contract-api-and-cli):
      * <ul>
      * <li>0 (converged): silent, exactly as before the contract existed.</li>
-     * <li>2 (did not converge): a prominent warning — helios still exported
-     * result files and the GUI will display them, but they are not a valid
-     * solution.</li>
+     * <li>2 (did not converge): a prominent warning, since helios still
+     * exported result files and the GUI will display them, but they are not a
+     * valid solution.</li>
      * <li>1 (input/usage error): an error explaining there may be no results
      * at all.</li>
      * <li>anything else: a generic failure naming the exit value.</li>
@@ -6082,8 +6078,8 @@ public class StepssUI extends javax.swing.JFrame {
             } catch (IOException ex) {
                 Logger.getLogger(StepssUI.class.getName())
                         .log(Level.WARNING, "The diagram could not be opened", ex);
-                banner.warn("The one-line diagram could not be opened.\n\n"
-                        + ex.getMessage());
+                banner.warn("<html>The one-line diagram could not be opened.<br><br>"
+                        + ex.getMessage() + "</html>");
             }
         });
     }
@@ -6141,7 +6137,7 @@ public class StepssUI extends javax.swing.JFrame {
         // same outcome with no such buttons.
         String detail = outcome.detail();
         if (exitValue == 2) {
-            detail += " The buttons below the console show them anyway.";
+            detail += " The buttons below the console still display them.";
         }
         return new HeliosStatusDialog(title,
                 "<html><body style='width: 350px'>"

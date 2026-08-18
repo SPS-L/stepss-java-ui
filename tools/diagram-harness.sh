@@ -25,4 +25,4 @@ if [ ! -d build/classes ]; then
 fi
 exec java -Djava.awt.headless=true \
      -cp "build/classes:lib/batik-all-1.19.jar:lib/xmlgraphics-commons-2.11.jar:lib/xml-apis-ext-1.3.04.jar:lib/commons-exec-1.3.jar:lib/commons-io-2.11.0.jar" \
-     my.stepss.diagram.DiagramCheck
+     my.stepss.DiagramCheck

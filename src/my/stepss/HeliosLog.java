@@ -38,12 +38,8 @@ import java.nio.charset.StandardCharsets;
  * into a buffer and dumps the whole of it into the console when helios exits
  * non-zero, so nothing can be hidden on the runs where an unrecognised line
  * would be the thing worth reading.
- *
- * <p>Public rather than package-private so {@code my.stepss.diagram.DiagramCheck}
- * can exercise {@link #isProgressLine} directly. The prefix list is a soft
- * contract on Helios' wording, and a contract nothing checks is one that drifts.
  */
-public final class HeliosLog {
+final class HeliosLog {
 
     /**
      * helios' startup banner, copied verbatim from {@code print_banner()} in
@@ -118,7 +114,7 @@ public final class HeliosLog {
      * false if it is table data (or blank padding between tables) and belongs
      * only in the .res file the following {@code X} command writes
      */
-    public static boolean isProgressLine(String line) {
+    static boolean isProgressLine(String line) {
         String trimmed = line.trim();
         if (trimmed.isEmpty()) {
             return false;

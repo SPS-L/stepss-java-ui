@@ -1,6 +1,7 @@
-package my.stepss.diagram;
+package my.stepss;
 
-import my.stepss.HeliosOutcome;
+import my.stepss.diagram.DiagramView;
+import my.stepss.diagram.SvgImage;
 
 /**
  * Headless checks for the annotated one-line diagram: the Helios exit-status
@@ -40,6 +41,7 @@ public final class DiagramCheck {
         checkZoomCostsNothingExtra();
         checkPanMovesTheRegion();
         checkAMalformedSvgRaises();
+        checkADegenerateViewBoxIsRefused();
         checkExternalResourcesAreRefused();
         checkAnUnknownElementDoesNotLoseTheDocument();
         checkFitShowsTheWholeDocument();
@@ -131,10 +133,26 @@ public final class DiagramCheck {
                         my.stepss.platform.Platform.WINDOWS_X86_64, dat);
         check("the editor launcher still opens Notepad on Windows",
                 cmd.getExecutable().contains("notepad"));
+
+        // Windows and Linux differ obviously (notepad.exe vs. cmd /c start;
+        // xdg-open vs. xdg-open). macOS is the one platform where the two
+        // launchers differ by a single argument, "-t", which is exactly the
+        // kind of thing an accidental merge would drop without either method
+        // changing its executable.
+        org.apache.commons.exec.CommandLine macEditor =
+                my.stepss.platform.PlatformLauncher.editorCommand(
+                        my.stepss.platform.Platform.MACOS_ARM64, dat);
+        org.apache.commons.exec.CommandLine macDefault =
+                my.stepss.platform.PlatformLauncher.defaultApplicationCommand(
+                        my.stepss.platform.Platform.MACOS_ARM64, dat);
+        check("the editor launcher still forces TextEdit on macOS",
+                java.util.Arrays.asList(macEditor.getArguments()).contains("-t"));
+        check("the default-application launcher still does not",
+                !java.util.Arrays.asList(macDefault.getArguments()).contains("-t"));
     }
 
     private static void checkTheDiagramCommandBlock() {
-        String block = my.stepss.StepssUI.diagramCommands("/case/6bus.svg", "in_diagram.svg");
+        String block = StepssUI.diagramCommands("/case/6bus.svg", "in_diagram.svg");
         check("the block starts with the main-menu command",
                 block.startsWith("1\n"));
         check("the block names the template",
@@ -155,10 +173,10 @@ public final class DiagramCheck {
             "DiagramRenderer: cannot open template: /case/6bus.svg"
         };
         for (String line : lines) {
-            check("the console keeps: " + line, my.stepss.HeliosLog.isProgressLine(line));
+            check("the console keeps: " + line, HeliosLog.isProgressLine(line));
         }
         check("a table row is still dropped",
-                !my.stepss.HeliosLog.isProgressLine("  A      6.000   1.0210    0.00"));
+                !HeliosLog.isProgressLine("  A      6.000   1.0210    0.00"));
     }
 
     /** A minimal document with known bounds and one black square in the corner. */
@@ -280,6 +298,30 @@ public final class DiagramCheck {
             check("a malformed SVG is refused", false);
         } catch (java.io.IOException expected) {
             check("a malformed SVG is refused", true);
+        }
+    }
+
+    /**
+     * A zero or negative {@code viewBox} is refused rather than accepted as an
+     * empty document.
+     *
+     * <p>{@code viewBox="0 0 0 0"} parses cleanly as four numbers, so without
+     * this check {@code documentBounds()} would hand back an empty rectangle
+     * despite promising never to, every area of interest built from it would
+     * be degenerate, and the window would open blank with nothing on screen
+     * saying why.
+     */
+    private static void checkADegenerateViewBoxIsRefused() throws Exception {
+        for (String viewBox : new String[] {"0 0 0 0", "0 0 -200 100"}) {
+            String svg = TEST_SVG.replace("viewBox=\"0 0 200 100\"",
+                    "viewBox=\"" + viewBox + "\"");
+            java.io.File file = writeTestSvg(svg);
+            try {
+                SvgImage.load(file);
+                check("a viewBox of \"" + viewBox + "\" is refused", false);
+            } catch (java.io.IOException expected) {
+                check("a viewBox of \"" + viewBox + "\" is refused", true);
+            }
         }
     }
 

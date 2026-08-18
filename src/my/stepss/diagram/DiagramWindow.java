@@ -14,7 +14,6 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.UIManager;
 import my.stepss.HeliosOutcome;
 import my.stepss.WindowCascade;
 
@@ -173,12 +172,5 @@ public final class DiagramWindow extends JFrame {
             return null;
         }
         return target;
-    }
-
-    static {
-        // Nothing here depends on the look and feel being installed, but the
-        // window is opened from a background thread's invokeLater and a missing
-        // UIManager default would surface there rather than at startup.
-        UIManager.getDefaults();
     }
 }

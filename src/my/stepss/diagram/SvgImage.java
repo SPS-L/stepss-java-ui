@@ -164,6 +164,13 @@ public final class SvgImage {
      * <p>Read from the attributes rather than from a built scene graph, so
      * loading costs one parse. A document with neither is refused, because
      * everything downstream divides by these numbers.
+     *
+     * <p>A {@code viewBox} with a zero or negative width or height is refused
+     * the same way, for the same reason: {@code viewBox="0 0 0 0"} parses
+     * cleanly as four numbers, and without this check {@link #documentBounds}
+     * would hand back an empty rectangle despite promising never to, every
+     * area of interest built from it would be degenerate, and the window
+     * would open blank with nothing on screen saying why.
      */
     private static Rectangle2D readBounds(SVGDocument document, File file)
             throws IOException {
@@ -171,14 +178,23 @@ public final class SvgImage {
         if (viewBox != null && !viewBox.trim().isEmpty()) {
             String[] parts = viewBox.trim().split("[\\s,]+");
             if (parts.length == 4) {
+                double vbWidth;
+                double vbHeight;
                 try {
-                    return new Rectangle2D.Double(
-                            Double.parseDouble(parts[0]), Double.parseDouble(parts[1]),
-                            Double.parseDouble(parts[2]), Double.parseDouble(parts[3]));
+                    vbWidth = Double.parseDouble(parts[2]);
+                    vbHeight = Double.parseDouble(parts[3]);
                 } catch (NumberFormatException notNumbers) {
                     throw new IOException(file.getName()
                             + " has a viewBox that is not four numbers: " + viewBox);
                 }
+                if (vbWidth <= 0 || vbHeight <= 0) {
+                    throw new IOException(file.getName()
+                            + " has a viewBox with a width or height that is not"
+                            + " positive: " + viewBox);
+                }
+                return new Rectangle2D.Double(
+                        Double.parseDouble(parts[0]), Double.parseDouble(parts[1]),
+                        vbWidth, vbHeight);
             }
         }
         double width = length(document.getRootElement().getAttribute("width"));
@@ -247,15 +263,45 @@ public final class SvgImage {
     }
 
     /**
-     * Renders the whole document at a given width, aspect preserved.
+     * Ceiling on the pixel count {@link #renderWhole} will ask Batik to
+     * allocate, regardless of the width requested.
+     *
+     * <p>The height {@link #renderWhole} computes comes from the document's
+     * own aspect ratio, not from the caller, so a width that is entirely
+     * reasonable for a normal network diagram can still demand an enormous
+     * allocation for a document shaped very differently: a 1:10 document at
+     * the 2400 px Save-as-PNG uses asks for 2400 x 24000 ARGB, about 230 MB.
+     * {@code OutOfMemoryError} is an {@link Error}, not an {@link IOException},
+     * so {@link DiagramWindow}'s {@code catch (IOException)} around the save
+     * does not catch it and the user gets no message at all, just a request
+     * that silently never completes. 40 million pixels is about 160 MB at 4
+     * bytes each: generous for anything that will still be legible on a
+     * printed page, and comfortably inside what the default JVM heap can
+     * actually allocate.
+     */
+    private static final int MAX_RENDER_PIXELS = 40_000_000;
+
+    /**
+     * Renders the whole document at a given width, aspect preserved, unless
+     * that would exceed {@link #MAX_RENDER_PIXELS}, in which case the width is
+     * scaled down (aspect still preserved) until it does not.
      *
      * <p>What Save as PNG uses. A saved figure goes into a report, so it is the
      * whole drawing at a generous size rather than whatever the window happened
-     * to be showing: zoom is a reading aid here, not a crop tool.
+     * to be showing: zoom is a reading aid here, not a crop tool. The cap
+     * exists so an extreme aspect ratio yields a smaller but valid image
+     * instead of an allocation failure; see {@link #MAX_RENDER_PIXELS}.
      */
     public BufferedImage renderWhole(int width) throws IOException {
-        int height = (int) Math.round(width * bounds.getHeight() / bounds.getWidth());
-        return render(documentBounds(), width, Math.max(1, height));
+        int height = Math.max(1,
+                (int) Math.round(width * bounds.getHeight() / bounds.getWidth()));
+        if ((long) width * height > MAX_RENDER_PIXELS) {
+            width = Math.max(1, (int) Math.sqrt(
+                    MAX_RENDER_PIXELS * bounds.getWidth() / bounds.getHeight()));
+            height = Math.max(1,
+                    (int) Math.round(width * bounds.getHeight() / bounds.getWidth()));
+        }
+        return render(documentBounds(), width, height);
     }
 
     /**

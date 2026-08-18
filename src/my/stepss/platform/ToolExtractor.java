@@ -307,7 +307,7 @@ public final class ToolExtractor {
      * {@link #UNKNOWN_VERSION} rather than throwing: a broken version
      * resource must degrade the staleness check, not make the toolchain
      * unusable. Deliberately not re-read per call or hashed from the
-     * payload streams themselves — the payloads total ~130 MB, and hashing
+     * payload streams themselves: the payloads total ~130 MB, and hashing
      * them on every startup would be far more costly than the staleness
      * bug this guards against.
      */

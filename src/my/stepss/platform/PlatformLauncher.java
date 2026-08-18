@@ -375,8 +375,8 @@ public final class PlatformLauncher {
 
     /**
      * Notified when a launch started via {@link #run} fails after the async
-     * {@code execute} call has already returned normally — e.g. the target
-     * program (xdg-open, a terminal emulator, ...) does not exist. Commons
+     * {@code execute} call has already returned normally, for example when the
+     * target program (xdg-open, a terminal emulator, ...) does not exist. Commons
      * Exec's async {@code execute(CommandLine, ExecuteResultHandler)}
      * overload runs the whole launch, including the {@code IOException} that
      * a missing executable throws from {@code ProcessBuilder}, on a worker
@@ -391,7 +391,7 @@ public final class PlatformLauncher {
     /**
      * Registers the callback used to surface an async launch failure to the
      * user. Called back on whatever thread Commons Exec's worker thread is
-     * running on, not the EDT — implementations that touch Swing must hop
+     * running on, not the EDT; implementations that touch Swing must hop
      * back with {@code SwingUtilities.invokeLater} themselves.
      */
     public static void setLaunchFailureListener(BiConsumer<String, Throwable> listener) {

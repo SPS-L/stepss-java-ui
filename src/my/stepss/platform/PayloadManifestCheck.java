@@ -18,7 +18,7 @@ import java.util.List;
  * because nothing at build time ever compares the staged directory against
  * {@link Toolchain}'s resource strings. The mismatch then surfaces only at
  * launch, on every user's machine, as "Missing bundled resource" followed by
- * {@code System.exit(1)} — the one place a build-time check is cheaper than
+ * {@code System.exit(1)}: the one place a build-time check is cheaper than
  * letting it ship.
  *
  * <p>Invoked from build.xml's {@code -post-compile} target (after
