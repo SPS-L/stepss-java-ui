@@ -227,7 +227,13 @@ and checks:
   sixteen handlers and `createCustomObsFile` collapse into delegations;
   `OBSERVABLE_TYPES` gains `TO` and `SOL`; the 31 generated picker controls and
   their event stubs go
-- `src/my/stepss/StepssUI.form`: the `jPanel7` subtree, lines 1178 to 1626
+- `src/my/stepss/StepssUI.form`: the 31 `<Component>` blocks inside
+  `jPanel7`'s `<SubComponents>`, lines 1187 to 1624
+
+  The `<Container name="jPanel7">` element itself stays. `jPanel4`'s generated
+  `GroupLayout` refers to `jPanel7` by id (`StepssUI.form:1063,1112`), so
+  deleting the container would leave two dangling references; emptying it
+  leaves the form valid and the deletion self-contained.
 
 ## Out of scope
 
@@ -267,7 +273,7 @@ for fixing RAMSES, not for withholding `TO`.
 
 ## Accepted costs
 
-- **Deleting 449 lines from `StepssUI.form` plus the matching `initComponents`
+- **Deleting 438 lines from `StepssUI.form` plus the matching `initComponents`
   block is the bulk of the risk in this change.** It is mechanical and
   self-contained, but it is generated code and the compiler is the only thing
   checking it.
