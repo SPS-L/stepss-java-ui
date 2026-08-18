@@ -1697,8 +1697,8 @@
               </Properties>
               <Constraints>
                 <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout$JTabbedPaneConstraintsDescription">
-                  <JTabbedPaneConstraints tabName="Initialization">
-                    <Property name="tabTitle" type="java.lang.String" value="Initialization"/>
+                  <JTabbedPaneConstraints tabName="Power Flow Simulation">
+                    <Property name="tabTitle" type="java.lang.String" value="Power Flow Simulation"/>
                   </JTabbedPaneConstraints>
                 </Constraint>
               </Constraints>
@@ -1715,7 +1715,11 @@
                                   <EmptySpace max="-2" attributes="0"/>
                                   <Component id="loadLFRESV2DAT" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
+                                  <Component id="savePFSolution" min="-2" max="-2" attributes="0"/>
+                                  <EmptySpace max="-2" attributes="0"/>
                                   <Component id="loadBusOverview" min="-2" max="-2" attributes="0"/>
+                                  <EmptySpace max="-2" attributes="0"/>
+                                  <Component id="loadFlows" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
                                   <Component id="loadGens" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
@@ -1740,7 +1744,9 @@
                           <Group type="103" groupAlignment="3" attributes="0">
                               <Component id="runPF" alignment="3" max="32767" attributes="0"/>
                               <Component id="loadLFRESV2DAT" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="savePFSolution" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="loadBusOverview" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="loadFlows" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="loadGens" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="loadTrfos" alignment="3" min="-2" max="-2" attributes="0"/>
                               <Component id="loadPow" alignment="3" min="-2" max="-2" attributes="0"/>
@@ -1801,6 +1807,28 @@
                   </Properties>
                   <Events>
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loadLFRESV2DATActionPerformed"/>
+                  </Events>
+                </Component>
+                <Component class="javax.swing.JButton" name="savePFSolution">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Save power flow solution"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to keep this run&apos;s in_volt_trfo.dat.&lt;br&gt;&#xa;The next power flow overwrites the one in the temporary directory; a saved copy can be loaded as a data file later.&lt;/html&gt;"/>
+                    <Property name="enabled" type="boolean" value="false"/>
+                    <Property name="name" type="java.lang.String" value="savePFSolution" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="savePFSolutionActionPerformed"/>
+                  </Events>
+                </Component>
+                <Component class="javax.swing.JButton" name="loadFlows">
+                  <Properties>
+                    <Property name="text" type="java.lang.String" value="Branch flows"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the branch flow table.&lt;br&gt;&#xa;P and Q at each end, losses, and loading as a percentage of rated MVA.&lt;/html&gt;"/>
+                    <Property name="enabled" type="boolean" value="false"/>
+                    <Property name="name" type="java.lang.String" value="loadFlows" noResource="true"/>
+                  </Properties>
+                  <Events>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loadFlowsActionPerformed"/>
                   </Events>
                 </Component>
                 <Component class="javax.swing.JButton" name="loadGens">

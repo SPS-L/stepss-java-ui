@@ -23,6 +23,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -342,7 +343,7 @@ public class StepssUI extends javax.swing.JFrame {
      * moves them, and the sequence a study runs in is untouched.
      */
     private void layoutTabs() {
-        layoutInitializationTab();
+        layoutPowerFlowTab();
         layoutDynamicSimulationTab();
         layoutCodegenTab();
         layoutSystemDataTab();
@@ -545,13 +546,15 @@ public class StepssUI extends javax.swing.JFrame {
     }
 
     /** Console in the middle, run and inspect along the bottom. */
-    private void layoutInitializationTab() {
+    private void layoutPowerFlowTab() {
         ActionBar.markPrimary(runPF);
         JPanel bar = ActionBar.create()
                 .add(runPF)
                 .add(loadLFRESV2DAT)
+                .add(savePFSolution)
                 .separate()
                 .add(loadBusOverview)
+                .add(loadFlows)
                 .add(loadGens)
                 .add(loadTrfos)
                 .add(loadPow)
@@ -1073,7 +1076,9 @@ public class StepssUI extends javax.swing.JFrame {
         pfcPane = new javax.swing.JTextArea();
         runPF = new javax.swing.JButton();
         loadBusOverview = new javax.swing.JButton();
+        loadFlows = new javax.swing.JButton();
         loadLFRESV2DAT = new javax.swing.JButton();
+        savePFSolution = new javax.swing.JButton();
         loadGens = new javax.swing.JButton();
         loadTrfos = new javax.swing.JButton();
         loadPow = new javax.swing.JButton();
@@ -2236,6 +2241,16 @@ public class StepssUI extends javax.swing.JFrame {
             }
         });
 
+        loadFlows.setText("Branch flows");
+        loadFlows.setToolTipText("<html>Click to see the branch flow table.<br>\nP and Q at each end, losses, and loading as a percentage of rated MVA.</html>");
+        loadFlows.setEnabled(false);
+        loadFlows.setName("loadFlows"); // NOI18N
+        loadFlows.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                loadFlowsActionPerformed(evt);
+            }
+        });
+
         loadLFRESV2DAT.setText("Add Helios results to data");
         loadLFRESV2DAT.setToolTipText("<html>Click to see the discrete trace of the simulation.<br>\nThis involves a detailed view on the discrete changes happening during the simulation.</html>");
         loadLFRESV2DAT.setEnabled(false);
@@ -2243,6 +2258,16 @@ public class StepssUI extends javax.swing.JFrame {
         loadLFRESV2DAT.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 loadLFRESV2DATActionPerformed(evt);
+            }
+        });
+
+        savePFSolution.setText("Save power flow solution");
+        savePFSolution.setToolTipText("<html>Click to keep this run's in_volt_trfo.dat.<br>\nThe next power flow overwrites the one in the temporary directory; a saved copy can be loaded as a data file later.</html>");
+        savePFSolution.setEnabled(false);
+        savePFSolution.setName("savePFSolution"); // NOI18N
+        savePFSolution.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                savePFSolutionActionPerformed(evt);
             }
         });
 
@@ -2299,7 +2324,11 @@ public class StepssUI extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(loadLFRESV2DAT)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(savePFSolution)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(loadBusOverview)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(loadFlows)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(loadGens)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -2320,7 +2349,9 @@ public class StepssUI extends javax.swing.JFrame {
                 .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(runPF, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(loadLFRESV2DAT)
+                    .addComponent(savePFSolution)
                     .addComponent(loadBusOverview)
+                    .addComponent(loadFlows)
                     .addComponent(loadGens)
                     .addComponent(loadTrfos)
                     .addComponent(loadPow)
@@ -2328,7 +2359,7 @@ public class StepssUI extends javax.swing.JFrame {
                 .addGap(17, 17, 17))
         );
 
-        jTabbedPane1.addTab("Initialization", jPanel6);
+        jTabbedPane1.addTab("Power Flow Simulation", jPanel6);
 
         jPanel5.setName("jPanel5"); // NOI18N
 
@@ -3273,13 +3304,22 @@ public class StepssUI extends javax.swing.JFrame {
             // eXport command: build a table, leave its item sub-menu with a blank
             // line, then "X" plus the target file name. "X" overwrites, so every
             // table needs its own file. A single "D" keeps us in the display
-            // sub-menu for all five exports.
+            // sub-menu for all six exports.
+            //
+            // The order here is the order the buttons appear in, because it is
+            // also the order helios prints its "Exported to:" lines in, and
+            // those lines are all the console shows of a run (see HeliosLog).
             out.append("D\n");
             out.append("O\n");           // bus Overview
             out.append("A\n");           // all buses
             out.newLine();               // leave the item sub-menu
             out.append("X\n");
             out.append("in_net.res\n");
+            out.append("F\n");           // branch Flows
+            out.append("A\n");
+            out.newLine();
+            out.append("X\n");
+            out.append("in_flow.res\n");
             out.append("T\n");           // adjustable Transformers
             out.append("A\n");
             out.newLine();
@@ -5601,8 +5641,8 @@ public class StepssUI extends javax.swing.JFrame {
     /**
      * Deletes every file a previous power-flow run may have left in
      * {@code myTempDir}: the four legacy-named .res exports, the in_svc.res
-     * export added for helios' per-table export mechanism, and the
-     * in_volt_trfo.dat file whose appearance signals a completed run (see
+     * and in_flow.res exports added for helios' per-table export mechanism,
+     * and the in_volt_trfo.dat file whose appearance signals a completed run (see
      * the completion thread in {@link #runPFActionPerformed}). Called at the
      * start of a run so a run that helios aborts partway through cannot
      * leave any of the previous run's results looking like they belong to
@@ -5611,7 +5651,7 @@ public class StepssUI extends javax.swing.JFrame {
     private void deletePFCResultFiles() {
         String[] resultFiles = {
             "in_net.res", "in_trfo.res", "in_gen.res", "in_bal.res",
-            "in_svc.res", "in_volt_trfo.dat"
+            "in_svc.res", "in_flow.res", "in_volt_trfo.dat"
         };
         for (String name : resultFiles) {
             Path p = Paths.get(myTempDir.getAbsolutePath(), name);
@@ -5657,6 +5697,11 @@ public class StepssUI extends javax.swing.JFrame {
         clearPFCOutputActionPerformed(evt);
         deletePFCResultFiles();
 
+        // helios prints its banner only on the interactive path, so a -t run
+        // opens the console on whatever the first data file has to say. Put it
+        // back here, where the console is already ours and already empty.
+        pfcPane.append(HeliosLog.BANNER);
+
         if (heliosExec == null || !heliosExec.exists()) {
             JOptionPane.showMessageDialog(this, "<html>The file <B>helios</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
             return;
@@ -5679,9 +5724,17 @@ public class StepssUI extends javax.swing.JFrame {
         ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
         // stderr also goes through a tee into heliosStderr so the completion
         // thread can look for the "helios: status: ..." line without disturbing
-        // what already gets shown, merged with stdout, in pfcPane.
+        // what already gets shown, merged with stdout, in pfcPane. Every line
+        // of it is progress, so it reaches the pane unfiltered.
         final ByteArrayOutputStream heliosStderr = new ByteArrayOutputStream();
-        PumpStreamHandler streamHandler = new PumpStreamHandler(outputstreamPFC,
+        // stdout is the stream carrying the six result tables, which the six
+        // buttons below the console exist to show on demand; HeliosLog.Filter
+        // keeps helios' progress lines out of it and drops the tables. Its tee
+        // holds the unfiltered text so reportHeliosExitStatus can produce all
+        // of it when helios exits non-zero - see HeliosLog for why that matters.
+        final ByteArrayOutputStream heliosStdout = new ByteArrayOutputStream();
+        PumpStreamHandler streamHandler = new PumpStreamHandler(
+                new TeeOutputStream(new HeliosLog.Filter(outputstreamPFC), heliosStdout),
                 new TeeOutputStream(outputstreamPFCErr, heliosStderr));
         simulExecutor.setStreamHandler(streamHandler);
 
@@ -5717,9 +5770,18 @@ public class StepssUI extends javax.swing.JFrame {
                 }
 
                 if (f.exists()) {
+                    // No loadOutput here. That is the Dynamic Simulation tab's
+                    // "Load output" button, pasted in along with the
+                    // output.trace block the comment above loadBusOverview
+                    // describes, and it made a power-flow run offer to load the
+                    // output of a simulation that never happened.
+                    // runSimulationActionPerformed enables it and
+                    // clearSimulOutputActionPerformed disables it; that tab
+                    // owns the whole of its lifecycle.
                     SwingUtilities.invokeLater(() -> {
-                        loadOutput.setEnabled(true);
                         loadBusOverview.setEnabled(true);
+                        loadFlows.setEnabled(true);
+                        savePFSolution.setEnabled(true);
                         loadGens.setEnabled(true);
                         loadTrfos.setEnabled(true);
                         loadPow.setEnabled(true);
@@ -5730,7 +5792,7 @@ public class StepssUI extends javax.swing.JFrame {
                     statusBar.failed("Power flow produced no results");
                 }
 
-                reportHeliosExitStatus(resultHandler, heliosStderr);
+                reportHeliosExitStatus(resultHandler, heliosStderr, heliosStdout);
             }
         }).start();
         clearPFCOutput.setEnabled(true);
@@ -5771,11 +5833,19 @@ public class StepssUI extends javax.swing.JFrame {
      * dispatched with {@code invokeLater}, following the pattern used by the
      * launch-failure listener registered in the constructor.
      *
+     * Also closes the console out, and is the right place to do it: Commons
+     * Exec stops the stream pumps before completing the result handler, so by
+     * the time {@code waitFor()} returns every line helios wrote has already
+     * reached the pane and nothing this method appends can land mid-output.
+     *
      * @param resultHandler the result handler for the run being reported on
      * @param heliosStderr the run's captured stderr, searched for the
      * {@code helios: status: ...} line
+     * @param heliosStdout the run's captured stdout, unfiltered, shown in full
+     * when helios exits non-zero
      */
-    private void reportHeliosExitStatus(DefaultExecuteResultHandler resultHandler, ByteArrayOutputStream heliosStderr) {
+    private void reportHeliosExitStatus(DefaultExecuteResultHandler resultHandler,
+            ByteArrayOutputStream heliosStderr, ByteArrayOutputStream heliosStdout) {
         try {
             resultHandler.waitFor();
         } catch (InterruptedException ex) {
@@ -5785,6 +5855,24 @@ public class StepssUI extends javax.swing.JFrame {
         if (!resultHandler.hasResult()) {
             return;
         }
+        // HeliosLog.Filter judges stdout against a list of helios' progress
+        // lines, so a line a future helios adds is one it drops. That is a fair
+        // trade on a run that worked - the tables it hides are all a button
+        // press away - and a bad one on a run that did not, where the
+        // unrecognised line is likely to be the thing worth reading. So a
+        // non-zero exit gets the whole of stdout, table text and all.
+        final boolean failed = resultHandler.getExitValue() != 0;
+        // Empty whenever helios stopped before displaying anything, which is
+        // the common shape of an exit 1: the heading alone, with nothing under
+        // it, would say there was output to see and be wrong.
+        final String fullStdout = heliosStdout.toString();
+        SwingUtilities.invokeLater(() -> {
+            if (failed && !fullStdout.trim().isEmpty()) {
+                pfcPane.append("\n--- helios output in full ---\n");
+                pfcPane.append(fullStdout);
+            }
+            pfcPane.append("\nDONE\n");
+        });
         final HeliosStatusDialog dialog = describeHeliosExit(resultHandler.getExitValue(), heliosStderr.toString());
         if (dialog == null) {
             return;
@@ -5869,11 +5957,11 @@ public class StepssUI extends javax.swing.JFrame {
         }
     }
 
-    // This and the three below it, loadGens, loadTrfos and loadPow, each clear
-    // pfcPane and fill it from one of helios' .res exports. None of them backs
-    // the pane up first, and none of them should.
+    // This and the four below it, loadFlows, loadGens, loadTrfos and loadPow,
+    // each clear pfcPane and fill it from one of helios' .res exports. None of
+    // them backs the pane up first, and none of them should.
     //
-    // All four used to open output.trace and write pfcPane into it, pasted from
+    // Four of them used to open output.trace and write pfcPane into it, pasted from
     // the Dynamic Simulation console's own save-and-restore where the same block
     // belongs. output.trace is that console's file: loadOutputActionPerformed is
     // the only thing that reads it, savedOutputBool is the only thing that says
@@ -5881,17 +5969,18 @@ public class StepssUI extends javax.swing.JFrame {
     // Nothing on this tab ever read it back, so the copy served no purpose here
     // and each press overwrote the last one anyway.
     //
-    // What kept that harmless was the one line the paste dropped: these four
+    // What kept that harmless was the one line the paste dropped: these five
     // never set savedOutputBool, so the flag stayed false, and a false flag is
     // what lets the simulation console overwrite the file with its own text
     // before ever reading it. Adding `savedOutputBool = true` here to make the
-    // four consistent with their seven siblings looks like an obvious tidy-up
+    // five consistent with their seven siblings looks like an obvious tidy-up
     // and is the bug: it would leave power-flow text in output.trace with the
     // flag claiming it is the simulation console's, and the next Load output
     // would print helios' log into the simulation pane. Deleting the blocks is
-    // what removes that, so do not put them back.
+    // what removes that, so do not put them back. loadOutput.setEnabled came
+    // from the same paste and is gone from this tab for the same reason.
     //
-    // The four .res files survive in myTempDir until the next run, so every
+    // The six .res files survive in myTempDir until the next run, so every
     // table here can be shown again at will. Only helios' run log is lost when
     // the pane is cleared, because it is streamed straight into pfcPane and
     // written nowhere; Run power flow is what brings it back.
@@ -5910,6 +5999,22 @@ public class StepssUI extends javax.swing.JFrame {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
         }
     }//GEN-LAST:event_loadBusOverviewActionPerformed
+
+    private void loadFlowsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadFlowsActionPerformed
+        try {
+            pfcPane.setText("");
+            File traceFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "in_flow.res");
+            BufferedReader traceFileBufReader = new BufferedReader(new FileReader(traceFile));
+            String line;
+            while ((line = traceFileBufReader.readLine()) != null) {
+                pfcPane.append(line);
+                pfcPane.append("\n");
+            }
+            traceFileBufReader.close();
+        } catch (IOException ex) {
+            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }//GEN-LAST:event_loadFlowsActionPerformed
 
     private void loadGensActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadGensActionPerformed
         try {
@@ -5945,6 +6050,85 @@ public class StepssUI extends javax.swing.JFrame {
     private void loadLFRESV2DATActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadLFRESV2DATActionPerformed
         fileData10.setText(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "in_volt_trfo.dat");
     }//GEN-LAST:event_loadLFRESV2DATActionPerformed
+
+    /**
+     * Copies the run's in_volt_trfo.dat out of {@code myTempDir} to somewhere
+     * the user keeps.
+     *
+     * <p>That file is the power-flow solution in the form the dynamic
+     * simulation consumes - bus voltages and transformer ratios - and
+     * "Add Helios results to data" points data slot 10 straight at the copy in
+     * the temp directory. That copy does not survive: the next Run power flow
+     * deletes it (deletePFCResultFiles) before helios writes a new one, so a
+     * solution worth keeping has to leave the temp directory to survive, and
+     * without this button the only way to reuse one was to solve it again.
+     *
+     * <p>Defaults to the folder the case was loaded from, under helios' own
+     * name for the file, so saving several solutions of one case is a matter
+     * of editing the name in the dialog: in_volt_trfo_intact.dat,
+     * in_volt_trfo_n1.dat, and so on. Nothing downstream depends on the name -
+     * slot 10 holds whatever path it is given.
+     */
+    private void savePFSolutionActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_savePFSolutionActionPerformed
+        File solution = new File(myTempDir.getAbsolutePath()
+                + System.getProperty("file.separator") + "in_volt_trfo.dat");
+        if (!solution.exists()) {
+            banner.warn("There is no power flow solution to save. Run the power flow first.");
+            return;
+        }
+        File suggested = new File(caseDirectory(), "in_volt_trfo.dat");
+        fileChooser.setSelectedFile(suggested);
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        fileChooser.setDialogTitle("Save power flow solution");
+        int returnVal = fileChooser.showSaveDialog(this);
+        fileChooser.resetChoosableFileFilters();
+        if (returnVal != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        File target = fileChooser.getSelectedFile();
+        if (target.exists()) {
+            int response = JOptionPane.showConfirmDialog(this, "Overwrite existing file?",
+                    "Confirm Overwrite", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+            if (response != JOptionPane.OK_OPTION) {
+                return;
+            }
+        }
+        try {
+            Files.copy(solution.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            banner.confirm("Power flow solution saved to " + target.getAbsolutePath());
+        } catch (IOException ex) {
+            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this,
+                    "Could not write " + target.getAbsolutePath(),
+                    "Save failed", JOptionPane.ERROR_MESSAGE);
+        }
+    }//GEN-LAST:event_savePFSolutionActionPerformed
+
+    /**
+     * Where a case's own files live, used as the starting point for the save
+     * dialog above.
+     *
+     * <p>The first loaded data file's folder rather than the working directory,
+     * because that is the folder the case was actually read from, and the two
+     * differ whenever a case is loaded from somewhere other than the working
+     * directory. Falls back to the working directory, and then to whatever the
+     * chooser was last showing, so it always has an answer.
+     */
+    private File caseDirectory() {
+        for (JTextField field : dataFileList) {
+            String path = field.getText();
+            if (!path.isEmpty()) {
+                File parent = new File(path).getParentFile();
+                if (parent != null && parent.isDirectory()) {
+                    return parent;
+                }
+            }
+        }
+        if (selWorkDir != null && selWorkDir.isDirectory()) {
+            return selWorkDir;
+        }
+        return fileChooser.getCurrentDirectory();
+    }
 
     private void loadTrfosActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadTrfosActionPerformed
         try {
@@ -6382,12 +6566,16 @@ public class StepssUI extends javax.swing.JFrame {
 
     private void clearPFCOutputActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearPFCOutputActionPerformed
         pfcPane.setText("");
-        loadOutput.setEnabled(false);
+        // No loadOutput: it belongs to the Dynamic Simulation tab, and
+        // disabling it from here took away a button for results this console
+        // has nothing to do with. See the comment above loadBusOverview.
         loadBusOverview.setEnabled(false);
+        loadFlows.setEnabled(false);
         loadGens.setEnabled(false);
         loadTrfos.setEnabled(false);
         loadPow.setEnabled(false);
         loadLFRESV2DAT.setEnabled(false);
+        savePFSolution.setEnabled(false);
     }//GEN-LAST:event_clearPFCOutputActionPerformed
 
     private void showRAMSESLicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showRAMSESLicenseButtonActionPerformed
@@ -6918,6 +7106,7 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton loadDumpTraceButton;
     private javax.swing.JButton loadDynJac;
     private javax.swing.JMenuItem loadExtSimButton;
+    private javax.swing.JButton loadFlows;
     private javax.swing.JButton loadGens;
     private javax.swing.JButton loadLFRESV2DAT;
     private javax.swing.JButton loadObsButton;
@@ -6970,6 +7159,7 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JMenuItem saveObsFileMenuItem;
     private javax.swing.JCheckBox saveOutputTrajButton;
     private javax.swing.JButton saveDynJac;
+    private javax.swing.JButton savePFSolution;
     private javax.swing.JButton saveSimulOutput;
     private javax.swing.JButton saveTrajToFileButton;
     private javax.swing.JButton savedynsim;
