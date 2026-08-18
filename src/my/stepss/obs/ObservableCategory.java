@@ -1,5 +1,7 @@
 package my.stepss.obs;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -253,6 +255,24 @@ public final class ObservableCategory {
         list.setEnabled(!everything);
         addButton.setEnabled(!everything);
         syncRemoveEnabled();
+    }
+
+    /**
+     * Writes this row's lines, or nothing when the row is empty.
+     *
+     * @param out the file being built
+     * @throws IOException if the file cannot be written
+     */
+    public void appendTo(BufferedWriter out) throws IOException {
+        if (allBox.isSelected()) {
+            out.append(kind.keyword()).append(" *");
+            out.newLine();
+            return;
+        }
+        for (String name : names()) {
+            out.append(kind.keyword()).append(' ').append(name);
+            out.newLine();
+        }
     }
 
     /**

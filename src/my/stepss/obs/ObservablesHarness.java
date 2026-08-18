@@ -1,7 +1,15 @@
 package my.stepss.obs;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JTextField;
 import my.stepss.obs.ObservableCategory.Kind;
 
 /**
@@ -20,12 +28,13 @@ public final class ObservablesHarness {
     private ObservablesHarness() {
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         checkTheEightKeywords();
         checkClearEmptiesARow();
         checkAddValidates();
         checkRemoveIsSafe();
         checkAllTogglesTheRow();
+        checkTheFileItWrites();
         checkInstalledButtonsAreWired();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
@@ -153,6 +162,66 @@ public final class ObservablesHarness {
         expect("field re-enabled", true, row.field().isEnabled());
         expect("list re-enabled", true, row.list().isEnabled());
         expect("add re-enabled", true, row.addButton().isEnabled());
+    }
+
+    /**
+     * The file is the whole point of the picker, so it is compared whole
+     * rather than probed. Branch lines carried a trailing space that no other
+     * category had, copy-paste residue from when this was five blocks of the
+     * same code; the reader does trim(adjustl(string)) before a list-directed
+     * read, so dropping it changes nothing RAMSES sees.
+     */
+    private static void checkTheFileItWrites() throws IOException {
+        ObservableWizard wizard = newWizard();
+        for (ObservableCategory row : wizard.categories()) {
+            switch (row.kind()) {
+                case BUS:
+                    row.field().setText("b1");
+                    row.add();
+                    row.field().setText("b2");
+                    row.add();
+                    break;
+                case IMPLOAD:
+                    row.allBox().setSelected(true);
+                    break;
+                case BRANCH:
+                    row.field().setText("br1");
+                    row.add();
+                    break;
+                case TWOP:
+                    row.field().setText("lk1");
+                    row.add();
+                    break;
+                case DCTL:
+                    row.allBox().setSelected(true);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        File out = File.createTempFile("customObs", ".txt");
+        out.deleteOnExit();
+        wizard.write(out);
+
+        String want = "BUS b1\nBUS b2\nIMPLOAD *\nBRANCH br1\nTWOP lk1\nDCTL *\n\n\n";
+        String got = new String(Files.readAllBytes(out.toPath()),
+                StandardCharsets.UTF_8).replace("\r\n", "\n");
+        expect("the observables file", want, got);
+    }
+
+    /** A wizard over throwaway controls, with no frame anywhere near it. */
+    private static ObservableWizard newWizard() {
+        String[] types = {"Bus Voltage", "Machine Speed", "Wall Time"};
+        JComboBox<?>[] runtimeTypes = {
+            new JComboBox<>(new DefaultComboBoxModel<>(types)),
+            new JComboBox<>(new DefaultComboBoxModel<>(types)),
+            new JComboBox<>(new DefaultComboBoxModel<>(types))};
+        JTextField[] runtimeNames = {
+            new JTextField(), new JTextField(), new JTextField()};
+        return new ObservableWizard(new JTextField(), runtimeTypes, runtimeNames,
+                new JCheckBox(), new JCheckBox(), new JCheckBox(),
+                new JCheckBox(), new JCheckBox());
     }
 
     /**
