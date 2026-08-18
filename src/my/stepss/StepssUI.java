@@ -152,6 +152,10 @@ public class StepssUI extends javax.swing.JFrame {
         initComponents();
         fillObservableTypes();
         scenarioBinding = bindScenario();
+        fileDiagram.setEditable(false);
+        fileDiagram.setMinimumSize(new java.awt.Dimension(0, 24));
+        loadDiagram.addActionListener(evt -> loadDiagramActionPerformed(evt));
+        nppDiagramButton.addActionListener(evt -> nppOpenDefault(fileDiagram.getText()));
         applyModernChrome();
         // PlatformLauncher's launches (editor/terminal/file manager) run via
         // Commons Exec's async execute(), which hands a launch failure (e.g.
@@ -647,6 +651,11 @@ public class StepssUI extends javax.swing.JFrame {
         rows.add(Box.createVerticalStrut(10), span(row++));
         rows.add(heading(jLabel9), span(row++));
         rows.add(fileRow("", loadDist, fileDist, nppDstButton), stretch(row++));
+        rows.add(Box.createVerticalStrut(10), span(row++));
+        rows.add(heading(new JLabel(
+                "<html><b>One-line diagram annotated SVG</b> (optional)</html>")),
+                span(row++));
+        rows.add(fileRow("", loadDiagram, fileDiagram, nppDiagramButton), stretch(row++));
         // Absorbs the leftover height so the rows stay together at the top
         // instead of spreading out over a tall window.
         GridBagConstraints filler = new GridBagConstraints();
@@ -826,13 +835,16 @@ public class StepssUI extends javax.swing.JFrame {
         JButton[] editButtons = {
             nppData1Button, nppData2Button, nppData3Button, nppData4Button,
             nppData5Button, nppData6Button, nppData7Button, nppData8Button,
-            nppData9Button, nppData10Button, nppDstButton, nppObsButton};
+            nppData9Button, nppData10Button, nppDstButton, nppObsButton,
+            nppDiagramButton};
         for (JButton button : editButtons) {
             button.setIcon(EditIcon.SMALL);
             button.setToolTipText("Open this file in your default editor");
             button.putClientProperty("JButton.buttonType", "toolBarButton");
             button.setMargin(new Insets(0, 0, 0, 0));
         }
+        nppDiagramButton.setToolTipText(
+                "Open this diagram in your default SVG viewer or editor");
     }
 
     /**
@@ -3740,6 +3752,7 @@ public class StepssUI extends javax.swing.JFrame {
         // look like a file had been loaded.
         fileDist.setText(slotPath(dir, example.dist()));
         fileObs.setText(slotPath(dir, example.obs()));
+        fileDiagram.setText(slotPath(dir, example.diagram()));
         // What loadObsButton does once a file is chosen: an observables file
         // with the trajectory output switched off produces nothing to plot.
         // Only when there is one: ticking it for a case with nothing to observe
@@ -5544,6 +5557,51 @@ public class StepssUI extends javax.swing.JFrame {
         nppOpen(evt, fileDist.getText());
     }//GEN-LAST:event_nppDstButtonActionPerformed
 
+    private void loadDiagramActionPerformed(java.awt.event.ActionEvent evt) {
+        fileChooser.setSelectedFile(new File(""));
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        FileNameExtensionFilter filter =
+                new FileNameExtensionFilter("Annotated one-line diagram", "svg");
+        fileChooser.setFileFilter(filter);
+        fileChooser.setDialogTitle("Choose One-Line Diagram SVG");
+        int returnVal = fileChooser.showOpenDialog(this);
+        fileChooser.resetChoosableFileFilters();
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            File file = fileChooser.getSelectedFile();
+            fileDiagram.setText(file.getAbsolutePath());
+        } else {
+            fileDiagram.setText("");
+        }
+    }
+
+    /**
+     * Opens a file in the platform's application for its type, rather than in a
+     * text editor.
+     *
+     * <p>The sibling of {@link #nppOpen}, and separate from it on purpose. That
+     * one falls back to Notepad and to {@code open -t}, which shows an SVG as
+     * XML source; this one falls back to the shell's own open, so a drawing
+     * reaches a drawing program.
+     */
+    private void nppOpenDefault(String filename) {
+        if (filename.isEmpty()) {
+            banner.warn("No one-line diagram is loaded. Add one on the System Data tab.");
+            return;
+        }
+        File target = new File(filename);
+        if (!target.exists()) {
+            banner.warn("<html>The file <B>" + target.getName()
+                    + "</B> does not exist.</html>");
+            return;
+        }
+        try {
+            PlatformLauncher.openInDefaultApplication(target);
+        } catch (IOException ex) {
+            banner.warn("Could not open " + target.getAbsolutePath()
+                    + "\n\n" + ex.getMessage());
+        }
+    }
+
     private void nppData5ButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nppData5ButtonActionPerformed
         nppOpen(evt, fileData5.getText());
     }//GEN-LAST:event_nppData5ButtonActionPerformed
@@ -5585,6 +5643,7 @@ public class StepssUI extends javax.swing.JFrame {
             s.setText("");
         }
         fileDist.setText("");
+        fileDiagram.setText("");
     }//GEN-LAST:event_clearDataFilesActionPerformed
 
     private void loadData4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadData4ActionPerformed
@@ -7187,6 +7246,15 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton viewCurvesButton;
     private javax.swing.JLabel webpageLabel;
     // End of variables declaration//GEN-END:variables
+
+    // The one-line diagram row. Declared here and not in StepssUI.form because
+    // layoutSystemDataTab() builds the whole tab programmatically, so a form
+    // control would buy nothing and would have to be kept in step with the
+    // designer. See the heading built in layoutSystemDataTab for the same
+    // reasoning applied to a label.
+    private final javax.swing.JTextField fileDiagram = new javax.swing.JTextField();
+    private final javax.swing.JButton loadDiagram = new javax.swing.JButton("Load File");
+    private final javax.swing.JButton nppDiagramButton = new javax.swing.JButton();
 
     private boolean createCustomObsFile() {
         try {

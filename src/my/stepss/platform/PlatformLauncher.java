@@ -75,12 +75,15 @@ public final class PlatformLauncher {
         return candidate.isFile() && candidate.canExecute() ? candidate : null;
     }
 
-    /** Hands the file to the user's default editor. Replaces bundled Notepad++. */
-    public static void openInEditor(File file) throws IOException {
-        if (tryDesktop(file)) {
-            return;
-        }
-        Platform p = platformOrThrow();
+    /**
+     * The per-platform command that opens {@code file} in a TEXT editor.
+     *
+     * <p>Split out of {@link #openInEditor} so it can be checked without
+     * launching anything. Every branch here deliberately forces a text editor,
+     * which is right for the data and disturbance files it serves and wrong for
+     * anything else; see {@link #defaultApplicationCommand}.
+     */
+    public static CommandLine editorCommand(Platform p, File file) {
         CommandLine cmd;
         if (p == Platform.WINDOWS_X86_64) {
             cmd = new CommandLine("notepad.exe");
@@ -91,7 +94,62 @@ public final class PlatformLauncher {
             cmd = new CommandLine("xdg-open");
         }
         cmd.addArgument(file.getAbsolutePath(), false);
-        run(cmd, file.getParentFile(), "open an editor for " + file.getName());
+        return cmd;
+    }
+
+    /**
+     * The per-platform command that opens {@code file} in whatever application
+     * the desktop associates with its type.
+     *
+     * <p>The difference from {@link #editorCommand} is the whole reason this
+     * exists: two of that method's three branches force a text editor, so an
+     * SVG opened through it appears as XML source rather than as a drawing.
+     * Here macOS gets {@code open} without {@code -t} and Windows gets the
+     * shell's own {@code start}, so an installed SVG editor is used and a
+     * machine with none falls through to the browser, which is a viewer.
+     */
+    public static CommandLine defaultApplicationCommand(Platform p, File file) {
+        CommandLine cmd;
+        if (p == Platform.WINDOWS_X86_64) {
+            cmd = new CommandLine("cmd.exe");
+            cmd.addArgument("/c");
+            cmd.addArgument("start");
+            // start treats its first quoted argument as the window title, so a
+            // path in quotes with nothing before it opens a console instead of
+            // the file. The empty title is what stops that.
+            cmd.addArgument("\"\"", false);
+        } else if (p == Platform.MACOS_ARM64) {
+            cmd = new CommandLine("open");
+        } else {
+            cmd = new CommandLine("xdg-open");
+        }
+        cmd.addArgument(file.getAbsolutePath(), false);
+        return cmd;
+    }
+
+    /** Hands the file to the user's default editor. Replaces bundled Notepad++. */
+    public static void openInEditor(File file) throws IOException {
+        if (tryDesktop(file)) {
+            return;
+        }
+        run(editorCommand(platformOrThrow(), file), file.getParentFile(),
+                "open an editor for " + file.getName());
+    }
+
+    /**
+     * Opens {@code file} in the platform's own application for its type: an SVG
+     * editor for a drawing, falling back to a viewer.
+     *
+     * <p>Tries {@code Desktop.EDIT} first, then {@code Desktop.OPEN}, exactly as
+     * {@link #openInEditor} does, because EDIT is what reaches Inkscape for
+     * anyone who has it associated. Only the per-platform fallback differs.
+     */
+    public static void openInDefaultApplication(File file) throws IOException {
+        if (tryDesktop(file)) {
+            return;
+        }
+        run(defaultApplicationCommand(platformOrThrow(), file),
+                file.getParentFile(), "open " + file.getName());
     }
 
     /**

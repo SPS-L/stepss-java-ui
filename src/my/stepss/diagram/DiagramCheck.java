@@ -31,6 +31,8 @@ public final class DiagramCheck {
         checkUndocumentedStatusIsAnError();
         checkMissingStatusLineLeavesTheHeadlineAlone();
         checkRenderFailureIsItsOwnOutcome();
+        checkTheLauncherDoesNotForceATextEditor();
+        checkTheEditorLauncherStillForcesOne();
 
         System.out.println(failures == 0 ? "ALL DIAGRAM CHECKS PASSED"
                 : failures + " DIAGRAM CHECK(S) FAILED");
@@ -85,6 +87,33 @@ public final class DiagramCheck {
         check("a render failure names the template",
                 outcome.headline().contains("6bus.svg")
                         || outcome.detail().contains("6bus.svg"));
+    }
+
+    private static void checkTheLauncherDoesNotForceATextEditor() {
+        java.io.File svg = new java.io.File("/tmp/6bus.svg");
+        for (my.stepss.platform.Platform platform : my.stepss.platform.Platform.values()) {
+            org.apache.commons.exec.CommandLine cmd =
+                    my.stepss.platform.PlatformLauncher.defaultApplicationCommand(platform, svg);
+            String line = cmd.getExecutable() + " "
+                    + String.join(" ", cmd.getArguments());
+            // "open -t" forces TextEdit and "notepad.exe" forces Notepad, which
+            // is right for a .dat and shows an SVG as XML source.
+            check(platform + " does not force a text editor",
+                    !line.contains(" -t ") && !line.contains("notepad"));
+            check(platform + " passes the file",
+                    line.contains(svg.getAbsolutePath()));
+        }
+    }
+
+    private static void checkTheEditorLauncherStillForcesOne() {
+        // The twelve data-file buttons keep the behaviour they have. This check
+        // is what stops a future tidy-up merging the two launchers.
+        java.io.File dat = new java.io.File("/tmp/lf.dat");
+        org.apache.commons.exec.CommandLine cmd =
+                my.stepss.platform.PlatformLauncher.editorCommand(
+                        my.stepss.platform.Platform.WINDOWS_X86_64, dat);
+        check("the editor launcher still opens Notepad on Windows",
+                cmd.getExecutable().contains("notepad"));
     }
 
     private static void check(String what, boolean ok) {
