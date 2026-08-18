@@ -204,9 +204,18 @@ public final class ObservablesHarness {
         out.deleteOnExit();
         wizard.write(out);
 
-        String want = "BUS b1\nBUS b2\nIMPLOAD *\nBRANCH br1\nTWOP lk1\nDCTL *\n\n\n";
+        // Built from the platform separator rather than "\n", and compared
+        // without normalising. newLine() emits System.lineSeparator(), which is
+        // right: this file is written into the session's working directory and
+        // read back by RAMSES on the same machine, so it wants that machine's
+        // convention. Normalising the two apart would make this comparison pass
+        // whichever the writer emitted, which is the one thing a whole-file
+        // check like this looks like it is proving.
+        String nl = System.lineSeparator();
+        String want = "BUS b1" + nl + "BUS b2" + nl + "IMPLOAD *" + nl
+                + "BRANCH br1" + nl + "TWOP lk1" + nl + "DCTL *" + nl + nl + nl;
         String got = new String(Files.readAllBytes(out.toPath()),
-                StandardCharsets.UTF_8).replace("\r\n", "\n");
+                StandardCharsets.UTF_8);
         expect("the observables file", want, got);
     }
 
