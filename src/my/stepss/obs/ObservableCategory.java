@@ -2,6 +2,7 @@ package my.stepss.obs;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
@@ -101,6 +102,14 @@ public final class ObservableCategory {
     private final JCheckBox allBox = new JCheckBox("All");
 
     /**
+     * RAMSES reads an observable name into a character(len=20). A longer one is
+     * truncated without a word, which is worse than a refusal because the
+     * truncated name usually matches nothing and the observable is dropped
+     * with a warning in a log the user is not reading.
+     */
+    private static final int MAX_NAME = 20;
+
+    /**
      * Builds the row's controls rather than adopting form-generated ones.
      *
      * <p>Eight categories is 49 controls where jPanel7 carried 31, and adding
@@ -190,5 +199,79 @@ public final class ObservableCategory {
      */
     private void syncRemoveEnabled() {
         removeButton.setEnabled(list.getItemCount() > 0 && !allBox.isSelected());
+    }
+
+    /**
+     * Adds what the field holds to this row's list.
+     *
+     * @return null when it was added, or one sentence saying why it was not
+     */
+    public String add() {
+        String name = field.getText().trim();
+        if (name.isEmpty()) {
+            return "Type a name before pressing Add.";
+        }
+        if (name.length() > MAX_NAME) {
+            return "RAMSES reads observable names " + MAX_NAME
+                    + " characters wide, and \"" + name + "\" is "
+                    + name.length() + ".";
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (Character.isWhitespace(c) || c == ',') {
+                return "An observable name cannot contain a space or a comma,"
+                        + " because RAMSES reads the line one token at a time:"
+                        + " \"" + name + "\".";
+            }
+        }
+        if (names().contains(name)) {
+            return "\"" + name + "\" is already in the "
+                    + kind.label().toLowerCase(java.util.Locale.ROOT) + " list.";
+        }
+        list.addItem(name);
+        field.setText("");
+        syncRemoveEnabled();
+        return null;
+    }
+
+    /** Removes the selected name, or does nothing when none is selected. */
+    public void removeSelected() {
+        int index = list.getSelectedIndex();
+        if (index >= 0) {
+            list.removeItemAt(index);
+        }
+        syncRemoveEnabled();
+    }
+
+    /** Greys the field and list out when All makes them meaningless. */
+    public void allToggled() {
+        boolean everything = allBox.isSelected();
+        if (everything) {
+            field.setText("");
+        }
+        field.setEnabled(!everything);
+        list.setEnabled(!everything);
+        addButton.setEnabled(!everything);
+        syncRemoveEnabled();
+    }
+
+    /**
+     * Wires the three buttons.
+     *
+     * <p>The problem sink is a parameter rather than a field so the harness can
+     * collect what the user would have been told, and so this class carries no
+     * reference to the window's banner.
+     *
+     * @param onProblem told why an Add was refused, once per refusal
+     */
+    public void install(Consumer<String> onProblem) {
+        addButton.addActionListener(event -> {
+            String problem = add();
+            if (problem != null) {
+                onProblem.accept(problem);
+            }
+        });
+        removeButton.addActionListener(event -> removeSelected());
+        allBox.addActionListener(event -> allToggled());
     }
 }
