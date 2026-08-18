@@ -116,6 +116,84 @@ public final class ObservableWizard {
         }
     }
 
+    public JTextField observablesFile() {
+        return observablesFile;
+    }
+
+    public JComboBox<?> runtimeType(int row) {
+        return runtimeTypes[row];
+    }
+
+    public JTextField runtimeName(int row) {
+        return runtimeNames[row];
+    }
+
+    public JCheckBox wizardBox() {
+        return wizardBox;
+    }
+
+    public JCheckBox trajectoryBox() {
+        return trajectoryBox;
+    }
+
+    public JCheckBox continuousBox() {
+        return continuousBox;
+    }
+
+    public JCheckBox discreteBox() {
+        return discreteBox;
+    }
+
+    public JCheckBox dumpBox() {
+        return dumpBox;
+    }
+
+    /**
+     * Everything Clear clears.
+     *
+     * <p>All four recording checkboxes and all three runtime rows, including
+     * the dropdowns. The handler this replaces emptied the three name fields
+     * but left their type dropdowns set, and reset two of the four recording
+     * boxes while leaving Save Continuous trace and Save Discrete trace
+     * ticked, which is not something a button called Clear should do.
+     *
+     * <p>Showing and hiding the picker panel is not here. That stays in
+     * {@code StepssUI} with the rest of the tab's visibility, which is what
+     * lets this class be built without a frame.
+     */
+    public void reset() {
+        for (ObservableCategory category : categories) {
+            category.clear();
+        }
+        observablesFile.setText("");
+        for (int row = 0; row < RUNTIME_ROWS; row++) {
+            runtimeNames[row].setText("");
+            if (runtimeTypes[row].getItemCount() > 0) {
+                runtimeTypes[row].setSelectedIndex(0);
+            }
+        }
+        wizardBox.setSelected(false);
+        trajectoryBox.setSelected(false);
+        continuousBox.setSelected(false);
+        discreteBox.setSelected(false);
+        dumpBox.setSelected(false);
+    }
+
+    /**
+     * True when the picker would contribute nothing to a run.
+     *
+     * <p>A ticked All counts even over an empty list, because it is what asks
+     * for every member of its category.
+     */
+    public boolean isEmpty() {
+        for (ObservableCategory category : categories) {
+            if (category.isAll() || !category.names().isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static <T> T require(T control, String what) {
         if (control == null) {
             throw new IllegalArgumentException("no " + what);

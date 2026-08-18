@@ -9,6 +9,8 @@ import java.util.List;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import my.stepss.obs.ObservableCategory.Kind;
 
@@ -35,6 +37,8 @@ public final class ObservablesHarness {
         checkRemoveIsSafe();
         checkAllTogglesTheRow();
         checkTheFileItWrites();
+        checkResetThroughANestedTree();
+        checkIsEmpty();
         checkInstalledButtonsAreWired();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
@@ -217,6 +221,87 @@ public final class ObservablesHarness {
         String got = new String(Files.readAllBytes(out.toPath()),
                 StandardCharsets.UTF_8);
         expect("the observables file", want, got);
+    }
+
+    /**
+     * The acceptance case from the issue: fill every control, bury them, reset,
+     * and assert every one came back empty.
+     *
+     * <p>The nesting is the point. The handler this replaces matched nothing
+     * once the controls were reparented into exactly this arrangement, so a
+     * check against controls sitting flat on one panel would pass while being
+     * blind to the only fault that has ever occurred here.
+     */
+    private static void checkResetThroughANestedTree() {
+        ObservableWizard wizard = newWizard();
+        JPanel content = new JPanel();
+        for (ObservableCategory row : wizard.categories()) {
+            JPanel line = new JPanel();
+            line.add(row.nameLabel());
+            line.add(row.field());
+            line.add(row.addButton());
+            line.add(row.list());
+            line.add(row.removeButton());
+            line.add(row.allBox());
+            JPanel wrapper = new JPanel();
+            wrapper.add(line);
+            content.add(wrapper);
+        }
+        // The third level, and the one that broke the old walk.
+        new JScrollPane(content);
+
+        for (ObservableCategory row : wizard.categories()) {
+            row.field().setText("x1");
+            row.add();
+            row.allBox().setSelected(true);
+            row.allToggled();
+        }
+        wizard.observablesFile().setText("/tmp/obs.dat");
+        for (int row = 0; row < ObservableWizard.RUNTIME_ROWS; row++) {
+            wizard.runtimeName(row).setText("g" + row);
+            wizard.runtimeType(row).setSelectedIndex(2);
+        }
+        wizard.wizardBox().setSelected(true);
+        wizard.trajectoryBox().setSelected(true);
+        wizard.continuousBox().setSelected(true);
+        wizard.discreteBox().setSelected(true);
+        wizard.dumpBox().setSelected(true);
+
+        wizard.reset();
+
+        for (ObservableCategory row : wizard.categories()) {
+            expect(row.kind() + " field", "", row.field().getText());
+            expect(row.kind() + " list", 0, row.list().getItemCount());
+            expect(row.kind() + " all", false, row.allBox().isSelected());
+            expect(row.kind() + " field enabled", true, row.field().isEnabled());
+            expect(row.kind() + " list enabled", true, row.list().isEnabled());
+        }
+        expect("observables path", "", wizard.observablesFile().getText());
+        for (int row = 0; row < ObservableWizard.RUNTIME_ROWS; row++) {
+            expect("runtime name " + row, "", wizard.runtimeName(row).getText());
+            expect("runtime type " + row, 0,
+                    wizard.runtimeType(row).getSelectedIndex());
+        }
+        expect("wizard box", false, wizard.wizardBox().isSelected());
+        expect("trajectory box", false, wizard.trajectoryBox().isSelected());
+        expect("continuous box", false, wizard.continuousBox().isSelected());
+        expect("discrete box", false, wizard.discreteBox().isSelected());
+        expect("dump box", false, wizard.dumpBox().isSelected());
+        expect("empty after reset", true, wizard.isEmpty());
+    }
+
+    /** A ticked All contributes to a run even with an empty list. */
+    private static void checkIsEmpty() {
+        ObservableWizard wizard = newWizard();
+        expect("a fresh wizard is empty", true, wizard.isEmpty());
+
+        wizard.categories().get(0).field().setText("b1");
+        wizard.categories().get(0).add();
+        expect("a named observable is not empty", false, wizard.isEmpty());
+
+        wizard.reset();
+        wizard.categories().get(7).allBox().setSelected(true);
+        expect("a ticked All is not empty", false, wizard.isEmpty());
     }
 
     /** A wizard over throwaway controls, with no frame anywhere near it. */
