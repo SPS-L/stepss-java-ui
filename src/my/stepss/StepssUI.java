@@ -5813,17 +5813,6 @@ public class StepssUI extends javax.swing.JFrame {
     }//GEN-LAST:event_runPFActionPerformed
 
     /**
-     * Matches helios' machine-readable status line, written once to stderr on
-     * every non-interactive run:
-     * {@code helios: status: CONVERGED (2 iterations)} or
-     * {@code helios: status: NOT_CONVERGED (max iterations)}. Group 1 is the
-     * token ({@code CONVERGED}/{@code NOT_CONVERGED}/{@code NOT_RUN}), group 2
-     * the optional parenthesised detail. See
-     * ../stepss-helios/docs/tui-guide.md#exit-status.
-     */
-    private static final Pattern HELIOS_STATUS_LINE = Pattern.compile("helios: status: (\\S+)(?: \\(([^)]*)\\))?");
-
-    /**
      * Reports the outcome of the helios run started by
      * {@link #runPFActionPerformed} per its normative exit-status contract
      * (../stepss-helios/README.md, docs/tui-guide.md#exit-status,
@@ -5924,50 +5913,28 @@ public class StepssUI extends javax.swing.JFrame {
      * {@code helios: status: ...} line
      * @return the dialog to show, or {@code null} for exit 0 (converged:
      * show nothing, exactly as before this contract existed)
+     *
+     * <p>The decision itself lives in {@link HeliosOutcome}, because the
+     * diagram window's banner has to say the same thing and two copies would
+     * agree only until one of them was edited. This method is now the dialog
+     * rendering of that decision, and keeps its signature and its contract.
      */
     static HeliosStatusDialog describeHeliosExit(int exitValue, String heliosStderrText) {
-        if (exitValue == 0) {
+        HeliosOutcome outcome = HeliosOutcome.of(exitValue, heliosStderrText);
+        if (outcome.severity() == HeliosOutcome.Severity.OK) {
             return null;
         }
-
-        // The "helios: status: TOKEN (detail)" line, when present, distinguishes
-        // *why* a non-converged run failed (max iterations, divergence, singular
-        // Jacobian). It is not required: the pinned v1.2.0 binary never writes it.
-        String statusDetail = null;
-        Matcher statusMatcher = HELIOS_STATUS_LINE.matcher(heliosStderrText);
-        if (statusMatcher.find()) {
-            statusDetail = statusMatcher.group(2);
-        }
-        final String detailSuffix = (statusDetail == null || statusDetail.isEmpty()) ? "" : " (" + statusDetail + ")";
-
-        switch (exitValue) {
-            case 2:
-                return new HeliosStatusDialog(
-                        "Power Flow Did NOT Converge!",
-                        "<html><body style='width: 350px'>"
-                        + "<b><font color='red'>The power flow did NOT converge" + detailSuffix + ".</font></b>"
-                        + "<br><br>helios still produced and exported result files, and the "
-                        + "buttons below now show them, but <b>they are NOT a valid "
-                        + "power-flow solution.</b> Do not use the displayed values."
-                        + "</body></html>",
-                        JOptionPane.WARNING_MESSAGE);
-            case 1:
-                return new HeliosStatusDialog(
-                        "Helios Could Not Process The Input!",
-                        "<html><body style='width: 350px'>"
-                        + "helios reported an input or usage error and stopped early"
-                        + detailSuffix + ". <b>There may be no results at all.</b>"
-                        + "</body></html>",
-                        JOptionPane.ERROR_MESSAGE);
-            default:
-                return new HeliosStatusDialog(
-                        "Helios Exited Abnormally!",
-                        "<html><body style='width: 350px'>"
-                        + "helios exited with status " + exitValue + ", which is not a "
-                        + "documented outcome. Treat any displayed results with suspicion."
-                        + "</body></html>",
-                        JOptionPane.ERROR_MESSAGE);
-        }
+        boolean warning = outcome.severity() == HeliosOutcome.Severity.WARNING;
+        String title = warning ? "Power Flow Did NOT Converge!"
+                : (exitValue == 1 ? "Helios Could Not Process The Input!"
+                        : "Helios Exited Abnormally!");
+        return new HeliosStatusDialog(title,
+                "<html><body style='width: 350px'>"
+                + (warning ? "<b><font color='red'>" + escapeHtml(outcome.headline())
+                        + "</font></b>" : escapeHtml(outcome.headline()))
+                + "<br><br>" + escapeHtml(outcome.detail())
+                + "</body></html>",
+                warning ? JOptionPane.WARNING_MESSAGE : JOptionPane.ERROR_MESSAGE);
     }
 
     // This and the four below it, loadFlows, loadGens, loadTrfos and loadPow,
