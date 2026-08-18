@@ -5908,16 +5908,16 @@ public class StepssUI extends javax.swing.JFrame {
      * no Swing state, so it is exercised directly by tests without needing a
      * live GUI. Package-visible for that reason.
      *
+     * <p>The decision itself lives in {@link HeliosOutcome}, because the
+     * diagram window's banner has to say the same thing and two copies would
+     * agree only until one of them was edited. This method is now the dialog
+     * rendering of that decision, and keeps its signature and its contract.
+     *
      * @param exitValue the process exit value ({@link DefaultExecuteResultHandler#getExitValue()})
      * @param heliosStderrText the run's captured stderr, searched for the
      * {@code helios: status: ...} line
      * @return the dialog to show, or {@code null} for exit 0 (converged:
      * show nothing, exactly as before this contract existed)
-     *
-     * <p>The decision itself lives in {@link HeliosOutcome}, because the
-     * diagram window's banner has to say the same thing and two copies would
-     * agree only until one of them was edited. This method is now the dialog
-     * rendering of that decision, and keeps its signature and its contract.
      */
     static HeliosStatusDialog describeHeliosExit(int exitValue, String heliosStderrText) {
         HeliosOutcome outcome = HeliosOutcome.of(exitValue, heliosStderrText);
@@ -5928,11 +5928,20 @@ public class StepssUI extends javax.swing.JFrame {
         String title = warning ? "Power Flow Did NOT Converge!"
                 : (exitValue == 1 ? "Helios Could Not Process The Input!"
                         : "Helios Exited Abnormally!");
+        // HeliosOutcome states what is true of the run; what is true only of
+        // this dialog's own surface belongs here instead. The buttons below
+        // the console are a fact about this window, not about helios, and
+        // would be false on the diagram window's banner that renders the
+        // same outcome with no such buttons.
+        String detail = outcome.detail();
+        if (exitValue == 2) {
+            detail += " The buttons below the console show them anyway.";
+        }
         return new HeliosStatusDialog(title,
                 "<html><body style='width: 350px'>"
                 + (warning ? "<b><font color='red'>" + escapeHtml(outcome.headline())
                         + "</font></b>" : escapeHtml(outcome.headline()))
-                + "<br><br>" + escapeHtml(outcome.detail())
+                + "<br><br>" + escapeHtml(detail)
                 + "</body></html>",
                 warning ? JOptionPane.WARNING_MESSAGE : JOptionPane.ERROR_MESSAGE);
     }
