@@ -113,9 +113,10 @@ Then, in the GUI:
 
 1. Load the **System data** files (`.dat`) in the *System Data* tab
 2. Load the **Disturbance file** (`.dst`)
-3. Select observables to record (*Observables* tab or the Observable dialog)
-4. Run the simulation from the *Dynamic Simulation* tab
-5. Plot results with **Extract Curves** (DYNGRAPH) or watch the real-time gnuplot curves
+3. Optionally, name a **one-line diagram** template (`.svg`) in the same *System Data* tab: it carries placeholder codes, and every **Run Power Flow** fills them in with the solved values and opens the result in a window of its own (placeholder table in the [user guide](https://stepss.sps-lab.org/user-guide/power-flow/))
+4. Select observables to record (*Observables* tab or the Observable dialog)
+5. Run the simulation from the *Dynamic Simulation* tab
+6. Plot results with **Extract Curves** (DYNGRAPH) or watch the real-time gnuplot curves
 
 ## Bundled tools
 
