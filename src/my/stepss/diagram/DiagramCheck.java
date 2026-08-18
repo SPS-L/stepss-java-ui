@@ -41,6 +41,14 @@ public final class DiagramCheck {
         checkAMalformedSvgRaises();
         checkExternalResourcesAreRefused();
         checkAnUnknownElementDoesNotLoseTheDocument();
+        checkFitShowsTheWholeDocument();
+        checkTheAoiKeepsTheViewportAspect();
+        checkZoomShrinksTheAoi();
+        checkZoomIsAnchoredAtThePointer();
+        checkPanMovesTheAoiByTheDeviceDelta();
+        checkZoomIsClamped();
+        checkPanIsClamped();
+        checkFitComesBack();
 
         System.out.println(failures == 0 ? "ALL DIAGRAM CHECKS PASSED"
                 : failures + " DIAGRAM CHECK(S) FAILED");
@@ -288,6 +296,88 @@ public final class DiagramCheck {
                 rendered.getWidth() == 400);
         check("and the rest of the drawing still draws",
                 inkedPixels(rendered) > 0);
+    }
+
+    private static DiagramView view() {
+        DiagramView v = new DiagramView(new java.awt.geom.Rectangle2D.Double(0, 0, 200, 100));
+        v.setViewport(400, 200);
+        return v;
+    }
+
+    private static void checkFitShowsTheWholeDocument() {
+        java.awt.geom.Rectangle2D aoi = view().aoi();
+        check("fit spans the document width", Math.abs(aoi.getWidth() - 200) < 0.01);
+        check("fit spans the document height", Math.abs(aoi.getHeight() - 100) < 0.01);
+        check("fit starts at the origin",
+                Math.abs(aoi.getX()) < 0.01 && Math.abs(aoi.getY()) < 0.01);
+    }
+
+    private static void checkTheAoiKeepsTheViewportAspect() {
+        DiagramView v = new DiagramView(new java.awt.geom.Rectangle2D.Double(0, 0, 200, 100));
+        v.setViewport(400, 400);
+        java.awt.geom.Rectangle2D aoi = v.aoi();
+        check("a square viewport gets a square area of interest",
+                Math.abs(aoi.getWidth() - aoi.getHeight()) < 0.01);
+        check("and the document still fits inside it",
+                aoi.getWidth() >= 200 - 0.01 && aoi.getHeight() >= 100 - 0.01);
+    }
+
+    private static void checkZoomShrinksTheAoi() {
+        DiagramView v = view();
+        v.zoomAt(2.0, 200, 100);
+        check("zooming doubles the magnification", Math.abs(v.zoom() - 2.0) < 0.01);
+        check("which halves the area of interest",
+                Math.abs(v.aoi().getWidth() - 100) < 0.01);
+    }
+
+    private static void checkZoomIsAnchoredAtThePointer() {
+        DiagramView v = view();
+        // The document point under the top-left corner of the viewport.
+        double beforeX = v.aoi().getX();
+        double beforeY = v.aoi().getY();
+        v.zoomAt(2.0, 0, 0);
+        check("zooming at the top-left leaves that point where it was",
+                Math.abs(v.aoi().getX() - beforeX) < 0.01
+                        && Math.abs(v.aoi().getY() - beforeY) < 0.01);
+    }
+
+    private static void checkPanMovesTheAoiByTheDeviceDelta() {
+        DiagramView v = view();
+        v.setZoom(2.0);
+        double beforeX = v.aoi().getX();
+        // At zoom 2 the viewport is 400 px across showing 100 user units, so
+        // one user unit is four pixels and dragging 40 px moves 10 units.
+        v.panBy(-40, 0);
+        check("panning moves the area of interest by the scaled delta",
+                Math.abs((v.aoi().getX() - beforeX) - 10.0) < 0.01);
+    }
+
+    private static void checkZoomIsClamped() {
+        DiagramView v = view();
+        v.setZoom(10000.0);
+        check("zoom is clamped at the top", v.zoom() <= 50.0 + 0.01);
+        v.setZoom(0.0001);
+        check("zoom is clamped at the bottom", v.zoom() >= 0.05 - 0.001);
+    }
+
+    private static void checkPanIsClamped() {
+        DiagramView v = view();
+        v.setZoom(4.0);
+        v.panBy(-100000, -100000);
+        check("the document cannot be pushed off to the left",
+                v.aoi().intersects(new java.awt.geom.Rectangle2D.Double(0, 0, 200, 100)));
+        v.panBy(200000, 200000);
+        check("or off to the right",
+                v.aoi().intersects(new java.awt.geom.Rectangle2D.Double(0, 0, 200, 100)));
+    }
+
+    private static void checkFitComesBack() {
+        DiagramView v = view();
+        v.setZoom(20.0);
+        v.panBy(-300, -300);
+        v.fit();
+        check("fit returns to the whole document", Math.abs(v.zoom() - 1.0) < 0.01);
+        check("and to the origin", Math.abs(v.aoi().getX()) < 0.01);
     }
 
     private static void check(String what, boolean ok) {
