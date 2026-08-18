@@ -36,6 +36,7 @@ public final class DiagramCheck {
         checkTheDiagramCommandBlock();
         checkHeliosDiagramLinesReachTheConsole();
         checkASvgRendersAtAll();
+        checkCopyToSavesTheOriginalBytes();
         checkZoomCostsNothingExtra();
         checkPanMovesTheRegion();
         checkAMalformedSvgRaises();
@@ -210,6 +211,38 @@ public final class DiagramCheck {
                 rendered.getWidth() == 400);
         check("it renders at the document's aspect ratio", rendered.getHeight() == 200);
         check("something was drawn", inkedPixels(rendered) > 0);
+    }
+
+    /**
+     * The regression guard for the Save-as-SVG data-loss bug: {@code copyTo}
+     * must write back what was loaded, not whatever now sits at the path it
+     * was loaded from.
+     *
+     * <p>The source path for a real run is {@code myTempDir/in_diagram.svg},
+     * which the very next Run Power Flow deletes and rewrites while an older
+     * window showing the first run's diagram is still open. A {@code copyTo}
+     * that re-read that path at save time would silently hand the user the
+     * second run's diagram under the belief it was the first's, with no error
+     * to say so. This overwrites the file on disk after loading and asserts
+     * {@code copyTo} still produces the bytes read at load time.
+     */
+    private static void checkCopyToSavesTheOriginalBytes() throws Exception {
+        java.io.File file = writeTestSvg(TEST_SVG);
+        SvgImage image = SvgImage.load(file);
+
+        String overwritten = TEST_SVG.replace("black", "red");
+        java.nio.file.Files.write(file.toPath(),
+                overwritten.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        java.io.File target = java.io.File.createTempFile("stepss-diagram-copy", ".svg");
+        target.deleteOnExit();
+        image.copyTo(target);
+
+        String saved = new String(java.nio.file.Files.readAllBytes(target.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8);
+        check("copyTo saves the run the window was opened for", saved.equals(TEST_SVG));
+        check("not whatever overwrote the source path meanwhile",
+                !saved.equals(overwritten));
     }
 
     /** Zoom is a smaller AOI at the same pixel size, not a bigger image. */

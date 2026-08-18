@@ -2,10 +2,10 @@ package my.stepss.diagram;
 
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import org.apache.batik.anim.dom.SAXSVGDocumentFactory;
 import org.apache.batik.anim.dom.SVGDOMImplementation;
 import org.apache.batik.dom.AbstractDocument;
@@ -47,27 +47,57 @@ public final class SvgImage {
 
     private final SVGDocument document;
     private final File source;
+    private final byte[] bytes;
     private final Rectangle2D bounds;
 
-    private SvgImage(SVGDocument document, File source, Rectangle2D bounds) {
+    private SvgImage(SVGDocument document, File source, byte[] bytes, Rectangle2D bounds) {
         this.document = document;
         this.source = source;
+        this.bytes = bytes;
         this.bounds = bounds;
     }
 
     /**
      * Parses {@code file}.
      *
+     * <p>The file's bytes are read once, here, and kept in {@link #bytes} for
+     * {@link #copyTo} to write back verbatim. The document is then parsed from
+     * that same byte array rather than re-read from {@code file}, so nothing
+     * downstream of this call ever touches the path again. The window showing
+     * a run's diagram is meant to keep showing that run's diagram even after
+     * the next Run Power Flow deletes and rewrites {@code in_diagram.svg}
+     * underneath it: {@link #render} already honoured that, by working from
+     * the parsed document, but a {@code copyTo} that re-read {@code source}
+     * did not, and Save as SVG on an older, still-open window could silently
+     * save whichever run happened to be on disk at the moment the button was
+     * pressed, not the run the window was opened for. Holding the bytes costs
+     * nothing worth worrying about: the bundled 6-bus example is 35 KB, and
+     * the parsed DOM this class already keeps dwarfs the source bytes for any
+     * document that fits on screen.
+     *
      * @throws IOException if it cannot be read or is not SVG. Raising is the
      * point: a renderer that answered a malformed file with a blank image would
      * put an empty window on screen with nothing saying why.
      */
     public static SvgImage load(File file) throws IOException {
+        byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(file.toPath());
+        } catch (IOException ex) {
+            throw new IOException("Could not read " + file.getName()
+                    + " as an SVG file: " + ex.getMessage(), ex);
+        }
         String parser = XMLResourceDescriptor.getXMLParserClassName();
         SAXSVGDocumentFactory factory = lenientFactory(parser);
         SVGDocument document;
         try {
-            document = (SVGDocument) factory.createDocument(file.toURI().toString());
+            // The URI is passed alongside the stream purely so any relative
+            // resolution inside the document (there should be none; see
+            // checkExternalResourcesAreRefused) behaves exactly as it did when
+            // this parsed straight from the file. The bytes actually parsed
+            // come from the array above, not from re-reading that URI.
+            document = (SVGDocument) factory.createDocument(file.toURI().toString(),
+                    new ByteArrayInputStream(bytes));
         } catch (IOException ex) {
             throw new IOException("Could not read " + file.getName()
                     + " as an SVG file: " + ex.getMessage(), ex);
@@ -77,7 +107,7 @@ public final class SvgImage {
             throw new IOException(file.getName() + " is not a readable SVG file: "
                     + ex.getMessage(), ex);
         }
-        return new SvgImage(document, file, readBounds(document, file));
+        return new SvgImage(document, file, bytes, readBounds(document, file));
     }
 
     /**
@@ -228,9 +258,23 @@ public final class SvgImage {
         return render(documentBounds(), width, Math.max(1, height));
     }
 
-    /** Copies the SVG this was loaded from to {@code dest}, for Save as SVG. */
+    /**
+     * Writes the bytes this was loaded from to {@code dest}, for Save as SVG.
+     *
+     * <p>Writes the held {@link #bytes}, not a fresh read of {@link #source}.
+     * {@code source} is {@code myTempDir/in_diagram.svg} for a normal run,
+     * which the very next Run Power Flow deletes and rewrites; a live
+     * {@code Files.copy(source.toPath(), ...)} here would let a later run
+     * silently overwrite what an older, still-open window saves under the
+     * belief it is its own diagram, or fail outright if the later run is
+     * still in flight when the button is pressed. The bytes are exactly what
+     * was on disk at {@link #load}, byte for byte, which is what a saved
+     * figure needs to be: {@link #document} is not re-serialised here, because
+     * Batik would reformat it and the result would no longer match the file
+     * Helios actually wrote.
+     */
     public void copyTo(File dest) throws IOException {
-        Files.copy(source.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        Files.write(dest.toPath(), bytes);
     }
 
     /**
