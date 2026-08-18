@@ -18,8 +18,6 @@ public class fileOps {
 
     public static boolean deleteDirectory(File directory) {
 
-        // System.out.println("removeDirectory " + directory);
-
         if (directory == null) {
             return false;
         }
@@ -37,8 +35,6 @@ public class fileOps {
         if (list != null) {
             for (int i = 0; i < list.length; i++) {
                 File entry = new File(directory, list[i]);
-
-                //        System.out.println("\tremoving entry " + entry);
 
                 if (entry.isDirectory()) {
                     if (!deleteDirectory(entry)) {

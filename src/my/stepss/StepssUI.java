@@ -18,6 +18,8 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Rectangle;
 import java.awt.SplashScreen;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.KeyEvent;
 import java.io.*;
 import java.nio.file.Files;
@@ -187,6 +189,12 @@ public class StepssUI extends javax.swing.JFrame {
                     "Could not " + description + ".\n\n" + cause.getMessage(),
                     "Launch failed", JOptionPane.ERROR_MESSAGE));
         });
+        // The same arrangement for URLs, which get their own dialog because
+        // the address is the one thing the user still needs when no browser
+        // could be reached, and a JOptionPane message cannot be copied.
+        PlatformLauncher.setUrlFailureListener((url, cause) -> {
+            SwingUtilities.invokeLater(() -> showUrlFailure(url, cause));
+        });
         this_version = getVersion();
         versionLabel.setText("<html><b>Version:</b> " + this_version + "</html>");
         prefs = preferences();
@@ -202,16 +210,6 @@ public class StepssUI extends javax.swing.JFrame {
             // this one as the first.
             prefs.putBoolean(FIRST_RUN, false);
         }
-
-//        KeyStroke ctrlGKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_G,InputEvent.CTRL_DOWN_MASK);
-//        jPanel1.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(ctrlGKeyStroke, "KILLGP");
-//        jPanel1.getActionMap().put("KILLGP", new AbstractAction() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                System.out.println("Killing Gnuplot");
-//                clearGnuplotButtonActionPerformed(e);
-//            }
-//        });
 
         ToolTipManager.sharedInstance().setDismissDelay(6000000);
         ToolTipManager.sharedInstance().setEnabled(false);
@@ -244,8 +242,7 @@ public class StepssUI extends javax.swing.JFrame {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        if (initRamses()) {
-        } else {
+        if (!initRamses()) {
             // initRamses() already showed a dialog naming the specific tool
             // and path that failed; a second, generic dialog here would just
             // repeat the failure without adding information.
@@ -3390,7 +3387,7 @@ public class StepssUI extends javax.swing.JFrame {
         ExamplesDialog.Choice choice = ExamplesDialog.show(this, examples,
                 Branding.logo(dark),
                 preferences().getBoolean(SHOW_EXAMPLES_KEY, true),
-                BareBonesBrowserLaunch::openURL);
+                PlatformLauncher::openUrl);
 
         rememberExamplesAtStartup(choice.showAtStartup());
         if (choice.example() != null) {
@@ -3773,7 +3770,7 @@ public class StepssUI extends javax.swing.JFrame {
         // notes composed by tools/ci/release.py are this repo's changelog, and
         // they embed each bumped component's upstream notes, so the RAMSES
         // history the old file carried is still reachable from here.
-        BareBonesBrowserLaunch.openURL(RELEASES_URL);
+        PlatformLauncher.openUrl(RELEASES_URL);
     }//GEN-LAST:event_showChangeLogButtonActionPerformed
 
     /**
@@ -3798,12 +3795,54 @@ public class StepssUI extends javax.swing.JFrame {
         int choice = JOptionPane.showOptionDialog(this, message, "Update Manager",
                 JOptionPane.DEFAULT_OPTION, messageType, null, options, options[0]);
         if (choice == 0) {
-            BareBonesBrowserLaunch.openURL(releaseUrl);
+            PlatformLauncher.openUrl(releaseUrl);
+        }
+    }
+
+    /**
+     * Reports a URL that no browser could be reached for, and hands the
+     * address back to the user.
+     *
+     * <p>A plain message dialog is not enough. JOptionPane draws its message
+     * through a JLabel, so the one thing the user needs here - the address, to
+     * paste somewhere themselves - would be the one thing they cannot select.
+     * The read-only text field can be, and the Copy button spares them having
+     * to. Both beat the previous behaviour, which was for the menu item to do
+     * nothing at all and say nothing about why.
+     *
+     * <p>{@code cause} is shown as well rather than logged: the failure that
+     * matters happens on machines whose owner never sees a console, which is
+     * how a Windows report of "the page does not open" reached us with nothing
+     * to go on (issue #18).
+     *
+     * @param url   the address that could not be opened
+     * @param cause what the last attempt failed with; may be null
+     */
+    private void showUrlFailure(String url, Throwable cause) {
+        JTextField address = new JTextField(url);
+        address.setEditable(false);
+        address.setCaretPosition(0);
+
+        java.util.List<Object> message = new ArrayList<>();
+        message.add("STEPSS could not open a browser for this address:");
+        message.add(address);
+        if (cause != null && cause.getMessage() != null) {
+            message.add(" ");
+            message.add(cause.getMessage());
+        }
+
+        Object[] options = {"Copy address", "Close"};
+        int choice = JOptionPane.showOptionDialog(this, message.toArray(),
+                "Could not open the page", JOptionPane.DEFAULT_OPTION,
+                JOptionPane.ERROR_MESSAGE, null, options, options[0]);
+        if (choice == 0) {
+            Toolkit.getDefaultToolkit().getSystemClipboard()
+                    .setContents(new StringSelection(url), null);
         }
     }
 
     private void showUserGuideButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showUserGuideButtonActionPerformed
-        BareBonesBrowserLaunch.openURL("https://stepss.sps-lab.org/");
+        PlatformLauncher.openUrl("https://stepss.sps-lab.org/");
     }//GEN-LAST:event_showUserGuideButtonActionPerformed
 
     private void selWorkDirButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_selWorkDirButtonActionPerformed
@@ -3820,8 +3859,7 @@ public class StepssUI extends javax.swing.JFrame {
             if (!selWorkDir.isDirectory()) {
                 selWorkDir.getParentFile();
             }
-            if (initRamses()) {
-            } else {
+            if (!initRamses()) {
                 // initRamses() already showed a dialog naming the specific
                 // tool and path that failed; a second, generic dialog here
                 // would just repeat the failure without adding information.
@@ -3932,7 +3970,7 @@ public class StepssUI extends javax.swing.JFrame {
             final String published = Version.fromReleaseUrl(location);
             SwingUtilities.invokeLater(() -> {
                 banner.notice(notice, "Open release page",
-                        () -> BareBonesBrowserLaunch.openURL(location));
+                        () -> PlatformLauncher.openUrl(location));
                 // The banner clears on the user's next click, so the About box
                 // keeps the fact after it has gone.
                 versionLabel.setText("<html><b>Version:</b> " + this_version
@@ -3964,7 +4002,7 @@ public class StepssUI extends javax.swing.JFrame {
 
     private void webpageLabelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_webpageLabelMouseClicked
         String url = "https://stepss.sps-lab.org";
-        BareBonesBrowserLaunch.openURL(url);
+        PlatformLauncher.openUrl(url);
     }//GEN-LAST:event_webpageLabelMouseClicked
 
     private void showApacheLicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showApacheLicenseButtonActionPerformed
@@ -4476,10 +4514,6 @@ public class StepssUI extends javax.swing.JFrame {
     private void viewCurvesButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_viewCurvesButtonActionPerformed
         try {
             if (gnuplotExec != null && gnuplotExec.exists()) {
-                //                String command = gnuplotExec.getAbsolutePath() + " -persist " + myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut.plt";
-                //                Runtime rt = Runtime.getRuntime();
-                //                rt.exec(command);
-                //                Process p = new ProcessBuilder(command).start();
                 CommandLine command = new CommandLine(gnuplotExec.getAbsolutePath());
                 command.addArgument("-persist");
                 command.addArgument(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut.plt");
@@ -4927,8 +4961,6 @@ public class StepssUI extends javax.swing.JFrame {
             return;
         }
         CommandLine command;
-
-        //        simulationOutput.setText("");
         loadOutputActionPerformed(evt);
         savedOutputBool = false;
 
@@ -5346,8 +5378,6 @@ public class StepssUI extends javax.swing.JFrame {
             return;
         }
         CommandLine command;
-
-        //        simulationOutput.setText("");
         fileData10.setText("");
 
         // No loadOutputActionPerformed / savedOutputBool here. That pair was
