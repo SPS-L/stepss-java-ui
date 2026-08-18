@@ -5854,6 +5854,7 @@ public class StepssUI extends javax.swing.JFrame {
         // own export produces fresh files.
         clearPFCOutputActionPerformed(evt);
         deletePFCResultFiles();
+        powerFlowRun++;
 
         // helios prints its banner only on the interactive path, so a -t run
         // opens the console on whatever the first data file has to say. Put it
@@ -5902,6 +5903,10 @@ public class StepssUI extends javax.swing.JFrame {
         // invocation started, even if the shared simulExecutorResultHandler
         // field is reassigned by another action before the thread wakes up.
         final DefaultExecuteResultHandler resultHandler = simulExecutorResultHandler;
+        // Read on the EDT and captured, so the completion thread reports on the
+        // run this invocation started even if the field is edited meanwhile.
+        final String diagramTemplate = fileDiagram.getText();
+        final int runNumber = powerFlowRun;
         try {
             simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
             statusBar.running("Solving power flow");
@@ -5951,6 +5956,7 @@ public class StepssUI extends javax.swing.JFrame {
                 }
 
                 reportHeliosExitStatus(resultHandler, heliosStderr, heliosStdout);
+                showDiagram(diagramTemplate, runNumber, resultHandler, heliosStderr);
             }
         }).start();
         clearPFCOutput.setEnabled(true);
@@ -6025,6 +6031,61 @@ public class StepssUI extends javax.swing.JFrame {
             return;
         }
         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, dialog.message, dialog.title, dialog.messageType));
+    }
+
+    /**
+     * Opens the run's one-line diagram, if the case has one.
+     *
+     * <p>Every run gets its own window, converged or not. A run that failed
+     * still shows the template, because a diagram the user can see the shape of
+     * is easier to reason about than an error message on its own, and the
+     * banner says plainly that the numbers are not there.
+     *
+     * <p>Called off the EDT, from the completion thread, so the window is
+     * opened through invokeLater, as every dialog on this path is.
+     *
+     * @param templatePath the diagram slot's contents, captured when the run
+     * started
+     * @param runNumber which run of this session this is, for the title
+     */
+    private void showDiagram(String templatePath, int runNumber,
+            DefaultExecuteResultHandler resultHandler,
+            ByteArrayOutputStream heliosStderr) {
+        if (templatePath.isEmpty()) {
+            return;
+        }
+        final File template = new File(templatePath);
+        final File annotated = new File(myTempDir, DIAGRAM_OUTPUT);
+        final boolean drawn = annotated.isFile();
+
+        HeliosOutcome exitOutcome = resultHandler.hasResult()
+                ? HeliosOutcome.of(resultHandler.getExitValue(), heliosStderr.toString())
+                : HeliosOutcome.of(1, "");
+        // A converged run that still drew nothing is not an exit status: Helios'
+        // 1 command catches its own exceptions and leaves the run successful,
+        // so the missing file is the only signal there is.
+        final HeliosOutcome outcome
+                = (!drawn && exitOutcome.severity() == HeliosOutcome.Severity.OK)
+                ? HeliosOutcome.renderFailed(template.getName())
+                : exitOutcome;
+        final File toShow = drawn ? annotated : template;
+
+        if (!toShow.isFile()) {
+            banner.warn("The one-line diagram " + template.getName()
+                    + " could not be found, so no diagram was shown.");
+            return;
+        }
+        SwingUtilities.invokeLater(() -> {
+            try {
+                my.stepss.diagram.DiagramWindow.open(this, toShow,
+                        template.getName(), runNumber, outcome);
+            } catch (IOException ex) {
+                Logger.getLogger(StepssUI.class.getName())
+                        .log(Level.WARNING, "The diagram could not be opened", ex);
+                banner.warn("The one-line diagram could not be opened.\n\n"
+                        + ex.getMessage());
+            }
+        });
     }
 
     /**
@@ -7137,6 +7198,8 @@ public class StepssUI extends javax.swing.JFrame {
     private double engineVersion = Double.NaN;
     private DefaultExecutor simulExecutor;
     private DefaultExecuteResultHandler simulExecutorResultHandler;
+    /** How many power flows this session has run, for the diagram window titles. */
+    private int powerFlowRun;
     private int highlighterIndex;
     private Highlighter highlighter;
     private int highlighterLen;
