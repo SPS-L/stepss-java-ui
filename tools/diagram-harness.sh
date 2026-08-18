@@ -11,6 +11,12 @@
 # call PlatformLauncher.editorCommand/defaultApplicationCommand, whose return
 # type is org.apache.commons.exec.CommandLine, so the class cannot even load
 # without it, though nothing here launches a process.
+#
+# lib/commons-io joined it once checkTheDiagramCommandBlock started calling
+# StepssUI.diagramCommands: loading any class verifies every method's bytecode,
+# and StepssUI imports org.apache.commons.io.output.TeeOutputStream (among
+# others) in a method the check never calls, so the class fails to load
+# without that jar even though nothing here tees a stream.
 set -eu
 cd "$(dirname "$0")/.."
 if [ ! -d build/classes ]; then
@@ -18,5 +24,5 @@ if [ ! -d build/classes ]; then
     exit 1
 fi
 exec java -Djava.awt.headless=true \
-     -cp "build/classes:lib/batik-all-1.19.jar:lib/xmlgraphics-commons-2.11.jar:lib/xml-apis-ext-1.3.04.jar:lib/commons-exec-1.3.jar" \
+     -cp "build/classes:lib/batik-all-1.19.jar:lib/xmlgraphics-commons-2.11.jar:lib/xml-apis-ext-1.3.04.jar:lib/commons-exec-1.3.jar:lib/commons-io-2.11.0.jar" \
      my.stepss.diagram.DiagramCheck

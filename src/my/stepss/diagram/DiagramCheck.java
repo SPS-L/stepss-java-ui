@@ -33,6 +33,8 @@ public final class DiagramCheck {
         checkRenderFailureIsItsOwnOutcome();
         checkTheLauncherDoesNotForceATextEditor();
         checkTheEditorLauncherStillForcesOne();
+        checkTheDiagramCommandBlock();
+        checkHeliosDiagramLinesReachTheConsole();
 
         System.out.println(failures == 0 ? "ALL DIAGRAM CHECKS PASSED"
                 : failures + " DIAGRAM CHECK(S) FAILED");
@@ -114,6 +116,34 @@ public final class DiagramCheck {
                         my.stepss.platform.Platform.WINDOWS_X86_64, dat);
         check("the editor launcher still opens Notepad on Windows",
                 cmd.getExecutable().contains("notepad"));
+    }
+
+    private static void checkTheDiagramCommandBlock() {
+        String block = my.stepss.StepssUI.diagramCommands("/case/6bus.svg", "in_diagram.svg");
+        check("the block starts with the main-menu command",
+                block.startsWith("1\n"));
+        check("the block names the template",
+                block.contains("\n/case/6bus.svg\n"));
+        check("the block names the output",
+                block.endsWith("in_diagram.svg\n"));
+        check("the block is exactly three lines",
+                block.split("\n", -1).length == 4);
+    }
+
+    private static void checkHeliosDiagramLinesReachTheConsole() {
+        // cmd_diagram writes all of these to stdout, which HeliosLog filters
+        // against a fixed prefix list. Without them a failed render is silent.
+        String[] lines = {
+            "Open in_diagram.svg in your browser",
+            "This file does not exist !",
+            "output file must be different from input file !",
+            "DiagramRenderer: cannot open template: /case/6bus.svg"
+        };
+        for (String line : lines) {
+            check("the console keeps: " + line, my.stepss.HeliosLog.isProgressLine(line));
+        }
+        check("a table row is still dropped",
+                !my.stepss.HeliosLog.isProgressLine("  A      6.000   1.0210    0.00"));
     }
 
     private static void check(String what, boolean ok) {

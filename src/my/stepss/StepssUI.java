@@ -3284,6 +3284,59 @@ public class StepssUI extends javax.swing.JFrame {
     }
 
     /**
+     * Where Helios' {@code 1} command writes the annotated diagram.
+     *
+     * <p>A bare name, so it lands in the run's working directory, which
+     * {@code simulExecutor.setWorkingDirectory(myTempDir)} has already set.
+     */
+    static final String DIAGRAM_OUTPUT = "in_diagram.svg";
+
+    /**
+     * The three command-file lines that render one template.
+     *
+     * <p>{@code 1} is a main-menu command like {@code VT}, so it sits outside
+     * the {@code D} display sub-menu block. {@code cmd_diagram} then reads two
+     * lines: the template and the output name.
+     *
+     * <p>Static and returning a string so the harness can check it without a
+     * live frame, which is the same reason {@code describeHeliosExit} is
+     * separable from the run that calls it.
+     *
+     * <p>Public for the same reason {@link HeliosLog#isProgressLine} is:
+     * {@code my.stepss.diagram.DiagramCheck} is a different package from
+     * {@code my.stepss} and cannot reach a package-private member.
+     */
+    public static String diagramCommands(String templatePath, String outputName) {
+        return "1\n" + templatePath + "\n" + outputName + "\n";
+    }
+
+    /**
+     * Whether two paths name the same file, canonical paths compared.
+     *
+     * <p>Canonical and not textual, because Helios' own guard is textual and
+     * therefore misses this. {@code cmd_diagram} compares the two strings it
+     * was handed, so an absolute template and the relative output name slip
+     * past it and it overwrites the template with the annotated copy. Measured:
+     * a run given {@code /abs/dir/template.svg} in and {@code template.svg} out
+     * printed its usual success line, exited 0, and left the template holding
+     * the solved values with every placeholder gone. The user's source file was
+     * destroyed. This check is what stops that, so it is not belt and braces.
+     *
+     * <p>Falls back to the absolute paths when either cannot be canonicalised.
+     * That direction is the safe one only because the output name is fixed and
+     * lives in the working directory, so the two are almost always both
+     * canonicalisable, and a residual false negative costs the template rather
+     * than the run. There is nothing downstream to catch it.
+     */
+    private static boolean sameFile(File a, File b) {
+        try {
+            return a.getCanonicalPath().equals(b.getCanonicalPath());
+        } catch (IOException ex) {
+            return a.getAbsolutePath().equals(b.getAbsolutePath());
+        }
+    }
+
+    /**
      * Writes the power-flow command file, or returns why it could not be.
      *
      * <p>Returns null on success and a sentence on failure, rather than a
@@ -3351,6 +3404,38 @@ public class StepssUI extends javax.swing.JFrame {
             out.append("X\n");
             out.append("in_bal.res\n");
             out.newLine();               // leave the display sub-menu
+            // Before VT, not after. The completion thread in
+            // runPFActionPerformed waits for in_volt_trfo.dat, which VT writes,
+            // and treats its appearance as the run being finished. Rendering
+            // after it would fire that sentinel while the diagram was still
+            // being written.
+            String template = fileDiagram.getText();
+            if (!template.isEmpty()) {
+                File templateFile = new File(template);
+                // Checked here rather than left to Helios, because Helios
+                // handles it by desynchronising the command file. cmd_diagram
+                // prints "This file does not exist !" and returns WITHOUT
+                // consuming the output-name line, so Helios reads that line as
+                // a main-menu command, fails on it, and aborts the whole run
+                // with exit 1. Everything after the diagram block is lost,
+                // including the VT export the completion thread waits on.
+                // Refusing before the file is written costs the user a sentence
+                // instead of a dead run.
+                if (!templateFile.isFile()) {
+                    out.close();
+                    return "The one-line diagram file " + templateFile.getName()
+                            + " does not exist. Choose another on the System Data tab,"
+                            + " or clear the slot.";
+                }
+                if (sameFile(templateFile, new File(myTempDir, DIAGRAM_OUTPUT))) {
+                    out.close();
+                    return "The one-line diagram template is the file the power"
+                            + " flow writes its result to, so running would"
+                            + " overwrite your template with its own output."
+                            + " Move it or rename it, then run again.";
+                }
+                out.append(diagramCommands(templateFile.getAbsolutePath(), DIAGRAM_OUTPUT));
+            }
             out.append("VT\n");
             out.append("in_volt_trfo.dat\n");
             out.append("E\n");
@@ -5714,16 +5799,17 @@ public class StepssUI extends javax.swing.JFrame {
      * Deletes every file a previous power-flow run may have left in
      * {@code myTempDir}: the four legacy-named .res exports, the in_svc.res
      * and in_flow.res exports added for helios' per-table export mechanism,
-     * and the in_volt_trfo.dat file whose appearance signals a completed run (see
-     * the completion thread in {@link #runPFActionPerformed}). Called at the
-     * start of a run so a run that helios aborts partway through cannot
-     * leave any of the previous run's results looking like they belong to
-     * the run just made.
+     * the in_volt_trfo.dat file whose appearance signals a completed run (see
+     * the completion thread in {@link #runPFActionPerformed}), and
+     * {@link #DIAGRAM_OUTPUT}. Called at the start of a run so a run that
+     * helios aborts partway through cannot leave any of the previous run's
+     * results, diagram included, looking like they belong to the run just
+     * made.
      */
     private void deletePFCResultFiles() {
         String[] resultFiles = {
             "in_net.res", "in_trfo.res", "in_gen.res", "in_bal.res",
-            "in_svc.res", "in_flow.res", "in_volt_trfo.dat"
+            "in_svc.res", "in_flow.res", "in_volt_trfo.dat", DIAGRAM_OUTPUT
         };
         for (String name : resultFiles) {
             Path p = Paths.get(myTempDir.getAbsolutePath(), name);
