@@ -15,7 +15,7 @@ This one is a Java (Swing) desktop application. It bundles the complete simulati
 
 ## Features
 
-- **Complete workflow in tabs**: System Data, Observables, Initialization, Dynamic Simulation, Analysis, and Codegen
+- **Complete workflow in tabs**: System Data, Observables, Power Flow Simulation, Dynamic Simulation, Analysis, and Codegen
 - **Bundled examples**: *File -> Open Examples* extracts a ready-to-run test system (Kundur two-area, IEEE Nordic, or the 5-bus tutorial) into your examples directory and fills in the case, so there is something to run on a fresh install
 - **Dynamic simulation**: runs the bundled RAMSES engine on the loaded data and disturbance files
 - **Power flow**: drives the bundled Helios power-flow engine
