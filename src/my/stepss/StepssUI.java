@@ -3734,11 +3734,19 @@ public class StepssUI extends javax.swing.JFrame {
                     ? new File(dir, example.data().get(i)).getAbsolutePath()
                     : "");
         }
-        fileDist.setText(new File(dir, example.dist()).getAbsolutePath());
-        fileObs.setText(new File(dir, example.obs()).getAbsolutePath());
+        // An empty slot is left empty rather than resolved. new File(dir, "")
+        // is the example DIRECTORY, so the unconditional form put a directory
+        // path into the disturbance field of a power-flow-only case and made it
+        // look like a file had been loaded.
+        fileDist.setText(slotPath(dir, example.dist()));
+        fileObs.setText(slotPath(dir, example.obs()));
         // What loadObsButton does once a file is chosen: an observables file
         // with the trajectory output switched off produces nothing to plot.
-        saveOutputTrajButton.setSelected(true);
+        // Only when there is one: ticking it for a case with nothing to observe
+        // sets a switch that cannot do anything.
+        if (!example.obs().isEmpty()) {
+            saveOutputTrajButton.setSelected(true);
+        }
 
         // Remembered so the next example lands beside this one rather than
         // inside it. Stored before the working directory moves, because that is
@@ -3771,6 +3779,11 @@ public class StepssUI extends javax.swing.JFrame {
                                 .log(Level.SEVERE, null, ex);
                     }
                 });
+    }
+
+    /** An example's file, resolved against its directory, or "" for an unfilled slot. */
+    private static String slotPath(File dir, String name) {
+        return name.isEmpty() ? "" : new File(dir, name).getAbsolutePath();
     }
 
     /**

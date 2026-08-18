@@ -27,10 +27,12 @@ public final class Example {
     private final List<String> data;
     private final String dist;
     private final String obs;
+    private final String diagram;
     private final List<String> extra;
 
     Example(String id, String name, String scale, String summary, String docs,
-            String dir, List<String> data, String dist, String obs, List<String> extra) {
+            String dir, List<String> data, String dist, String obs, String diagram,
+            List<String> extra) {
         this.id = id;
         this.name = name;
         this.scale = scale;
@@ -40,6 +42,7 @@ public final class Example {
         this.data = Collections.unmodifiableList(new ArrayList<>(data));
         this.dist = dist;
         this.obs = obs;
+        this.diagram = diagram;
         this.extra = Collections.unmodifiableList(new ArrayList<>(extra));
     }
 
@@ -88,6 +91,17 @@ public final class Example {
         return obs;
     }
 
+    /**
+     * The filename of the annotated one-line diagram template, or "".
+     *
+     * <p>Optional because it exists only for cases whose repository ships one.
+     * When present it fills the diagram slot on the System Data tab, and Run
+     * Power Flow renders it through Helios' {@code 1} command.
+     */
+    public String diagram() {
+        return diagram;
+    }
+
     /** Files that ship but fill no slot: variants, the README, the LICENCE. */
     public List<String> extra() {
         return extra;
@@ -115,14 +129,31 @@ public final class Example {
      *
      * <p>Deduplicated because nothing stops an entry naming the same file in
      * two roles, and a manifest with a repeated path would digest differently
-     * from the same content declared once.
+     * from the same content declared once. Empty slots are skipped the same
+     * way: {@code dist}, {@code obs} and {@code diagram} are optional, and an
+     * unfilled one is not a filename to look up or dedupe against.
      */
     public List<String> retained() {
         LinkedHashSet<String> all = new LinkedHashSet<>(data);
-        all.add(dist);
-        all.add(obs);
+        addIfNamed(all, dist);
+        addIfNamed(all, obs);
+        addIfNamed(all, diagram);
         all.addAll(extra);
         return Collections.unmodifiableList(new ArrayList<>(all));
+    }
+
+    /**
+     * Adds a slot's filename unless the slot is empty.
+     *
+     * <p>An unconditional add is what this replaces, and with optional slots it
+     * would put "" into the set. {@code ExamplesPack} looks up every retained
+     * name in the upstream archive, so that becomes a build failure naming no
+     * file, and the manifest digest would cover a path that is not a path.
+     */
+    private static void addIfNamed(LinkedHashSet<String> all, String name) {
+        if (!name.isEmpty()) {
+            all.add(name);
+        }
     }
 
     @Override

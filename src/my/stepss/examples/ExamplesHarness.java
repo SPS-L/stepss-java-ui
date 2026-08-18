@@ -37,6 +37,8 @@ public final class ExamplesHarness {
         List<Example> examples = ExampleCatalog.load();
 
         checkCatalogIsSane(examples);
+        checkOptionalSlotsParse();
+        checkDataIsStillRequired();
         for (Example example : examples) {
             checkInstalls(example);
         }
@@ -79,6 +81,56 @@ public final class ExamplesHarness {
                             && !example.dir().equals(".") && !example.dir().equals(".."));
             check(example.id() + " retains its LICENSE",
                     example.retained().contains("LICENSE"));
+            check(example.id() + " names both a disturbance and observables, or neither",
+                    example.dist().isEmpty() == example.obs().isEmpty());
+            check(example.id() + " names an .svg in its diagram slot",
+                    example.diagram().isEmpty() || example.diagram().endsWith(".svg"));
+        }
+    }
+
+    /** The descriptor text a power-flow-only entry produces. */
+    private static final String PF_ONLY_DESCRIPTOR
+            = "examples=pfonly\n"
+            + "pfonly.name=Power flow only\n"
+            + "pfonly.scale=6 buses\n"
+            + "pfonly.summary=A case with no dynamic data.\n"
+            + "pfonly.docs=https://example.invalid/pfonly\n"
+            + "pfonly.dir=pf-only\n"
+            + "pfonly.data=case.dat\n"
+            + "pfonly.svg=case.svg\n"
+            + "pfonly.extra=README.md, LICENSE\n";
+
+    /**
+     * An entry naming no disturbance and no observables parses, and does not
+     * carry an empty path into its retained set.
+     *
+     * <p>The empty path is the failure that matters. {@code retained()} feeds
+     * {@code ExamplesPack}, which looks up each name in the upstream archive,
+     * so an empty string there fails the build with a message naming no file.
+     */
+    private static void checkOptionalSlotsParse() throws IOException {
+        List<Example> examples = ExampleCatalog.load(
+                new ByteArrayInputStream(PF_ONLY_DESCRIPTOR.getBytes("UTF-8")));
+        check("a power-flow-only entry parses", examples.size() == 1);
+        Example only = examples.get(0);
+        check("its disturbance slot is empty", only.dist().isEmpty());
+        check("its observables slot is empty", only.obs().isEmpty());
+        check("its diagram slot is read", "case.svg".equals(only.diagram()));
+        check("nothing retained is blank", !only.retained().contains(""));
+        check("the diagram is retained", only.retained().contains("case.svg"));
+        check("retained holds exactly the named files, once each",
+                only.retained().size() == 4);
+    }
+
+    /** A data file is still required, because an example without one is not one. */
+    private static void checkDataIsStillRequired() {
+        String descriptor = PF_ONLY_DESCRIPTOR.replace("pfonly.data=case.dat\n", "");
+        try {
+            ExampleCatalog.load(new ByteArrayInputStream(descriptor.getBytes("UTF-8")));
+            check("a descriptor with no data file is refused", false);
+        } catch (IOException expected) {
+            check("a descriptor with no data file is refused",
+                    expected.getMessage().contains("pfonly.data"));
         }
     }
 
@@ -99,9 +151,15 @@ public final class ExamplesHarness {
             List<String> missing = ExampleInstaller.missingFrom(example, dir);
             check(example.id() + " leaves nothing missing: " + missing, missing.isEmpty());
 
+            // Only the slots this example actually fills. An empty one would
+            // otherwise assert that a file named "" has content.
             List<String> slots = new ArrayList<>(example.data());
-            slots.add(example.dist());
-            slots.add(example.obs());
+            for (String optional : new String[]{example.dist(), example.obs(),
+                example.diagram()}) {
+                if (!optional.isEmpty()) {
+                    slots.add(optional);
+                }
+            }
             for (String slot : slots) {
                 File file = new File(dir, slot);
                 check(example.id() + " slot file " + slot + " has content",
