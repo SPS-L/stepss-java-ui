@@ -1,5 +1,7 @@
 package my.stepss.obs;
 
+import java.util.ArrayList;
+import java.util.List;
 import my.stepss.obs.ObservableCategory.Kind;
 
 /**
@@ -24,6 +26,7 @@ public final class ObservablesHarness {
         checkAddValidates();
         checkRemoveIsSafe();
         checkAllTogglesTheRow();
+        checkInstalledButtonsAreWired();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -150,6 +153,40 @@ public final class ObservablesHarness {
         expect("field re-enabled", true, row.field().isEnabled());
         expect("list re-enabled", true, row.list().isEnabled());
         expect("add re-enabled", true, row.addButton().isEnabled());
+    }
+
+    /**
+     * install() is the only path the window drives the row through, so a
+     * listener wired to the wrong method would ship while every check above,
+     * which calls the methods directly, went on passing.
+     */
+    private static void checkInstalledButtonsAreWired() {
+        ObservableCategory row = new ObservableCategory(Kind.SYNC);
+        List<String> problems = new ArrayList<>();
+        row.install(problems::add);
+
+        row.field().setText("g1");
+        row.addButton().doClick();
+        expect("Add button added the name", 1, row.list().getItemCount());
+        expect("Add button reported no problem", 0, problems.size());
+
+        row.field().setText("g1");
+        row.addButton().doClick();
+        expect("duplicate reported through the sink", 1, problems.size());
+        expect("duplicate not added", 1, row.list().getItemCount());
+
+        row.allBox().doClick();
+        expect("All ticked by its own click", true, row.allBox().isSelected());
+        expect("All disabled the field", false, row.field().isEnabled());
+        expect("All disabled Add", false, row.addButton().isEnabled());
+
+        row.allBox().doClick();
+        expect("All unticked by a second click", false, row.allBox().isSelected());
+        expect("field re-enabled", true, row.field().isEnabled());
+
+        row.list().setSelectedIndex(0);
+        row.removeButton().doClick();
+        expect("Remove button removed the name", 0, row.list().getItemCount());
     }
 
     private static void expectRefused(String what, String problem) {
