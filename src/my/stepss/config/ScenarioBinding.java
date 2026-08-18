@@ -32,6 +32,7 @@ public final class ScenarioBinding {
     private final JTextField[] dataFields;
     private final JTextField disturbanceField;
     private final JTextField observablesField;
+    private final JTextField diagramField;
     private final JCheckBox wizardBox;
     private final JComboBox<?>[] runtimeTypes;
     private final JTextField[] runtimeNames;
@@ -44,6 +45,7 @@ public final class ScenarioBinding {
      * @param dataFields       the ten system data rows, in tab order
      * @param disturbanceField the disturbance path
      * @param observablesField the observables file path
+     * @param diagramField     the one-line diagram template path
      * @param wizardBox        Show observable dialog
      * @param runtimeTypes     the three runtime observable dropdowns
      * @param runtimeNames     the three runtime observable name fields
@@ -55,7 +57,7 @@ public final class ScenarioBinding {
      *                                  control is null
      */
     public ScenarioBinding(JTextField[] dataFields, JTextField disturbanceField,
-            JTextField observablesField, JCheckBox wizardBox,
+            JTextField observablesField, JTextField diagramField, JCheckBox wizardBox,
             JComboBox<?>[] runtimeTypes, JTextField[] runtimeNames,
             JCheckBox trajectoryBox, JCheckBox continuousBox,
             JCheckBox discreteBox, JCheckBox dumpBox) {
@@ -68,6 +70,7 @@ public final class ScenarioBinding {
         require(runtimeNames, Scenario.RUNTIME_ROWS, "runtime observable names");
         requireNotNull(disturbanceField, "disturbance field");
         requireNotNull(observablesField, "observables field");
+        requireNotNull(diagramField, "diagram field");
         requireNotNull(wizardBox, "observable dialog checkbox");
         requireNotNull(trajectoryBox, "trajectory checkbox");
         requireNotNull(continuousBox, "continuous trace checkbox");
@@ -76,6 +79,7 @@ public final class ScenarioBinding {
         this.dataFields = dataFields.clone();
         this.disturbanceField = disturbanceField;
         this.observablesField = observablesField;
+        this.diagramField = diagramField;
         this.wizardBox = wizardBox;
         this.runtimeTypes = runtimeTypes.clone();
         this.runtimeNames = runtimeNames.clone();
@@ -93,6 +97,7 @@ public final class ScenarioBinding {
         }
         scenario.setDisturbance(disturbanceField.getText());
         scenario.setObservablesFile(observablesField.getText());
+        scenario.setDiagram(diagramField.getText());
         scenario.setObservableWizard(wizardBox.isSelected());
         for (int row = 0; row < Scenario.RUNTIME_ROWS; row++) {
             Object selected = runtimeTypes[row].getSelectedItem();
@@ -119,6 +124,7 @@ public final class ScenarioBinding {
         }
         disturbanceField.setText(scenario.disturbance());
         observablesField.setText(scenario.observablesFile());
+        diagramField.setText(scenario.diagram());
         wizardBox.setSelected(scenario.observableWizard());
         for (int row = 0; row < Scenario.RUNTIME_ROWS; row++) {
             selectType(row, scenario.runtimeType(row), problems);

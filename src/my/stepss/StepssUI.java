@@ -152,6 +152,10 @@ public class StepssUI extends javax.swing.JFrame {
         initComponents();
         fillObservableTypes();
         scenarioBinding = bindScenario();
+        fileDiagram.setEditable(false);
+        fileDiagram.setMinimumSize(new java.awt.Dimension(0, 24));
+        loadDiagram.addActionListener(evt -> loadDiagramActionPerformed(evt));
+        nppDiagramButton.addActionListener(evt -> nppOpenDefault(fileDiagram.getText()));
         applyModernChrome();
         // PlatformLauncher's launches (editor/terminal/file manager) run via
         // Commons Exec's async execute(), which hands a launch failure (e.g.
@@ -520,7 +524,7 @@ public class StepssUI extends javax.swing.JFrame {
         return new ScenarioBinding(
                 new JTextField[]{fileData1, fileData2, fileData3, fileData4, fileData5,
                     fileData6, fileData7, fileData8, fileData9, fileData10},
-                fileDist, fileObs, observFileWizButton,
+                fileDist, fileObs, fileDiagram, observFileWizButton,
                 new JComboBox<?>[]{runtimeObsType, runtimeObsType1, runtimeObsType2},
                 new JTextField[]{runtimeObsName, runtimeObsName1, runtimeObsName2},
                 saveOutputTrajButton, saveContTrace, saveDiscTrace, saveDumpButton);
@@ -647,6 +651,11 @@ public class StepssUI extends javax.swing.JFrame {
         rows.add(Box.createVerticalStrut(10), span(row++));
         rows.add(heading(jLabel9), span(row++));
         rows.add(fileRow("", loadDist, fileDist, nppDstButton), stretch(row++));
+        rows.add(Box.createVerticalStrut(10), span(row++));
+        rows.add(heading(new JLabel(
+                "<html><b>One-line diagram annotated SVG</b> (optional)</html>")),
+                span(row++));
+        rows.add(fileRow("", loadDiagram, fileDiagram, nppDiagramButton), stretch(row++));
         // Absorbs the leftover height so the rows stay together at the top
         // instead of spreading out over a tall window.
         GridBagConstraints filler = new GridBagConstraints();
@@ -826,13 +835,16 @@ public class StepssUI extends javax.swing.JFrame {
         JButton[] editButtons = {
             nppData1Button, nppData2Button, nppData3Button, nppData4Button,
             nppData5Button, nppData6Button, nppData7Button, nppData8Button,
-            nppData9Button, nppData10Button, nppDstButton, nppObsButton};
+            nppData9Button, nppData10Button, nppDstButton, nppObsButton,
+            nppDiagramButton};
         for (JButton button : editButtons) {
             button.setIcon(EditIcon.SMALL);
             button.setToolTipText("Open this file in your default editor");
             button.putClientProperty("JButton.buttonType", "toolBarButton");
             button.setMargin(new Insets(0, 0, 0, 0));
         }
+        nppDiagramButton.setToolTipText(
+                "Open this diagram in your default SVG viewer or editor");
     }
 
     /**
@@ -1434,7 +1446,7 @@ public class StepssUI extends javax.swing.JFrame {
             }
         });
 
-        jLabel9.setText("<html><b>Disturbance file</b> (required)</html>");
+        jLabel9.setText("<html><b>Disturbance file</b> (optional)</html>");
         jLabel9.setName("jLabel9"); // NOI18N
 
         loadData6.setText("Load file");
@@ -3272,6 +3284,55 @@ public class StepssUI extends javax.swing.JFrame {
     }
 
     /**
+     * Where Helios' {@code 1} command writes the annotated diagram.
+     *
+     * <p>A bare name, so it lands in the run's working directory, which
+     * {@code simulExecutor.setWorkingDirectory(myTempDir)} has already set.
+     */
+    static final String DIAGRAM_OUTPUT = "in_diagram.svg";
+
+    /**
+     * The three command-file lines that render one template.
+     *
+     * <p>{@code 1} is a main-menu command like {@code VT}, so it sits outside
+     * the {@code D} display sub-menu block. {@code cmd_diagram} then reads two
+     * lines: the template and the output name.
+     *
+     * <p>Static and returning a string so the harness can check it without a
+     * live frame, which is the same reason {@code describeHeliosExit} is
+     * separable from the run that calls it.
+     */
+    static String diagramCommands(String templatePath, String outputName) {
+        return "1\n" + templatePath + "\n" + outputName + "\n";
+    }
+
+    /**
+     * Whether two paths name the same file, canonical paths compared.
+     *
+     * <p>Canonical and not textual, because Helios' own guard is textual and
+     * therefore misses this. {@code cmd_diagram} compares the two strings it
+     * was handed, so an absolute template and the relative output name slip
+     * past it and it overwrites the template with the annotated copy. Measured:
+     * a run given {@code /abs/dir/template.svg} in and {@code template.svg} out
+     * printed its usual success line, exited 0, and left the template holding
+     * the solved values with every placeholder gone. The user's source file was
+     * destroyed. This check is what stops that, so it is not belt and braces.
+     *
+     * <p>Falls back to the absolute paths when either cannot be canonicalised.
+     * That direction is the safe one only because the output name is fixed and
+     * lives in the working directory, so the two are almost always both
+     * canonicalisable, and a residual false negative costs the template rather
+     * than the run. There is nothing downstream to catch it.
+     */
+    private static boolean sameFile(File a, File b) {
+        try {
+            return a.getCanonicalPath().equals(b.getCanonicalPath());
+        } catch (IOException ex) {
+            return a.getAbsolutePath().equals(b.getAbsolutePath());
+        }
+    }
+
+    /**
      * Writes the power-flow command file, or returns why it could not be.
      *
      * <p>Returns null on success and a sentence on failure, rather than a
@@ -3339,6 +3400,38 @@ public class StepssUI extends javax.swing.JFrame {
             out.append("X\n");
             out.append("in_bal.res\n");
             out.newLine();               // leave the display sub-menu
+            // Before VT, not after. The completion thread in
+            // runPFActionPerformed waits for in_volt_trfo.dat, which VT writes,
+            // and treats its appearance as the run being finished. Rendering
+            // after it would fire that sentinel while the diagram was still
+            // being written.
+            String template = fileDiagram.getText();
+            if (!template.isEmpty()) {
+                File templateFile = new File(template);
+                // Checked here rather than left to Helios, because Helios
+                // handles it by desynchronising the command file. cmd_diagram
+                // prints "This file does not exist !" and returns WITHOUT
+                // consuming the output-name line, so Helios reads that line as
+                // a main-menu command, fails on it, and aborts the whole run
+                // with exit 1. Everything after the diagram block is lost,
+                // including the VT export the completion thread waits on.
+                // Refusing before the file is written costs the user a sentence
+                // instead of a dead run.
+                if (!templateFile.isFile()) {
+                    out.close();
+                    return "The one-line diagram file " + templateFile.getName()
+                            + " does not exist. Choose another on the System Data tab,"
+                            + " or clear the slot.";
+                }
+                if (sameFile(templateFile, new File(myTempDir, DIAGRAM_OUTPUT))) {
+                    out.close();
+                    return "The one-line diagram template is the file the power"
+                            + " flow writes its result to, so running would"
+                            + " overwrite your template with its own output."
+                            + " Move it or rename it, then run again.";
+                }
+                out.append(diagramCommands(templateFile.getAbsolutePath(), DIAGRAM_OUTPUT));
+            }
             out.append("VT\n");
             out.append("in_volt_trfo.dat\n");
             out.append("E\n");
@@ -3734,11 +3827,20 @@ public class StepssUI extends javax.swing.JFrame {
                     ? new File(dir, example.data().get(i)).getAbsolutePath()
                     : "");
         }
-        fileDist.setText(new File(dir, example.dist()).getAbsolutePath());
-        fileObs.setText(new File(dir, example.obs()).getAbsolutePath());
+        // An empty slot is left empty rather than resolved. new File(dir, "")
+        // is the example DIRECTORY, so the unconditional form put a directory
+        // path into the disturbance field of a power-flow-only case and made it
+        // look like a file had been loaded.
+        fileDist.setText(slotPath(dir, example.dist()));
+        fileObs.setText(slotPath(dir, example.obs()));
+        fileDiagram.setText(slotPath(dir, example.diagram()));
         // What loadObsButton does once a file is chosen: an observables file
         // with the trajectory output switched off produces nothing to plot.
-        saveOutputTrajButton.setSelected(true);
+        // Only when there is one: ticking it for a case with nothing to observe
+        // sets a switch that cannot do anything.
+        if (!example.obs().isEmpty()) {
+            saveOutputTrajButton.setSelected(true);
+        }
 
         // Remembered so the next example lands beside this one rather than
         // inside it. Stored before the working directory moves, because that is
@@ -3771,6 +3873,11 @@ public class StepssUI extends javax.swing.JFrame {
                                 .log(Level.SEVERE, null, ex);
                     }
                 });
+    }
+
+    /** An example's file, resolved against its directory, or "" for an unfilled slot. */
+    private static String slotPath(File dir, String name) {
+        return name.isEmpty() ? "" : new File(dir, name).getAbsolutePath();
     }
 
     /**
@@ -5531,6 +5638,51 @@ public class StepssUI extends javax.swing.JFrame {
         nppOpen(evt, fileDist.getText());
     }//GEN-LAST:event_nppDstButtonActionPerformed
 
+    private void loadDiagramActionPerformed(java.awt.event.ActionEvent evt) {
+        fileChooser.setSelectedFile(new File(""));
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        FileNameExtensionFilter filter =
+                new FileNameExtensionFilter("Annotated one-line diagram", "svg");
+        fileChooser.setFileFilter(filter);
+        fileChooser.setDialogTitle("Choose One-Line Diagram SVG");
+        int returnVal = fileChooser.showOpenDialog(this);
+        fileChooser.resetChoosableFileFilters();
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            File file = fileChooser.getSelectedFile();
+            fileDiagram.setText(file.getAbsolutePath());
+        } else {
+            fileDiagram.setText("");
+        }
+    }
+
+    /**
+     * Opens a file in the platform's application for its type, rather than in a
+     * text editor.
+     *
+     * <p>The sibling of {@link #nppOpen}, and separate from it on purpose. That
+     * one falls back to Notepad and to {@code open -t}, which shows an SVG as
+     * XML source; this one falls back to the shell's own open, so a drawing
+     * reaches a drawing program.
+     */
+    private void nppOpenDefault(String filename) {
+        if (filename.isEmpty()) {
+            banner.warn("No one-line diagram is loaded. Add one on the System Data tab.");
+            return;
+        }
+        File target = new File(filename);
+        if (!target.exists()) {
+            banner.warn("<html>The file <B>" + target.getName()
+                    + "</B> does not exist.</html>");
+            return;
+        }
+        try {
+            PlatformLauncher.openInDefaultApplication(target);
+        } catch (IOException ex) {
+            banner.warn("<html>Could not open " + target.getAbsolutePath()
+                    + "<br><br>" + ex.getMessage() + "</html>");
+        }
+    }
+
     private void nppData5ButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nppData5ButtonActionPerformed
         nppOpen(evt, fileData5.getText());
     }//GEN-LAST:event_nppData5ButtonActionPerformed
@@ -5572,6 +5724,7 @@ public class StepssUI extends javax.swing.JFrame {
             s.setText("");
         }
         fileDist.setText("");
+        fileDiagram.setText("");
     }//GEN-LAST:event_clearDataFilesActionPerformed
 
     private void loadData4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadData4ActionPerformed
@@ -5642,16 +5795,17 @@ public class StepssUI extends javax.swing.JFrame {
      * Deletes every file a previous power-flow run may have left in
      * {@code myTempDir}: the four legacy-named .res exports, the in_svc.res
      * and in_flow.res exports added for helios' per-table export mechanism,
-     * and the in_volt_trfo.dat file whose appearance signals a completed run (see
-     * the completion thread in {@link #runPFActionPerformed}). Called at the
-     * start of a run so a run that helios aborts partway through cannot
-     * leave any of the previous run's results looking like they belong to
-     * the run just made.
+     * the in_volt_trfo.dat file whose appearance signals a completed run (see
+     * the completion thread in {@link #runPFActionPerformed}), and
+     * {@link #DIAGRAM_OUTPUT}. Called at the start of a run so a run that
+     * helios aborts partway through cannot leave any of the previous run's
+     * results, diagram included, looking like they belong to the run just
+     * made.
      */
     private void deletePFCResultFiles() {
         String[] resultFiles = {
             "in_net.res", "in_trfo.res", "in_gen.res", "in_bal.res",
-            "in_svc.res", "in_flow.res", "in_volt_trfo.dat"
+            "in_svc.res", "in_flow.res", "in_volt_trfo.dat", DIAGRAM_OUTPUT
         };
         for (String name : resultFiles) {
             Path p = Paths.get(myTempDir.getAbsolutePath(), name);
@@ -5696,6 +5850,7 @@ public class StepssUI extends javax.swing.JFrame {
         // own export produces fresh files.
         clearPFCOutputActionPerformed(evt);
         deletePFCResultFiles();
+        powerFlowRun++;
 
         // helios prints its banner only on the interactive path, so a -t run
         // opens the console on whatever the first data file has to say. Put it
@@ -5744,6 +5899,10 @@ public class StepssUI extends javax.swing.JFrame {
         // invocation started, even if the shared simulExecutorResultHandler
         // field is reassigned by another action before the thread wakes up.
         final DefaultExecuteResultHandler resultHandler = simulExecutorResultHandler;
+        // Read on the EDT and captured, so the completion thread reports on the
+        // run this invocation started even if the field is edited meanwhile.
+        final String diagramTemplate = fileDiagram.getText();
+        final int runNumber = powerFlowRun;
         try {
             simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
             statusBar.running("Solving power flow");
@@ -5793,22 +5952,12 @@ public class StepssUI extends javax.swing.JFrame {
                 }
 
                 reportHeliosExitStatus(resultHandler, heliosStderr, heliosStdout);
+                showDiagram(diagramTemplate, runNumber, resultHandler, heliosStderr);
             }
         }).start();
         clearPFCOutput.setEnabled(true);
 
     }//GEN-LAST:event_runPFActionPerformed
-
-    /**
-     * Matches helios' machine-readable status line, written once to stderr on
-     * every non-interactive run:
-     * {@code helios: status: CONVERGED (2 iterations)} or
-     * {@code helios: status: NOT_CONVERGED (max iterations)}. Group 1 is the
-     * token ({@code CONVERGED}/{@code NOT_CONVERGED}/{@code NOT_RUN}), group 2
-     * the optional parenthesised detail. See
-     * ../stepss-helios/docs/tui-guide.md#exit-status.
-     */
-    private static final Pattern HELIOS_STATUS_LINE = Pattern.compile("helios: status: (\\S+)(?: \\(([^)]*)\\))?");
 
     /**
      * Reports the outcome of the helios run started by
@@ -5817,9 +5966,9 @@ public class StepssUI extends javax.swing.JFrame {
      * docs/api-reference.md#shared-status-contract-api-and-cli):
      * <ul>
      * <li>0 (converged): silent, exactly as before the contract existed.</li>
-     * <li>2 (did not converge): a prominent warning — helios still exported
-     * result files and the GUI will display them, but they are not a valid
-     * solution.</li>
+     * <li>2 (did not converge): a prominent warning, since helios still
+     * exported result files and the GUI will display them, but they are not a
+     * valid solution.</li>
      * <li>1 (input/usage error): an error explaining there may be no results
      * at all.</li>
      * <li>anything else: a generic failure naming the exit value.</li>
@@ -5881,6 +6030,61 @@ public class StepssUI extends javax.swing.JFrame {
     }
 
     /**
+     * Opens the run's one-line diagram, if the case has one.
+     *
+     * <p>Every run gets its own window, converged or not. A run that failed
+     * still shows the template, because a diagram the user can see the shape of
+     * is easier to reason about than an error message on its own, and the
+     * banner says plainly that the numbers are not there.
+     *
+     * <p>Called off the EDT, from the completion thread, so the window is
+     * opened through invokeLater, as every dialog on this path is.
+     *
+     * @param templatePath the diagram slot's contents, captured when the run
+     * started
+     * @param runNumber which run of this session this is, for the title
+     */
+    private void showDiagram(String templatePath, int runNumber,
+            DefaultExecuteResultHandler resultHandler,
+            ByteArrayOutputStream heliosStderr) {
+        if (templatePath.isEmpty()) {
+            return;
+        }
+        final File template = new File(templatePath);
+        final File annotated = new File(myTempDir, DIAGRAM_OUTPUT);
+        final boolean drawn = annotated.isFile();
+
+        HeliosOutcome exitOutcome = resultHandler.hasResult()
+                ? HeliosOutcome.of(resultHandler.getExitValue(), heliosStderr.toString())
+                : HeliosOutcome.of(1, "");
+        // A converged run that still drew nothing is not an exit status: Helios'
+        // 1 command catches its own exceptions and leaves the run successful,
+        // so the missing file is the only signal there is.
+        final HeliosOutcome outcome
+                = (!drawn && exitOutcome.severity() == HeliosOutcome.Severity.OK)
+                ? HeliosOutcome.renderFailed(template.getName())
+                : exitOutcome;
+        final File toShow = drawn ? annotated : template;
+
+        if (!toShow.isFile()) {
+            banner.warn("The one-line diagram " + template.getName()
+                    + " could not be found, so no diagram was shown.");
+            return;
+        }
+        SwingUtilities.invokeLater(() -> {
+            try {
+                my.stepss.diagram.DiagramWindow.open(this, toShow,
+                        template.getName(), runNumber, outcome);
+            } catch (IOException ex) {
+                Logger.getLogger(StepssUI.class.getName())
+                        .log(Level.WARNING, "The diagram could not be opened", ex);
+                banner.warn("<html>The one-line diagram could not be opened.<br><br>"
+                        + ex.getMessage() + "</html>");
+            }
+        });
+    }
+
+    /**
      * Immutable description of the dialog {@link #reportHeliosExitStatus}
      * should show for a given helios exit status. A plain field holder
      * rather than a record: StepssUI targets Java 11 syntax.
@@ -5906,6 +6110,11 @@ public class StepssUI extends javax.swing.JFrame {
      * no Swing state, so it is exercised directly by tests without needing a
      * live GUI. Package-visible for that reason.
      *
+     * <p>The decision itself lives in {@link HeliosOutcome}, because the
+     * diagram window's banner has to say the same thing and two copies would
+     * agree only until one of them was edited. This method is now the dialog
+     * rendering of that decision, and keeps its signature and its contract.
+     *
      * @param exitValue the process exit value ({@link DefaultExecuteResultHandler#getExitValue()})
      * @param heliosStderrText the run's captured stderr, searched for the
      * {@code helios: status: ...} line
@@ -5913,48 +6122,30 @@ public class StepssUI extends javax.swing.JFrame {
      * show nothing, exactly as before this contract existed)
      */
     static HeliosStatusDialog describeHeliosExit(int exitValue, String heliosStderrText) {
-        if (exitValue == 0) {
+        HeliosOutcome outcome = HeliosOutcome.of(exitValue, heliosStderrText);
+        if (outcome.severity() == HeliosOutcome.Severity.OK) {
             return null;
         }
-
-        // The "helios: status: TOKEN (detail)" line, when present, distinguishes
-        // *why* a non-converged run failed (max iterations, divergence, singular
-        // Jacobian). It is not required: the pinned v1.2.0 binary never writes it.
-        String statusDetail = null;
-        Matcher statusMatcher = HELIOS_STATUS_LINE.matcher(heliosStderrText);
-        if (statusMatcher.find()) {
-            statusDetail = statusMatcher.group(2);
+        boolean warning = outcome.severity() == HeliosOutcome.Severity.WARNING;
+        String title = warning ? "Power Flow Did NOT Converge!"
+                : (exitValue == 1 ? "Helios Could Not Process The Input!"
+                        : "Helios Exited Abnormally!");
+        // HeliosOutcome states what is true of the run; what is true only of
+        // this dialog's own surface belongs here instead. The buttons below
+        // the console are a fact about this window, not about helios, and
+        // would be false on the diagram window's banner that renders the
+        // same outcome with no such buttons.
+        String detail = outcome.detail();
+        if (exitValue == 2) {
+            detail += " The buttons below the console still display them.";
         }
-        final String detailSuffix = (statusDetail == null || statusDetail.isEmpty()) ? "" : " (" + statusDetail + ")";
-
-        switch (exitValue) {
-            case 2:
-                return new HeliosStatusDialog(
-                        "Power Flow Did NOT Converge!",
-                        "<html><body style='width: 350px'>"
-                        + "<b><font color='red'>The power flow did NOT converge" + detailSuffix + ".</font></b>"
-                        + "<br><br>helios still produced and exported result files, and the "
-                        + "buttons below now show them, but <b>they are NOT a valid "
-                        + "power-flow solution.</b> Do not use the displayed values."
-                        + "</body></html>",
-                        JOptionPane.WARNING_MESSAGE);
-            case 1:
-                return new HeliosStatusDialog(
-                        "Helios Could Not Process The Input!",
-                        "<html><body style='width: 350px'>"
-                        + "helios reported an input or usage error and stopped early"
-                        + detailSuffix + ". <b>There may be no results at all.</b>"
-                        + "</body></html>",
-                        JOptionPane.ERROR_MESSAGE);
-            default:
-                return new HeliosStatusDialog(
-                        "Helios Exited Abnormally!",
-                        "<html><body style='width: 350px'>"
-                        + "helios exited with status " + exitValue + ", which is not a "
-                        + "documented outcome. Treat any displayed results with suspicion."
-                        + "</body></html>",
-                        JOptionPane.ERROR_MESSAGE);
-        }
+        return new HeliosStatusDialog(title,
+                "<html><body style='width: 350px'>"
+                + (warning ? "<b><font color='red'>" + escapeHtml(outcome.headline())
+                        + "</font></b>" : escapeHtml(outcome.headline()))
+                + "<br><br>" + escapeHtml(detail)
+                + "</body></html>",
+                warning ? JOptionPane.WARNING_MESSAGE : JOptionPane.ERROR_MESSAGE);
     }
 
     // This and the four below it, loadFlows, loadGens, loadTrfos and loadPow,
@@ -7003,6 +7194,8 @@ public class StepssUI extends javax.swing.JFrame {
     private double engineVersion = Double.NaN;
     private DefaultExecutor simulExecutor;
     private DefaultExecuteResultHandler simulExecutorResultHandler;
+    /** How many power flows this session has run, for the diagram window titles. */
+    private int powerFlowRun;
     private int highlighterIndex;
     private Highlighter highlighter;
     private int highlighterLen;
@@ -7198,6 +7391,15 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton viewCurvesButton;
     private javax.swing.JLabel webpageLabel;
     // End of variables declaration//GEN-END:variables
+
+    // The one-line diagram row. Declared here and not in StepssUI.form because
+    // layoutSystemDataTab() builds the whole tab programmatically, so a form
+    // control would buy nothing and would have to be kept in step with the
+    // designer. See the heading built in layoutSystemDataTab for the same
+    // reasoning applied to a label.
+    private final javax.swing.JTextField fileDiagram = new javax.swing.JTextField();
+    private final javax.swing.JButton loadDiagram = new javax.swing.JButton("Load File");
+    private final javax.swing.JButton nppDiagramButton = new javax.swing.JButton();
 
     private boolean createCustomObsFile() {
         try {

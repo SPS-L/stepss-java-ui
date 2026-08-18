@@ -136,6 +136,7 @@ EXAMPLE_NAMES = {
     "kundur": "Kundur two-area",
     "nordic": "IEEE Nordic",
     "five-bus": "5-bus tutorial",
+    "six-bus": "6-bus microgrid",
 }
 
 

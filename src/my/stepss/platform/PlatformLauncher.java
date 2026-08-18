@@ -75,12 +75,15 @@ public final class PlatformLauncher {
         return candidate.isFile() && candidate.canExecute() ? candidate : null;
     }
 
-    /** Hands the file to the user's default editor. Replaces bundled Notepad++. */
-    public static void openInEditor(File file) throws IOException {
-        if (tryDesktop(file)) {
-            return;
-        }
-        Platform p = platformOrThrow();
+    /**
+     * The per-platform command that opens {@code file} in a TEXT editor.
+     *
+     * <p>Split out of {@link #openInEditor} so it can be checked without
+     * launching anything. Every branch here deliberately forces a text editor,
+     * which is right for the data and disturbance files it serves and wrong for
+     * anything else; see {@link #defaultApplicationCommand}.
+     */
+    public static CommandLine editorCommand(Platform p, File file) {
         CommandLine cmd;
         if (p == Platform.WINDOWS_X86_64) {
             cmd = new CommandLine("notepad.exe");
@@ -91,7 +94,62 @@ public final class PlatformLauncher {
             cmd = new CommandLine("xdg-open");
         }
         cmd.addArgument(file.getAbsolutePath(), false);
-        run(cmd, file.getParentFile(), "open an editor for " + file.getName());
+        return cmd;
+    }
+
+    /**
+     * The per-platform command that opens {@code file} in whatever application
+     * the desktop associates with its type.
+     *
+     * <p>The difference from {@link #editorCommand} is the whole reason this
+     * exists: two of that method's three branches force a text editor, so an
+     * SVG opened through it appears as XML source rather than as a drawing.
+     * Here macOS gets {@code open} without {@code -t} and Windows gets the
+     * shell's own {@code start}, so an installed SVG editor is used and a
+     * machine with none falls through to the browser, which is a viewer.
+     */
+    public static CommandLine defaultApplicationCommand(Platform p, File file) {
+        CommandLine cmd;
+        if (p == Platform.WINDOWS_X86_64) {
+            cmd = new CommandLine("cmd.exe");
+            cmd.addArgument("/c");
+            cmd.addArgument("start");
+            // start treats its first quoted argument as the window title, so a
+            // path in quotes with nothing before it opens a console instead of
+            // the file. The empty title is what stops that.
+            cmd.addArgument("\"\"", false);
+        } else if (p == Platform.MACOS_ARM64) {
+            cmd = new CommandLine("open");
+        } else {
+            cmd = new CommandLine("xdg-open");
+        }
+        cmd.addArgument(file.getAbsolutePath(), false);
+        return cmd;
+    }
+
+    /** Hands the file to the user's default editor. Replaces bundled Notepad++. */
+    public static void openInEditor(File file) throws IOException {
+        if (tryDesktop(file)) {
+            return;
+        }
+        run(editorCommand(platformOrThrow(), file), file.getParentFile(),
+                "open an editor for " + file.getName());
+    }
+
+    /**
+     * Opens {@code file} in the platform's own application for its type: an SVG
+     * editor for a drawing, falling back to a viewer.
+     *
+     * <p>Tries {@code Desktop.EDIT} first, then {@code Desktop.OPEN}, exactly as
+     * {@link #openInEditor} does, because EDIT is what reaches Inkscape for
+     * anyone who has it associated. Only the per-platform fallback differs.
+     */
+    public static void openInDefaultApplication(File file) throws IOException {
+        if (tryDesktop(file)) {
+            return;
+        }
+        run(defaultApplicationCommand(platformOrThrow(), file),
+                file.getParentFile(), "open " + file.getName());
     }
 
     /**
@@ -317,8 +375,8 @@ public final class PlatformLauncher {
 
     /**
      * Notified when a launch started via {@link #run} fails after the async
-     * {@code execute} call has already returned normally — e.g. the target
-     * program (xdg-open, a terminal emulator, ...) does not exist. Commons
+     * {@code execute} call has already returned normally, for example when the
+     * target program (xdg-open, a terminal emulator, ...) does not exist. Commons
      * Exec's async {@code execute(CommandLine, ExecuteResultHandler)}
      * overload runs the whole launch, including the {@code IOException} that
      * a missing executable throws from {@code ProcessBuilder}, on a worker
@@ -333,7 +391,7 @@ public final class PlatformLauncher {
     /**
      * Registers the callback used to surface an async launch failure to the
      * user. Called back on whatever thread Commons Exec's worker thread is
-     * running on, not the EDT — implementations that touch Swing must hop
+     * running on, not the EDT; implementations that touch Swing must hop
      * back with {@code SwingUtilities.invokeLater} themselves.
      */
     public static void setLaunchFailureListener(BiConsumer<String, Throwable> listener) {

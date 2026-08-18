@@ -152,8 +152,8 @@ class ExampleSetTest(unittest.TestCase):
             set(), set(pins.EXAMPLES) & set(pins.COMPONENTS)
         )
 
-    def test_the_examples_are_the_three_bundled_ones(self):
-        self.assertEqual(("kundur", "nordic", "five-bus"), pins.EXAMPLES)
+    def test_the_examples_are_the_four_bundled_ones(self):
+        self.assertEqual(("kundur", "nordic", "five-bus", "six-bus"), pins.EXAMPLES)
 
 
 TOOLCHAIN = """\

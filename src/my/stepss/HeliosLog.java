@@ -77,6 +77,12 @@ final class HeliosLog {
      * and {@code Exported to:}/{@code VoltRat file written to:} can appear in
      * a run java-ui starts, whose command file is fixed; the others are here
      * so a hand-edited or future command file does not go quiet.
+     *
+     * <p>The last four are the {@code 1} command's own lines, from
+     * {@code cmd_diagram} in PlainMenu.cpp and from {@code DiagramRenderer::render}.
+     * They are all written to stdout and none of them fails the run, so without
+     * them here a template that cannot be read produces no diagram, no error and
+     * nothing in the console.
      */
     private static final String[] PROGRESS_PREFIXES = {
         "Converged in ",
@@ -92,7 +98,11 @@ final class HeliosLog {
         "Not in this menu",
         "Reset OK",
         "Output redirection not yet implemented",
-        "dQg/dQl sensitivities not yet implemented"
+        "dQg/dQl sensitivities not yet implemented",
+        "Open ",
+        "This file does not exist !",
+        "output file must be different from input file !",
+        "DiagramRenderer: ",
     };
 
     private HeliosLog() {

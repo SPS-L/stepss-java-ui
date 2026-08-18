@@ -66,8 +66,9 @@ public final class ExampleCatalog {
                     required(props, id + ".docs", id),
                     required(props, id + ".dir", id),
                     split(required(props, id + ".data", id)),
-                    required(props, id + ".dist", id),
-                    required(props, id + ".obs", id),
+                    optional(props, id + ".dist"),
+                    optional(props, id + ".obs"),
+                    optional(props, id + ".svg"),
                     split(props.getProperty(id + ".extra", ""))));
         }
         if (examples.isEmpty()) {
@@ -90,10 +91,10 @@ public final class ExampleCatalog {
     /**
      * A required value, or an {@link IOException} naming the key.
      *
-     * <p>Every key here is required rather than defaulted, because there is no
-     * sensible default for any of them: an entry with no {@code .dist} would
-     * install and leave a slot empty, and an entry with no {@code .dir} would
-     * extract over the examples root itself.
+     * <p>Used for the keys that have no sensible default: an entry with no
+     * {@code .dir} would extract over the examples root itself, and one with no
+     * {@code .data} names no case. See {@link #optional} for the three that are
+     * allowed to be absent.
      */
     private static String required(Properties props, String key, String owner)
             throws IOException {
@@ -103,6 +104,22 @@ public final class ExampleCatalog {
                     + "', which '" + owner + "' needs.");
         }
         return value.trim();
+    }
+
+    /**
+     * An optional value, trimmed, or "" when the key is absent or blank.
+     *
+     * <p>Three keys are optional and the rest are not, which is a judgement
+     * about what an example <em>is</em> rather than about tidiness. A case with
+     * no disturbance and no observables is a power-flow-only case, and the
+     * 6-bus microgrid is exactly that; a case with no {@code .dir} would
+     * extract over the examples root, and a case with no {@code .data} is not a
+     * case. {@code .svg} is optional because only a case whose repository ships
+     * a diagram template can name one.
+     */
+    private static String optional(Properties props, String key) {
+        String value = props.getProperty(key);
+        return value == null ? "" : value.trim();
     }
 
     /** A comma-separated list, trimmed, with empty items dropped. */

@@ -21,6 +21,19 @@ License: Apache-2.0
  the Apache License, Version 2.0. On Debian systems the complete text is in
  /usr/share/common-licenses/Apache-2.0
 
+Files: opt/stepss/lib/app/lib/batik-all-1.19.jar
+ opt/stepss/lib/app/lib/xmlgraphics-commons-2.11.jar
+ opt/stepss/lib/app/lib/xml-apis-ext-1.3.04.jar
+Comment: Batik renders the annotated one-line diagram Helios writes on every
+ power flow run. A bundled third-party library, not a STEPSS component, so
+ this changes nothing about what RAMSES, Helios or CODEGEN are licensed
+ under, described above.
+Copyright: 1999-2025, The Apache Software Foundation
+License: Apache-2.0
+ https://xmlgraphics.apache.org/batik/
+ On Debian systems the complete text is in
+ /usr/share/common-licenses/Apache-2.0
+
 Files: opt/stepss/lib/app/stepss.jar
 Comment: The jar carries the simulation toolchain as embedded resources, which
  it extracts at runtime. The stanzas below name what those are and the terms

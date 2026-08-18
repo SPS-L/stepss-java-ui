@@ -32,6 +32,13 @@ import java.util.Set;
  * guarantee than a recursive walk with a test watching it, because there is no
  * longer anything for a relayout to break.
  *
+ * <p>{@code stepss.format} stays at 1 for the {@code diagram} key added in
+ * 2026-08. {@link #checkFormat} throws on a format BELOW the one this build
+ * writes, so a bump would make this build refuse every file already saved,
+ * while an added key costs an older build one advisory sentence from
+ * {@link #reportUnknownKeys} and nothing else. That asymmetry is why a new
+ * optional key is not a format change.
+ *
  * <p>Written by hand for the grouping and the section comments, read back with
  * {@link Properties#load(Reader)}. One small escaper against the standard
  * parser, rather than two halves of a format both written here.
@@ -57,6 +64,7 @@ public final class ScenarioFile {
     static final String FORMAT_KEY = "stepss.format";
 
     private static final String DISTURBANCE = "disturbance";
+    private static final String DIAGRAM = "diagram";
     private static final String OBSERVABLES_FILE = "observables.file";
     private static final String OBSERVABLES_WIZARD = "observables.wizard";
     private static final String RECORD_TRAJECTORY = "record.trajectory";
@@ -136,6 +144,8 @@ public final class ScenarioFile {
             }
             write(out, DISTURBANCE,
                     ScenarioPaths.store(scenario.disturbance(), cfgDir, workingDir));
+            write(out, DIAGRAM,
+                    ScenarioPaths.store(scenario.diagram(), cfgDir, workingDir));
 
             out.write("\n# Observables\n");
             write(out, OBSERVABLES_FILE,
@@ -196,6 +206,8 @@ public final class ScenarioFile {
         }
         scenario.setDisturbance(path(properties, DISTURBANCE, cfgDir,
                 "The disturbance file", problems));
+        scenario.setDiagram(path(properties, DIAGRAM, cfgDir,
+                "The one-line diagram file", problems));
         scenario.setObservablesFile(path(properties, OBSERVABLES_FILE, cfgDir,
                 "The observables file", problems));
         scenario.setObservableWizard(
@@ -282,6 +294,7 @@ public final class ScenarioFile {
             keys.add(dataKey(slot));
         }
         keys.add(DISTURBANCE);
+        keys.add(DIAGRAM);
         keys.add(OBSERVABLES_FILE);
         keys.add(OBSERVABLES_WIZARD);
         for (int row = 0; row < Scenario.RUNTIME_ROWS; row++) {

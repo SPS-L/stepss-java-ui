@@ -38,6 +38,7 @@ public final class Scenario {
     private final String[] data = blanks(DATA_SLOTS);
     private String disturbance = "";
     private String observablesFile = "";
+    private String diagram = "";
     private boolean observableWizard;
     private final String[] runtimeType = blanks(RUNTIME_ROWS);
     private final String[] runtimeName = blanks(RUNTIME_ROWS);
@@ -95,6 +96,16 @@ public final class Scenario {
     /** @param value the observables file path, null read as "" */
     public void setObservablesFile(String value) {
         this.observablesFile = text(value);
+    }
+
+    /** The one-line diagram template (.svg) path, or "". */
+    public String diagram() {
+        return diagram;
+    }
+
+    /** @param value the diagram template path, null read as "" */
+    public void setDiagram(String value) {
+        this.diagram = text(value);
     }
 
     /** Whether the observable dialog builds the observables list. */
