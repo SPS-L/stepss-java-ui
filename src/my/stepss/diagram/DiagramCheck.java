@@ -35,6 +35,12 @@ public final class DiagramCheck {
         checkTheEditorLauncherStillForcesOne();
         checkTheDiagramCommandBlock();
         checkHeliosDiagramLinesReachTheConsole();
+        checkASvgRendersAtAll();
+        checkZoomCostsNothingExtra();
+        checkPanMovesTheRegion();
+        checkAMalformedSvgRaises();
+        checkExternalResourcesAreRefused();
+        checkAnUnknownElementDoesNotLoseTheDocument();
 
         System.out.println(failures == 0 ? "ALL DIAGRAM CHECKS PASSED"
                 : failures + " DIAGRAM CHECK(S) FAILED");
@@ -144,6 +150,144 @@ public final class DiagramCheck {
         }
         check("a table row is still dropped",
                 !my.stepss.HeliosLog.isProgressLine("  A      6.000   1.0210    0.00"));
+    }
+
+    /** A minimal document with known bounds and one black square in the corner. */
+    private static final String TEST_SVG
+            = "<?xml version=\"1.0\"?>\n"
+            + "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"100\""
+            + " viewBox=\"0 0 200 100\">\n"
+            + "  <rect x=\"0\" y=\"0\" width=\"20\" height=\"20\" fill=\"black\"/>\n"
+            + "</svg>\n";
+
+    private static java.io.File writeTestSvg(String body) throws java.io.IOException {
+        java.io.File file = java.io.File.createTempFile("stepss-diagram", ".svg");
+        file.deleteOnExit();
+        java.nio.file.Files.write(file.toPath(),
+                body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return file;
+    }
+
+    /** A pixel count, for asserting that a region actually drew something. */
+    private static int inkedPixels(java.awt.image.BufferedImage image) {
+        int inked = 0;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                int argb = image.getRGB(x, y);
+                boolean opaque = ((argb >>> 24) & 0xff) > 0;
+                boolean dark = (argb & 0xffffff) != 0xffffff;
+                if (opaque && dark) {
+                    inked++;
+                }
+            }
+        }
+        return inked;
+    }
+
+    /**
+     * The end-to-end check, and the one that answers the Rhino question.
+     *
+     * <p>batik-all registers a Rhino interpreter factory through
+     * META-INF/services and Rhino is not shipped. If that were not harmless,
+     * this is where it would surface, on the classpath the application has.
+     */
+    private static void checkASvgRendersAtAll() throws Exception {
+        java.io.File file = writeTestSvg(TEST_SVG);
+        SvgImage image = SvgImage.load(file);
+        check("the document bounds are read",
+                Math.abs(image.documentBounds().getWidth() - 200.0) < 0.5
+                        && Math.abs(image.documentBounds().getHeight() - 100.0) < 0.5);
+        java.awt.image.BufferedImage rendered = image.renderWhole(400);
+        check("the whole document renders at the width asked for",
+                rendered.getWidth() == 400);
+        check("it renders at the document's aspect ratio", rendered.getHeight() == 200);
+        check("something was drawn", inkedPixels(rendered) > 0);
+    }
+
+    /** Zoom is a smaller AOI at the same pixel size, not a bigger image. */
+    private static void checkZoomCostsNothingExtra() throws Exception {
+        SvgImage image = SvgImage.load(writeTestSvg(TEST_SVG));
+        java.awt.image.BufferedImage wide = image.render(
+                new java.awt.geom.Rectangle2D.Double(0, 0, 200, 100), 400, 200);
+        java.awt.image.BufferedImage tight = image.render(
+                new java.awt.geom.Rectangle2D.Double(0, 0, 20, 10), 400, 200);
+        check("a tenfold zoom renders the same number of pixels",
+                tight.getWidth() == wide.getWidth()
+                        && tight.getHeight() == wide.getHeight());
+        check("and it is not the same picture",
+                inkedPixels(tight) != inkedPixels(wide));
+        check("zooming into the square fills more of the frame",
+                inkedPixels(tight) > inkedPixels(wide));
+    }
+
+    /** Panning off the square leaves an empty frame. */
+    private static void checkPanMovesTheRegion() throws Exception {
+        SvgImage image = SvgImage.load(writeTestSvg(TEST_SVG));
+        java.awt.image.BufferedImage onIt = image.render(
+                new java.awt.geom.Rectangle2D.Double(0, 0, 20, 10), 200, 100);
+        java.awt.image.BufferedImage offIt = image.render(
+                new java.awt.geom.Rectangle2D.Double(150, 50, 20, 10), 200, 100);
+        check("the region with the square has ink", inkedPixels(onIt) > 0);
+        check("the region without it does not", inkedPixels(offIt) == 0);
+    }
+
+    /** A file that is not an SVG raises rather than producing a blank image. */
+    private static void checkAMalformedSvgRaises() throws Exception {
+        java.io.File file = writeTestSvg("this is not markup at all");
+        try {
+            SvgImage.load(file);
+            check("a malformed SVG is refused", false);
+        } catch (java.io.IOException expected) {
+            check("a malformed SVG is refused", true);
+        }
+    }
+
+    /**
+     * An external reference is refused rather than fetched.
+     *
+     * <p>Batik's default transcoder user agent both declines the fetch and
+     * aborts the render, so the refusal surfaces as an IOException naming the
+     * resource. Asserting the message rather than merely "it threw" is what
+     * distinguishes a refused fetch from a broken file, which is the other
+     * thing that throws here.
+     */
+    private static void checkExternalResourcesAreRefused() throws Exception {
+        String hostile = TEST_SVG.replace("</svg>",
+                "  <image xlink:href=\"http://127.0.0.1:1/should-not-be-fetched.png\""
+                + " x=\"0\" y=\"0\" width=\"10\" height=\"10\"/>\n</svg>")
+                .replace("<svg xmlns=\"http://www.w3.org/2000/svg\"",
+                        "<svg xmlns=\"http://www.w3.org/2000/svg\""
+                        + " xmlns:xlink=\"http://www.w3.org/1999/xlink\"");
+        SvgImage image = SvgImage.load(writeTestSvg(hostile));
+        try {
+            image.renderWhole(200);
+            check("an external reference is refused", false);
+        } catch (java.io.IOException refused) {
+            check("an external reference is refused", true);
+            check("and the refusal names the resource",
+                    String.valueOf(refused.getMessage()).contains("127.0.0.1")
+                            || String.valueOf(refused.getCause()).contains("127.0.0.1"));
+        }
+    }
+
+    /**
+     * A metadata element the SVG DOM does not know does not lose the document.
+     *
+     * <p>The case this exists for is real and is the bundled example: WinFIG
+     * writes {@code <version>1.0</version>} inside {@code <desc>}, which
+     * inherits the SVG default namespace, and the strict DOM refuses the whole
+     * drawing over it. Browsers ignore such elements, and so must a viewer of
+     * files it did not author.
+     */
+    private static void checkAnUnknownElementDoesNotLoseTheDocument() throws Exception {
+        String withCruft = TEST_SVG.replace("<rect",
+                "<desc> METADATA <version id=\"v8\">1.0</version></desc>\n  <rect");
+        SvgImage image = SvgImage.load(writeTestSvg(withCruft));
+        java.awt.image.BufferedImage rendered = image.renderWhole(400);
+        check("an unknown element in the SVG namespace is tolerated",
+                rendered.getWidth() == 400);
+        check("and the rest of the drawing still draws",
+                inkedPixels(rendered) > 0);
     }
 
     private static void check(String what, boolean ok) {
