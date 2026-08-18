@@ -1867,21 +1867,56 @@ Add to `src/my/stepss/diagram/DiagramCheck.java`. The checks need a template on 
         }
     }
 
-    /** An external reference is refused rather than fetched. */
+    /**
+     * An external reference is refused rather than fetched.
+     *
+     * <p>Batik's default transcoder user agent both declines the fetch and
+     * aborts the render, so the refusal surfaces as an IOException naming the
+     * resource. Asserting the message rather than merely "it threw" is what
+     * distinguishes a refused fetch from a broken file, which is the other
+     * thing that throws here.
+     */
     private static void checkExternalResourcesAreRefused() throws Exception {
         String hostile = TEST_SVG.replace("</svg>",
-                "  <image href=\"http://127.0.0.1:1/should-not-be-fetched.png\""
-                + " x=\"0\" y=\"0\" width=\"10\" height=\"10\"/>\n</svg>");
+                "  <image xlink:href=\"http://127.0.0.1:1/should-not-be-fetched.png\""
+                + " x=\"0\" y=\"0\" width=\"10\" height=\"10\"/>\n</svg>")
+                .replace("<svg xmlns=\"http://www.w3.org/2000/svg\"",
+                        "<svg xmlns=\"http://www.w3.org/2000/svg\""
+                        + " xmlns:xlink=\"http://www.w3.org/1999/xlink\"");
         SvgImage image = SvgImage.load(writeTestSvg(hostile));
-        // The point is that this returns rather than hanging on a connection or
-        // throwing a network error out of the renderer.
-        java.awt.image.BufferedImage rendered = image.renderWhole(200);
-        check("a document with an external reference still renders",
-                rendered.getWidth() == 200);
+        try {
+            image.renderWhole(200);
+            check("an external reference is refused", false);
+        } catch (java.io.IOException refused) {
+            check("an external reference is refused", true);
+            check("and the refusal names the resource",
+                    String.valueOf(refused.getMessage()).contains("127.0.0.1")
+                            || String.valueOf(refused.getCause()).contains("127.0.0.1"));
+        }
+    }
+
+    /**
+     * A metadata element the SVG DOM does not know does not lose the document.
+     *
+     * <p>The case this exists for is real and is the bundled example: WinFIG
+     * writes {@code <version>1.0</version>} inside {@code <desc>}, which
+     * inherits the SVG default namespace, and the strict DOM refuses the whole
+     * drawing over it. Browsers ignore such elements, and so must a viewer of
+     * files it did not author.
+     */
+    private static void checkAnUnknownElementDoesNotLoseTheDocument() throws Exception {
+        String withCruft = TEST_SVG.replace("<rect",
+                "<desc> METADATA <version id=\"v8\">1.0</version></desc>\n  <rect");
+        SvgImage image = SvgImage.load(writeTestSvg(withCruft));
+        java.awt.image.BufferedImage rendered = image.renderWhole(400);
+        check("an unknown element in the SVG namespace is tolerated",
+                rendered.getWidth() == 400);
+        check("and the rest of the drawing still draws",
+                inkedPixels(rendered) > 0);
     }
 ```
 
-Call all five from `main()`, and change `main`'s signature to `public static void main(String[] args) throws Exception` if it is not already.
+Call all six from `main()`, and change `main`'s signature to `public static void main(String[] args) throws Exception` if it is not already.
 
 - [ ] **Step 4: Run it to verify it fails**
 
@@ -1904,12 +1939,17 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import org.apache.batik.anim.dom.SAXSVGDocumentFactory;
+import org.apache.batik.anim.dom.SVGDOMImplementation;
+import org.apache.batik.dom.AbstractDocument;
 import org.apache.batik.transcoder.SVGAbstractTranscoder;
 import org.apache.batik.transcoder.TranscoderException;
 import org.apache.batik.transcoder.TranscoderInput;
 import org.apache.batik.transcoder.TranscoderOutput;
 import org.apache.batik.transcoder.image.ImageTranscoder;
 import org.apache.batik.util.XMLResourceDescriptor;
+import org.w3c.dom.DOMException;
+import org.w3c.dom.DOMImplementation;
+import org.w3c.dom.Element;
 import org.w3c.dom.svg.SVGDocument;
 
 /**
@@ -1956,10 +1996,10 @@ public final class SvgImage {
      */
     public static SvgImage load(File file) throws IOException {
         String parser = XMLResourceDescriptor.getXMLParserClassName();
-        SAXSVGDocumentFactory factory = new SAXSVGDocumentFactory(parser);
+        SAXSVGDocumentFactory factory = lenientFactory(parser);
         SVGDocument document;
         try {
-            document = factory.createSVGDocument(file.toURI().toString());
+            document = (SVGDocument) factory.createDocument(file.toURI().toString());
         } catch (IOException ex) {
             throw new IOException("Could not read " + file.getName()
                     + " as an SVG file: " + ex.getMessage(), ex);
@@ -1970,6 +2010,53 @@ public final class SvgImage {
                     + ex.getMessage(), ex);
         }
         return new SvgImage(document, file, readBounds(document, file));
+    }
+
+    /**
+     * A document factory that tolerates elements the SVG DOM does not know.
+     *
+     * <p>Batik's strict DOM throws {@code DOMException} for any unrecognised
+     * local name in the SVG namespace, and refuses the entire document over
+     * it. Drawing tools emit exactly that: the bundled 6-bus example carries
+     * {@code <version>1.0</version>} inside {@code <desc>}, left there by
+     * WinFIG, which inherits the SVG default namespace and is not an SVG
+     * element. Every browser ignores it. A viewer of files it did not author
+     * has to do the same, or the first real diagram a user loads is refused
+     * for a reason that has nothing to do with the drawing.
+     *
+     * <p>An unknown element is remapped into the null namespace, which makes a
+     * generic DOM element. GVT has no bridge for one, so it contributes no
+     * graphics and the rest of the drawing renders unchanged. Verified against
+     * the real 6bus.svg: identical output to a copy with the element deleted.
+     *
+     * <p>The implementation cannot be installed by assigning the factory's
+     * field. {@code SAXSVGDocumentFactory} overrides
+     * {@code getDOMImplementation(String)} to return the strict singleton and
+     * never consults the field (SAXSVGDocumentFactory.java:323), so the
+     * override below is the hook that works.
+     *
+     * <p>This does not weaken the refusal of a genuinely broken file. Markup
+     * that is not XML fails inside the SAX parser, before any element is
+     * created, and never reaches this path.
+     */
+    private static SAXSVGDocumentFactory lenientFactory(String parser) {
+        final SVGDOMImplementation lenient = new SVGDOMImplementation() {
+            @Override
+            public Element createElementNS(AbstractDocument document,
+                    String namespaceURI, String qualifiedName) {
+                try {
+                    return super.createElementNS(document, namespaceURI, qualifiedName);
+                } catch (DOMException unknownElement) {
+                    return super.createElementNS(document, null, qualifiedName);
+                }
+            }
+        };
+        return new SAXSVGDocumentFactory(parser) {
+            @Override
+            public DOMImplementation getDOMImplementation(String version) {
+                return lenient;
+            }
+        };
     }
 
     /**
@@ -2115,7 +2202,9 @@ tools/diagram-harness.sh
 ```
 Expected: `ALL DIAGRAM CHECKS PASSED`.
 
-If instead it fails with `NoClassDefFoundError: org/mozilla/javascript/...`, the Rhino risk in the spec has materialised. The fallback is to replace `batik-all` with the individual module jars, omitting `batik-script`. Stop and report rather than adding Rhino, because Rhino is a JavaScript engine and nothing here should be able to run JavaScript.
+The Rhino risk the spec flags has already been settled by a controller probe against these exact jars: `batik-all-1.19` carries zero `org/mozilla/javascript` classes yet registers `META-INF/services/org.apache.batik.script.InterpreterFactory`, and transcoding works regardless. The check is kept because it is what holds that answer in place, not because the answer is in doubt.
+
+If it nonetheless fails with `NoClassDefFoundError: org/mozilla/javascript/...`, the fallback is to replace `batik-all` with the individual module jars, omitting `batik-script`. Stop and report rather than adding Rhino, because Rhino is a JavaScript engine and nothing here should be able to run JavaScript.
 
 - [ ] **Step 7: Name Batik in the packaging copyright**
 
@@ -2508,6 +2597,17 @@ public final class DiagramPanel extends JComponent {
         setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
         wireMouse();
         wireKeys();
+        // Without this, growing the window leaves the previous image scaled up
+        // to the new size and blurry: nothing else asks for a fresh render,
+        // because rerender() is reached only from a gesture or the first paint.
+        // schedule() coalesces through the settle timer, so a drag-resize
+        // produces one render rather than one per pixel.
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent event) {
+                schedule();
+            }
+        });
     }
 
     /** The document being shown, for the window's save buttons. */
