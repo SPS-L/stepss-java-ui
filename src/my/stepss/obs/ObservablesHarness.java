@@ -39,6 +39,7 @@ public final class ObservablesHarness {
         checkTheFileItWrites();
         checkResetThroughANestedTree();
         checkIsEmpty();
+        checkAnEmptyTypeDropdownIsRefused();
         checkInstalledButtonsAreWired();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
@@ -227,10 +228,14 @@ public final class ObservablesHarness {
      * The acceptance case from the issue: fill every control, bury them, reset,
      * and assert every one came back empty.
      *
-     * <p>The nesting is the point. The handler this replaces matched nothing
-     * once the controls were reparented into exactly this arrangement, so a
-     * check against controls sitting flat on one panel would pass while being
-     * blind to the only fault that has ever occurred here.
+     * <p>The nesting changes nothing this check observes, and that is the
+     * result worth recording rather than hiding: ObservableWizard holds its
+     * controls directly and never walks a container, so burying them three deep
+     * cannot alter a single assertion below. Deleting the nesting leaves the
+     * count unchanged. It stays as a regression guard. The handler this
+     * replaces matched nothing once the controls were reparented into exactly
+     * this arrangement, so the day anyone reintroduces a tree walk here, the
+     * check is already standing in the shape that catches it.
      */
     private static void checkResetThroughANestedTree() {
         ObservableWizard wizard = newWizard();
@@ -302,6 +307,34 @@ public final class ObservablesHarness {
         wizard.reset();
         wizard.categories().get(7).allBox().setSelected(true);
         expect("a ticked All is not empty", false, wizard.isEmpty());
+    }
+
+    /**
+     * The constructor refuses a dropdown with no items, so the complaint lands
+     * at launch instead of inside reset().
+     *
+     * <p>An empty model means the type lists were never filled, which is a
+     * wiring fault. reset() runs from the Clear button on the event dispatch
+     * thread, where a throw is an uncaught stack trace and a button that looks
+     * dead, so the check belongs where the wiring is handed over.
+     */
+    private static void checkAnEmptyTypeDropdownIsRefused() {
+        String[] types = {"Bus Voltage", "Machine Speed", "Wall Time"};
+        JComboBox<?>[] runtimeTypes = {
+            new JComboBox<>(new DefaultComboBoxModel<>(types)),
+            new JComboBox<String>(),
+            new JComboBox<>(new DefaultComboBoxModel<>(types))};
+        JTextField[] runtimeNames = {
+            new JTextField(), new JTextField(), new JTextField()};
+        try {
+            new ObservableWizard(new JTextField(), runtimeTypes, runtimeNames,
+                    new JCheckBox(), new JCheckBox(), new JCheckBox(),
+                    new JCheckBox(), new JCheckBox());
+            fail("an empty type dropdown: accepted, expected a refusal");
+        } catch (IllegalArgumentException refused) {
+            expect("an empty type dropdown names the row it found",
+                    "runtime observable type 1 has no items", refused.getMessage());
+        }
     }
 
     /** A wizard over throwaway controls, with no frame anywhere near it. */

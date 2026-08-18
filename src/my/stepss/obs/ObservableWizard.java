@@ -81,6 +81,16 @@ public final class ObservableWizard {
         for (int row = 0; row < RUNTIME_ROWS; row++) {
             require(this.runtimeTypes[row], "runtime observable type " + row);
             require(this.runtimeNames[row], "runtime observable name " + row);
+            // Checked here rather than guarded inside reset(), because reset()
+            // runs from the Clear button on the event dispatch thread, where a
+            // throw is an uncaught stack trace and a button that looks dead. An
+            // empty dropdown means the type models were never filled, which is a
+            // wiring mistake worth a crash on the first launch after it, not a
+            // reset that silently skips a control for the life of the release.
+            if (this.runtimeTypes[row].getItemCount() == 0) {
+                throw new IllegalArgumentException(
+                        "runtime observable type " + row + " has no items");
+            }
         }
         List<ObservableCategory> rows = new ArrayList<>();
         for (ObservableCategory.Kind kind : ObservableCategory.Kind.values()) {
@@ -168,9 +178,7 @@ public final class ObservableWizard {
         observablesFile.setText("");
         for (int row = 0; row < RUNTIME_ROWS; row++) {
             runtimeNames[row].setText("");
-            if (runtimeTypes[row].getItemCount() > 0) {
-                runtimeTypes[row].setSelectedIndex(0);
-            }
+            runtimeTypes[row].setSelectedIndex(0);
         }
         wizardBox.setSelected(false);
         trajectoryBox.setSelected(false);
