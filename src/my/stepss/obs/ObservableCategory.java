@@ -1,5 +1,13 @@
 package my.stepss.obs;
 
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
+import javax.swing.JTextField;
+
 /**
  * One row of the observable picker: a category of equipment, the controls that
  * choose members of it, and the keyword the observables file names it by.
@@ -82,5 +90,105 @@ public final class ObservableCategory {
             }
             return text.append("</html>").toString();
         }
+    }
+
+    private final Kind kind;
+    private final JLabel nameLabel;
+    private final JTextField field = new JTextField();
+    private final JButton addButton = new JButton("Add");
+    private final JComboBox<String> list = new JComboBox<>();
+    private final JButton removeButton = new JButton("Remove");
+    private final JCheckBox allBox = new JCheckBox("All");
+
+    /**
+     * Builds the row's controls rather than adopting form-generated ones.
+     *
+     * <p>Eight categories is 49 controls where jPanel7 carried 31, and adding
+     * eighteen through the NetBeans designer would have kept the last
+     * GridBagLayout island in a window that is otherwise BorderLayout. Owning
+     * them makes a ninth category a one-line change and makes it impossible to
+     * add an unrelated control to a panel Clear then resets. The one-line
+     * diagram row is declared the same way and for the same reason.
+     *
+     * @param kind which category this row chooses members of
+     */
+    public ObservableCategory(Kind kind) {
+        this.kind = kind;
+        this.nameLabel = new JLabel(kind.label());
+        String tooltip = kind.tooltip();
+        nameLabel.setToolTipText(tooltip);
+        field.setToolTipText(tooltip);
+        allBox.setToolTipText("Observe every " + kind.label().toLowerCase(
+                java.util.Locale.ROOT) + " in the network.");
+        removeButton.setEnabled(false);
+    }
+
+    /** Which category this row chooses members of. */
+    public Kind kind() {
+        return kind;
+    }
+
+    public JLabel nameLabel() {
+        return nameLabel;
+    }
+
+    public JTextField field() {
+        return field;
+    }
+
+    public JButton addButton() {
+        return addButton;
+    }
+
+    public JComboBox<String> list() {
+        return list;
+    }
+
+    public JButton removeButton() {
+        return removeButton;
+    }
+
+    public JCheckBox allBox() {
+        return allBox;
+    }
+
+    /**
+     * Back to the state a fresh launch is in.
+     *
+     * <p>Re-enabling is not tidying: ticking All disables the field and the
+     * list, so unticking it here has to put them back or the row is left
+     * cleared and unusable.
+     */
+    public void clear() {
+        field.setText("");
+        field.setEnabled(true);
+        list.removeAllItems();
+        list.setEnabled(true);
+        addButton.setEnabled(true);
+        allBox.setSelected(false);
+        syncRemoveEnabled();
+    }
+
+    /** The names chosen in this row, in the order they were added. */
+    public List<String> names() {
+        List<String> chosen = new ArrayList<>();
+        for (int i = 0; i < list.getItemCount(); i++) {
+            chosen.add(list.getItemAt(i));
+        }
+        return chosen;
+    }
+
+    /** True when the row asks for every member of its category. */
+    public boolean isAll() {
+        return allBox.isSelected();
+    }
+
+    /**
+     * Remove is enabled only when there is something selected to remove.
+     * Pressing it on an empty list used to be removeItemAt(-1), an uncaught
+     * exception on the event thread, and Clear is what empties the lists.
+     */
+    private void syncRemoveEnabled() {
+        removeButton.setEnabled(list.getItemCount() > 0 && !allBox.isSelected());
     }
 }

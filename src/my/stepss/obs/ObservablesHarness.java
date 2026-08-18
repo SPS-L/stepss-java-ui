@@ -20,6 +20,7 @@ public final class ObservablesHarness {
 
     public static void main(String[] args) {
         checkTheEightKeywords();
+        checkClearEmptiesARow();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -47,6 +48,32 @@ public final class ObservablesHarness {
                 pass(kind + " has a label");
             }
         }
+    }
+
+    /**
+     * Clear must empty the row and undo the disabling that ticking All does.
+     * The handler this replaces walked jPanel7 matching on widget type, so it
+     * cleared whatever happened to be a text field and re-enabled it without
+     * anything recording why.
+     */
+    private static void checkClearEmptiesARow() {
+        ObservableCategory row = new ObservableCategory(Kind.TWOP);
+        row.field().setText("link1");
+        row.list().addItem("link2");
+        row.list().addItem("link3");
+        row.allBox().setSelected(true);
+        row.field().setEnabled(false);
+        row.list().setEnabled(false);
+
+        row.clear();
+
+        expect("field emptied", "", row.field().getText());
+        expect("field re-enabled", true, row.field().isEnabled());
+        expect("list emptied", 0, row.list().getItemCount());
+        expect("list re-enabled", true, row.list().isEnabled());
+        expect("all unticked", false, row.allBox().isSelected());
+        expect("names empty", 0, row.names().size());
+        expect("isAll false", false, row.isAll());
     }
 
     private static void expect(String what, Object want, Object got) {
