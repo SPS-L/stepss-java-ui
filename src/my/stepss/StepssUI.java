@@ -54,6 +54,8 @@ import my.stepss.examples.Example;
 import my.stepss.examples.ExampleCatalog;
 import my.stepss.examples.ExampleInstaller;
 import my.stepss.examples.ExamplesDialog;
+import my.stepss.obs.ObservableCategory;
+import my.stepss.obs.ObservableWizard;
 import my.stepss.platform.Platform;
 import my.stepss.platform.PlatformLauncher;
 import my.stepss.platform.Toolchain;
@@ -75,6 +77,9 @@ public class StepssUI extends javax.swing.JFrame {
      * keyword followed by whatever the field holds.
      */
     private static final String WALL_TIME = "Wall Time";
+
+    /** The display types that name no equipment, so a blank field is normal. */
+    private static final String SOLUTIONS = "Injector solutions";
 
     /**
      * Every runtime observable type, in the order the Observables tab lists
@@ -103,12 +108,14 @@ public class StepssUI extends javax.swing.JFrame {
         types.put("Active power-delta of machine", "P-d");
         types.put("Center of Inertia", "COI");
         types.put(WALL_TIME, "RT");
+        types.put(SOLUTIONS, "SOL");
         types.put("Latency", "LAT");
         types.put("Branch Active Power Origin", "BPO");
         types.put("Branch Active Power Extremity", "BPE");
         types.put("Branch Reactive Power Origin", "BQO");
         types.put("Branch Reactive Power Extremity", "BQE");
         types.put("Injector Observable", "ON");
+        types.put("Two-port injector Observable", "TO");
         return Collections.unmodifiableMap(types);
     }
 
@@ -136,6 +143,17 @@ public class StepssUI extends javax.swing.JFrame {
     private final ScenarioBinding scenarioBinding;
 
     /**
+     * The Observables tab, named once.
+     *
+     * <p>Field references and eight rows this builds, handed over at
+     * construction. Clear used to find its controls by walking jPanel7 and
+     * matching on widget type, which tied what it cleared to the layout: that
+     * panel was the last one applyModernChrome() left alone, and the day it
+     * stopped being so, Clear would have stopped clearing without a word.
+     */
+    private final ObservableWizard observables;
+
+    /**
      * Creates new form StepssUI
      */
     public StepssUI() {
@@ -152,6 +170,7 @@ public class StepssUI extends javax.swing.JFrame {
         initComponents();
         fillObservableTypes();
         scenarioBinding = bindScenario();
+        observables = bindObservables();
         fileDiagram.setEditable(false);
         fileDiagram.setMinimumSize(new java.awt.Dimension(0, 24));
         loadDiagram.addActionListener(evt -> loadDiagramActionPerformed(evt));
@@ -407,6 +426,12 @@ public class StepssUI extends javax.swing.JFrame {
         jPanel4.removeAll();
         jPanel4.setLayout(new BorderLayout());
         jPanel4.add(settings, BorderLayout.NORTH);
+        jPanel7.removeAll();
+        jPanel7.setLayout(new GridBagLayout());
+        int pickerRow = 0;
+        for (ObservableCategory category : observables.categories()) {
+            jPanel7.add(pickerRow(category), stretch(pickerRow++));
+        }
         jPanel4.add(jPanel7, BorderLayout.CENTER);
         jPanel4.add(ActionBar.create().toTheEnd().add(clearObsFileButton).build(),
                 BorderLayout.SOUTH);
@@ -528,6 +553,49 @@ public class StepssUI extends javax.swing.JFrame {
                 new JComboBox<?>[]{runtimeObsType, runtimeObsType1, runtimeObsType2},
                 new JTextField[]{runtimeObsName, runtimeObsName1, runtimeObsName2},
                 saveOutputTrajButton, saveContTrace, saveDiscTrace, saveDumpButton);
+    }
+
+    /**
+     * The Observables tab's controls, and the eight picker rows built beside
+     * them. Runs before {@code applyModernChrome()} because
+     * {@code layoutObservablesTab} builds jPanel7 out of these rows.
+     */
+    private ObservableWizard bindObservables() {
+        ObservableWizard wizard = new ObservableWizard(fileObs,
+                new JComboBox<?>[]{runtimeObsType, runtimeObsType1, runtimeObsType2},
+                new JTextField[]{runtimeObsName, runtimeObsName1, runtimeObsName2},
+                observFileWizButton, saveOutputTrajButton, saveContTrace,
+                saveDiscTrace, saveDumpButton);
+        for (ObservableCategory category : wizard.categories()) {
+            category.install(banner::warn);
+        }
+        return wizard;
+    }
+
+    /**
+     * One picker row: what to name on the left of centre, what has been named
+     * on the right, so the two halves keep the same width down the panel.
+     */
+    private static JPanel pickerRow(ObservableCategory category) {
+        JPanel line = new JPanel(new BorderLayout(6, 0));
+        line.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
+        JLabel name = category.nameLabel();
+        name.setPreferredSize(new Dimension(150, name.getPreferredSize().height));
+        line.add(name, BorderLayout.WEST);
+
+        JPanel entry = new JPanel(new BorderLayout(6, 0));
+        entry.add(category.field(), BorderLayout.CENTER);
+        entry.add(leftRow(category.addButton(), category.allBox()), BorderLayout.EAST);
+
+        JPanel chosen = new JPanel(new BorderLayout(6, 0));
+        chosen.add(category.list(), BorderLayout.CENTER);
+        chosen.add(category.removeButton(), BorderLayout.EAST);
+
+        JPanel middle = new JPanel(new java.awt.GridLayout(1, 2, 12, 0));
+        middle.add(entry);
+        middle.add(chosen);
+        line.add(middle, BorderLayout.CENTER);
+        return line;
     }
 
     /** One runtime observable: what kind, and which one. */
@@ -1042,37 +1110,6 @@ public class StepssUI extends javax.swing.JFrame {
         saveDumpButton = new javax.swing.JCheckBox();
         observFileWizButton = new javax.swing.JCheckBox();
         jPanel7 = new javax.swing.JPanel();
-        jLabel25 = new javax.swing.JLabel();
-        busObsField = new javax.swing.JTextField();
-        addBusButton = new javax.swing.JButton();
-        busObsList = new javax.swing.JComboBox();
-        remBusObs = new javax.swing.JButton();
-        jLabel26 = new javax.swing.JLabel();
-        syncObsField = new javax.swing.JTextField();
-        addSyncButton = new javax.swing.JButton();
-        syncObsList = new javax.swing.JComboBox();
-        remSyncObs = new javax.swing.JButton();
-        jLabel27 = new javax.swing.JLabel();
-        shuntObsField = new javax.swing.JTextField();
-        addShuntButton = new javax.swing.JButton();
-        shuntObsList = new javax.swing.JComboBox();
-        remShuntObs = new javax.swing.JButton();
-        jLabel28 = new javax.swing.JLabel();
-        branchObsField = new javax.swing.JTextField();
-        addBranchButton = new javax.swing.JButton();
-        branchObsList = new javax.swing.JComboBox();
-        remBranchObs = new javax.swing.JButton();
-        jLabel29 = new javax.swing.JLabel();
-        injObsField = new javax.swing.JTextField();
-        addInjButton = new javax.swing.JButton();
-        injObsList = new javax.swing.JComboBox();
-        remInjObs = new javax.swing.JButton();
-        filler2 = new javax.swing.Box.Filler(new java.awt.Dimension(20, 0), new java.awt.Dimension(20, 0), new java.awt.Dimension(20, 32767));
-        allBusCheckBox = new javax.swing.JCheckBox();
-        allSyncCheckBox = new javax.swing.JCheckBox();
-        allShuntCheckBox = new javax.swing.JCheckBox();
-        allBranchCheckBox = new javax.swing.JCheckBox();
-        allInjCheckBox = new javax.swing.JCheckBox();
         runtimeObsType = new javax.swing.JComboBox();
         runtimeObsName = new javax.swing.JTextField();
         jLabel30 = new javax.swing.JLabel();
@@ -1748,360 +1785,10 @@ public class StepssUI extends javax.swing.JFrame {
         jPanel7.setName("jPanel7"); // NOI18N
         jPanel7.setLayout(new java.awt.GridBagLayout());
 
-        jLabel25.setText("BUS");
-        jLabel25.setName("jLabel25"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(jLabel25, gridBagConstraints);
-
-        busObsField.setToolTipText("Write tha name of the bus to save the observables.");
-        busObsField.setMinimumSize(new java.awt.Dimension(0, 0));
-        busObsField.setName("busObsField"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 100;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(busObsField, gridBagConstraints);
-
-        addBusButton.setText("Add BUS");
-        addBusButton.setName("addBusButton"); // NOI18N
-        addBusButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                addBusButtonActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(addBusButton, gridBagConstraints);
-
-        busObsList.setName("busObsList"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 5;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 100;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(busObsList, gridBagConstraints);
-
-        remBusObs.setText("Remove");
-        remBusObs.setMinimumSize(new java.awt.Dimension(64, 15));
-        remBusObs.setName("remBusObs"); // NOI18N
-        remBusObs.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                remBusObsActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 6;
-        gridBagConstraints.gridy = 0;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 40;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(remBusObs, gridBagConstraints);
-
-        jLabel26.setText("Synchronous Machine");
-        jLabel26.setName("jLabel26"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(jLabel26, gridBagConstraints);
-
-        syncObsField.setToolTipText("Write tha name of the synchronous machine to save the observables.");
-        syncObsField.setMinimumSize(new java.awt.Dimension(0, 0));
-        syncObsField.setName("syncObsField"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 1;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 100;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(syncObsField, gridBagConstraints);
-
-        addSyncButton.setText("Add Synchronous machine");
-        addSyncButton.setName("addSyncButton"); // NOI18N
-        addSyncButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                addSyncButtonActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 2;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(addSyncButton, gridBagConstraints);
-
-        syncObsList.setName("syncObsList"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 5;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 100;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(syncObsList, gridBagConstraints);
-
-        remSyncObs.setText("Remove");
-        remSyncObs.setMinimumSize(new java.awt.Dimension(64, 15));
-        remSyncObs.setName("remSyncObs"); // NOI18N
-        remSyncObs.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                remSyncObsActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 6;
-        gridBagConstraints.gridy = 1;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 40;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(remSyncObs, gridBagConstraints);
-
-        jLabel27.setText("Shunt");
-        jLabel27.setName("jLabel27"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 2;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(jLabel27, gridBagConstraints);
-
-        shuntObsField.setToolTipText("Write tha name of the shunt to save the observables.");
-        shuntObsField.setMinimumSize(new java.awt.Dimension(0, 0));
-        shuntObsField.setName("shuntObsField"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 1;
-        gridBagConstraints.gridy = 2;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 100;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(shuntObsField, gridBagConstraints);
-
-        addShuntButton.setText("Add Shunt");
-        addShuntButton.setName("addShuntButton"); // NOI18N
-        addShuntButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                addShuntButtonActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 2;
-        gridBagConstraints.gridy = 2;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(addShuntButton, gridBagConstraints);
-
-        shuntObsList.setName("shuntObsList"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 5;
-        gridBagConstraints.gridy = 2;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 100;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(shuntObsList, gridBagConstraints);
-
-        remShuntObs.setText("Remove");
-        remShuntObs.setMinimumSize(new java.awt.Dimension(64, 15));
-        remShuntObs.setName("remShuntObs"); // NOI18N
-        remShuntObs.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                remShuntObsActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 6;
-        gridBagConstraints.gridy = 2;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 40;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(remShuntObs, gridBagConstraints);
-
-        jLabel28.setText("Branch");
-        jLabel28.setName("jLabel28"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 3;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(jLabel28, gridBagConstraints);
-
-        branchObsField.setToolTipText("Write tha name of the branch to save the observables.");
-        branchObsField.setMinimumSize(new java.awt.Dimension(0, 0));
-        branchObsField.setName("branchObsField"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 1;
-        gridBagConstraints.gridy = 3;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 100;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(branchObsField, gridBagConstraints);
-
-        addBranchButton.setText("Add Branch");
-        addBranchButton.setName("addBranchButton"); // NOI18N
-        addBranchButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                addBranchButtonActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 2;
-        gridBagConstraints.gridy = 3;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(addBranchButton, gridBagConstraints);
-
-        branchObsList.setName("branchObsList"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 5;
-        gridBagConstraints.gridy = 3;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 100;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(branchObsList, gridBagConstraints);
-
-        remBranchObs.setText("Remove");
-        remBranchObs.setMinimumSize(new java.awt.Dimension(64, 15));
-        remBranchObs.setName("remBranchObs"); // NOI18N
-        remBranchObs.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                remBranchObsActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 6;
-        gridBagConstraints.gridy = 3;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 40;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(remBranchObs, gridBagConstraints);
-
-        jLabel29.setText("Injector");
-        jLabel29.setName("jLabel29"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 4;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(jLabel29, gridBagConstraints);
-
-        injObsField.setToolTipText("branch");
-        injObsField.setMinimumSize(new java.awt.Dimension(0, 0));
-        injObsField.setName("injObsField"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 1;
-        gridBagConstraints.gridy = 4;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 100;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(injObsField, gridBagConstraints);
-
-        addInjButton.setText("Add Injector");
-        addInjButton.setName("addInjButton"); // NOI18N
-        addInjButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                addInjButtonActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 2;
-        gridBagConstraints.gridy = 4;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(addInjButton, gridBagConstraints);
-
-        injObsList.setName("injObsList"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 5;
-        gridBagConstraints.gridy = 4;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 100;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(injObsList, gridBagConstraints);
-
-        remInjObs.setText("Remove");
-        remInjObs.setMinimumSize(new java.awt.Dimension(64, 15));
-        remInjObs.setName("remInjObs"); // NOI18N
-        remInjObs.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                remInjObsActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 6;
-        gridBagConstraints.gridy = 4;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
-        gridBagConstraints.ipadx = 40;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
-        jPanel7.add(remInjObs, gridBagConstraints);
-
-        filler2.setName("filler2"); // NOI18N
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 4;
-        gridBagConstraints.gridy = 0;
-        jPanel7.add(filler2, gridBagConstraints);
-
-        allBusCheckBox.setText("All");
-        allBusCheckBox.setName("allBusCheckBox"); // NOI18N
-        allBusCheckBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                allBusCheckBoxActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 0;
-        jPanel7.add(allBusCheckBox, gridBagConstraints);
-
-        allSyncCheckBox.setText("All");
-        allSyncCheckBox.setName("allSyncCheckBox"); // NOI18N
-        allSyncCheckBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                allSyncCheckBoxActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 1;
-        jPanel7.add(allSyncCheckBox, gridBagConstraints);
-
-        allShuntCheckBox.setText("All");
-        allShuntCheckBox.setName("allShuntCheckBox"); // NOI18N
-        allShuntCheckBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                allShuntCheckBoxActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 2;
-        jPanel7.add(allShuntCheckBox, gridBagConstraints);
-
-        allBranchCheckBox.setText("All");
-        allBranchCheckBox.setName("allBranchCheckBox"); // NOI18N
-        allBranchCheckBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                allBranchCheckBoxActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 3;
-        jPanel7.add(allBranchCheckBox, gridBagConstraints);
-
-        allInjCheckBox.setText("All");
-        allInjCheckBox.setName("allInjCheckBox"); // NOI18N
-        allInjCheckBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                allInjCheckBoxActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 4;
-        jPanel7.add(allInjCheckBox, gridBagConstraints);
-
         runtimeObsType.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType.setName("runtimeObsType"); // NOI18N
 
-        runtimeObsName.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
+        runtimeObsName.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName.setName("runtimeObsName"); // NOI18N
 
         jLabel30.setText("<html><b>Runtime observables</b></html>");
@@ -2126,13 +1813,13 @@ public class StepssUI extends javax.swing.JFrame {
         runtimeObsType1.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType1.setName("runtimeObsType1"); // NOI18N
 
-        runtimeObsName1.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
+        runtimeObsName1.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName1.setName("runtimeObsName1"); // NOI18N
 
         runtimeObsType2.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType2.setName("runtimeObsType2"); // NOI18N
 
-        runtimeObsName2.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
+        runtimeObsName2.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName2.setName("runtimeObsName2"); // NOI18N
 
         javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
@@ -3270,15 +2957,19 @@ public class StepssUI extends javax.swing.JFrame {
      */
     private String writeObservable(BufferedWriter out, JComboBox type, JTextField name) throws IOException {
         String label = String.valueOf(type.getSelectedItem());
-        boolean wallTime = WALL_TIME.equals(label);
-        if (name.getText().isEmpty() && !wallTime) {
+        // RT and SOL name no equipment. RAMSES treats both as a "Special
+        // Display" reading a single token, so a blank field is how they are
+        // normally left and must not be read as an unused row.
+        boolean noEquipment = WALL_TIME.equals(label) || SOLUTIONS.equals(label);
+        if (name.getText().isEmpty() && !noEquipment) {
             return null;
         }
         String keyword = OBSERVABLE_TYPES.get(label);
         if (keyword == null) {
             return "The command file could not be written.";
         }
-        out.append(wallTime ? keyword + " RT" : keyword + " " + name.getText());
+        out.append(noEquipment ? keyword + " " + keyword
+                : keyword + " " + name.getText());
         out.newLine();
         return null;
     }
@@ -3605,9 +3296,9 @@ public class StepssUI extends javax.swing.JFrame {
         // which also flips saveOutputTrajButton and would overwrite the value
         // just restored from the file.
         jPanel7.setVisible(observFileWizButton.isSelected());
-        // The observable dialog's five picker lists are session state, not part
+        // The observable dialog's eight picker lists are session state, not part
         // of the scenario, so a case saved with the dialog in use comes back
-        // with it ticked over five empty lists. Left unsaid, the next run would
+        // with it ticked over eight empty lists. Left unsaid, the next run would
         // write a customObs.txt of blank lines and plot nothing.
         if (observFileWizButton.isSelected() && noObservablesPicked()) {
             problems.add("Show observable dialog is on, but no observables are"
@@ -3645,12 +3336,7 @@ public class StepssUI extends javax.swing.JFrame {
 
     /** True when the observable dialog would contribute nothing to a run. */
     private boolean noObservablesPicked() {
-        return !allBusCheckBox.isSelected() && !allSyncCheckBox.isSelected()
-                && !allShuntCheckBox.isSelected() && !allBranchCheckBox.isSelected()
-                && !allInjCheckBox.isSelected()
-                && busObsList.getItemCount() == 0 && syncObsList.getItemCount() == 0
-                && shuntObsList.getItemCount() == 0 && branchObsList.getItemCount() == 0
-                && injObsList.getItemCount() == 0;
+        return observables.isEmpty();
     }
 
     private void openExamplesMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openExamplesMenuItemActionPerformed
@@ -5322,151 +5008,6 @@ public class StepssUI extends javax.swing.JFrame {
         nppOpen(evt, fileObs.getText());
     }//GEN-LAST:event_nppObsButtonActionPerformed
 
-    private void allInjCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_allInjCheckBoxActionPerformed
-        if (allInjCheckBox.isSelected()) {
-            injObsField.setText("");
-            injObsField.setEnabled(false);
-            injObsList.setEnabled(false);
-        } else {
-            injObsField.setEnabled(true);
-            injObsList.setEnabled(true);
-        }
-    }//GEN-LAST:event_allInjCheckBoxActionPerformed
-
-    private void allBranchCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_allBranchCheckBoxActionPerformed
-        if (allBranchCheckBox.isSelected()) {
-            branchObsField.setText("");
-            branchObsField.setEnabled(false);
-            branchObsList.setEnabled(false);
-        } else {
-            branchObsField.setEnabled(true);
-            branchObsList.setEnabled(true);
-        }
-    }//GEN-LAST:event_allBranchCheckBoxActionPerformed
-
-    private void allShuntCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_allShuntCheckBoxActionPerformed
-        if (allShuntCheckBox.isSelected()) {
-            shuntObsField.setText("");
-            shuntObsField.setEnabled(false);
-            shuntObsList.setEnabled(false);
-        } else {
-            shuntObsField.setEnabled(true);
-            shuntObsList.setEnabled(true);
-        }
-    }//GEN-LAST:event_allShuntCheckBoxActionPerformed
-
-    private void allSyncCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_allSyncCheckBoxActionPerformed
-        if (allSyncCheckBox.isSelected()) {
-            syncObsField.setText("");
-            syncObsField.setEnabled(false);
-            syncObsList.setEnabled(false);
-        } else {
-            syncObsField.setEnabled(true);
-            syncObsList.setEnabled(true);
-        }
-    }//GEN-LAST:event_allSyncCheckBoxActionPerformed
-
-    private void allBusCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_allBusCheckBoxActionPerformed
-        if (allBusCheckBox.isSelected()) {
-            busObsField.setText("");
-            busObsField.setEnabled(false);
-            busObsList.setEnabled(false);
-        } else {
-            busObsField.setEnabled(true);
-            busObsList.setEnabled(true);
-        }
-    }//GEN-LAST:event_allBusCheckBoxActionPerformed
-
-    private void remInjObsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_remInjObsActionPerformed
-        injObsList.removeItemAt(injObsList.getSelectedIndex());
-    }//GEN-LAST:event_remInjObsActionPerformed
-
-    private void addInjButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addInjButtonActionPerformed
-        if (!injObsField.getText().equals("")) {
-            for (int i = 0; i < injObsList.getItemCount(); i++) {
-                if (injObsField.getText().equals((injObsList.getItemAt(i).toString()))) {
-                    injObsField.setText("Already in List!");
-                    return;
-                }
-            }
-            injObsList.addItem(injObsField.getText());
-            injObsField.setText("");
-        }
-    }//GEN-LAST:event_addInjButtonActionPerformed
-
-    private void remBranchObsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_remBranchObsActionPerformed
-        branchObsList.removeItemAt(branchObsList.getSelectedIndex());
-    }//GEN-LAST:event_remBranchObsActionPerformed
-
-    private void addBranchButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addBranchButtonActionPerformed
-        if (!branchObsField.getText().equals("")) {
-            for (int i = 0; i < branchObsList.getItemCount(); i++) {
-                if (branchObsField.getText().equals((branchObsList.getItemAt(i).toString()))) {
-                    branchObsField.setText("Already in List!");
-                    return;
-                }
-            }
-            branchObsList.addItem(branchObsField.getText());
-            branchObsField.setText("");
-        }
-    }//GEN-LAST:event_addBranchButtonActionPerformed
-
-    private void remShuntObsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_remShuntObsActionPerformed
-        shuntObsList.removeItemAt(shuntObsList.getSelectedIndex());
-    }//GEN-LAST:event_remShuntObsActionPerformed
-
-    private void addShuntButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addShuntButtonActionPerformed
-        if (!shuntObsField.getText().equals("")) {
-            for (int i = 0; i < shuntObsList.getItemCount(); i++) {
-                if (shuntObsField.getText().equals((shuntObsList.getItemAt(i).toString()))) {
-                    shuntObsField.setText("Already in List!");
-                    return;
-                }
-            }
-            shuntObsList.addItem(shuntObsField.getText());
-            shuntObsField.setText("");
-        }
-    }//GEN-LAST:event_addShuntButtonActionPerformed
-
-    private void remSyncObsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_remSyncObsActionPerformed
-        syncObsList.removeItemAt(syncObsList.getSelectedIndex());
-    }//GEN-LAST:event_remSyncObsActionPerformed
-
-    private void addSyncButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addSyncButtonActionPerformed
-        if (!syncObsField.getText().equals("")) {
-            for (int i = 0; i < syncObsList.getItemCount(); i++) {
-                if (syncObsField.getText().equals((syncObsList.getItemAt(i).toString()))) {
-                    // syncObsField, not busObsField: this is the one of the
-                    // five copies of this handler that was never re-pointed
-                    // after being pasted, so a duplicate machine name put the
-                    // notice in the Bus row and overwrote whatever was typed
-                    // there, while the Sync row said nothing at all.
-                    syncObsField.setText("Already in List!");
-                    return;
-                }
-            }
-            syncObsList.addItem(syncObsField.getText());
-            syncObsField.setText("");
-        }
-    }//GEN-LAST:event_addSyncButtonActionPerformed
-
-    private void remBusObsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_remBusObsActionPerformed
-        busObsList.removeItemAt(busObsList.getSelectedIndex());
-    }//GEN-LAST:event_remBusObsActionPerformed
-
-    private void addBusButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addBusButtonActionPerformed
-        if (!busObsField.getText().equals("")) {
-            for (int i = 0; i < busObsList.getItemCount(); i++) {
-                if (busObsField.getText().equals((busObsList.getItemAt(i).toString()))) {
-                    busObsField.setText("Already in List!");
-                    return;
-                }
-            }
-            busObsList.addItem(busObsField.getText());
-            busObsField.setText("");
-        }
-    }//GEN-LAST:event_addBusButtonActionPerformed
-
     private void observFileWizButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_observFileWizButtonActionPerformed
         if (observFileWizButton.isSelected()) {
             jPanel7.setVisible(true);
@@ -5509,28 +5050,7 @@ public class StepssUI extends javax.swing.JFrame {
     }//GEN-LAST:event_saveOutputTrajButtonActionPerformed
 
     private void clearObsFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearObsFileButtonActionPerformed
-        fileObs.setText("");
-        // All three rows. The loop below walks jPanel7, the wizard panel, and
-        // the runtime observable rows are not in it, so clearing row one alone
-        // left rows two and three still naming equipment and the next run
-        // still plotting them, right after the user pressed Clear.
-        runtimeObsName.setText("");
-        runtimeObsName1.setText("");
-        runtimeObsName2.setText("");
-        for (Component c : jPanel7.getComponents()) {
-            if (c instanceof JTextField) {
-                ((JTextField) c).setText("");
-                ((JTextField) c).setEnabled(true);
-            } else if (c instanceof JComboBox) {
-                ((JComboBox) c).removeAllItems();
-                ((JComboBox) c).setEnabled(true);
-            } else if (c instanceof JCheckBox) {
-                ((JCheckBox) c).setSelected(false);
-            }
-        }
-        saveOutputTrajButton.setSelected(false);
-        observFileWizButton.setSelected(false);
-        saveDumpButton.setSelected(false);
+        observables.reset();
         observFileWizButtonActionPerformed(null);
     }//GEN-LAST:event_clearObsFileButtonActionPerformed
 
@@ -7213,20 +6733,6 @@ public class StepssUI extends javax.swing.JFrame {
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton Compile;
     private javax.swing.JDialog aboutBox;
-    private javax.swing.JButton addBranchButton;
-    private javax.swing.JButton addBusButton;
-    private javax.swing.JButton addInjButton;
-    private javax.swing.JButton addShuntButton;
-    private javax.swing.JButton addSyncButton;
-    private javax.swing.JCheckBox allBranchCheckBox;
-    private javax.swing.JCheckBox allBusCheckBox;
-    private javax.swing.JCheckBox allInjCheckBox;
-    private javax.swing.JCheckBox allShuntCheckBox;
-    private javax.swing.JCheckBox allSyncCheckBox;
-    private javax.swing.JTextField branchObsField;
-    private javax.swing.JComboBox branchObsList;
-    private javax.swing.JTextField busObsField;
-    private javax.swing.JComboBox busObsList;
     private javax.swing.ButtonGroup buttonGroup1;
     private javax.swing.JMenuItem checkUpdateButton;
     private javax.swing.JButton clearDataFiles;
@@ -7252,17 +6758,9 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JTextField fileDist;
     private javax.swing.JMenu fileMenu;
     private javax.swing.JTextField fileObs;
-    private javax.swing.Box.Filler filler2;
     private javax.swing.JMenu helpMenu;
-    private javax.swing.JTextField injObsField;
-    private javax.swing.JComboBox injObsList;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
-    private javax.swing.JLabel jLabel25;
-    private javax.swing.JLabel jLabel26;
-    private javax.swing.JLabel jLabel27;
-    private javax.swing.JLabel jLabel28;
-    private javax.swing.JLabel jLabel29;
     private javax.swing.JLabel jLabel30;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
@@ -7328,11 +6826,6 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JMenuItem openNppButton;
     private javax.swing.JMenuItem openTermButton;
     private javax.swing.JTextArea pfcPane;
-    private javax.swing.JButton remBranchObs;
-    private javax.swing.JButton remBusObs;
-    private javax.swing.JButton remInjObs;
-    private javax.swing.JButton remShuntObs;
-    private javax.swing.JButton remSyncObs;
     private javax.swing.JButton runDyngraphButton;
     private javax.swing.JButton runPF;
     private javax.swing.JButton runSimulation;
@@ -7367,8 +6860,6 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton showPFCLicenseButton;
     private javax.swing.JButton showRAMSESLicenseButton;
     private javax.swing.JMenuItem showUserGuideButton;
-    private javax.swing.JTextField shuntObsField;
-    private javax.swing.JComboBox shuntObsList;
     private javax.swing.JTextArea simulationOutput;
     private javax.swing.JTextField ssaBasename;
     private javax.swing.JLabel ssaBasenameLabel;
@@ -7382,8 +6873,6 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JTextField ssaTime;
     private javax.swing.JLabel ssaTimeLabel;
     private javax.swing.JButton stopSimulationButton;
-    private javax.swing.JTextField syncObsField;
-    private javax.swing.JComboBox syncObsList;
     private javax.swing.JMenu toolsMenu;
     private javax.swing.JLabel versionLabel;
     private javax.swing.JLabel versionLabel1;
@@ -7403,66 +6892,8 @@ public class StepssUI extends javax.swing.JFrame {
 
     private boolean createCustomObsFile() {
         try {
-            BufferedWriter tmpBuffWriter;
-            tmpBuffWriter = new BufferedWriter(new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "customObs.txt"));
-            tmpBuffWriter.write("");
-            tmpBuffWriter.flush();
-            if (allBusCheckBox.isSelected()) {
-                tmpBuffWriter.append("BUS *");
-                tmpBuffWriter.newLine();
-            } else if (busObsList.getItemCount() > 0) {
-                for (int i = 0; i < busObsList.getItemCount(); i++) {
-                    tmpBuffWriter.append("BUS " + busObsList.getItemAt(i).toString());
-                    tmpBuffWriter.newLine();
-                }
-            }
-
-            if (allSyncCheckBox.isSelected()) {
-                tmpBuffWriter.append("SYNC *");
-                tmpBuffWriter.newLine();
-            } else if (syncObsList.getItemCount() > 0) {
-                for (int i = 0; i < syncObsList.getItemCount(); i++) {
-                    tmpBuffWriter.append("SYNC " + syncObsList.getItemAt(i).toString());
-                    tmpBuffWriter.newLine();
-                }
-            }
-
-            if (allShuntCheckBox.isSelected()) {
-                tmpBuffWriter.append("SHUNT *");
-                tmpBuffWriter.newLine();
-            } else if (shuntObsList.getItemCount() > 0) {
-                for (int i = 0; i < shuntObsList.getItemCount(); i++) {
-                    tmpBuffWriter.append("SHUNT " + shuntObsList.getItemAt(i).toString());
-                    tmpBuffWriter.newLine();
-                }
-            }
-
-            if (allBranchCheckBox.isSelected()) {
-                tmpBuffWriter.append("BRANCH *");
-                tmpBuffWriter.newLine();
-            } else if (branchObsList.getItemCount() > 0) {
-                for (int i = 0; i < branchObsList.getItemCount(); i++) {
-                    tmpBuffWriter.append("BRANCH " + branchObsList.getItemAt(i).toString() + " ");
-                    tmpBuffWriter.newLine();
-                }
-            }
-
-            if (allInjCheckBox.isSelected()) {
-                tmpBuffWriter.append("INJEC *");
-                tmpBuffWriter.newLine();
-            } else if (injObsList.getItemCount() > 0) {
-                for (int i = 0; i < injObsList.getItemCount(); i++) {
-                    tmpBuffWriter.append("INJEC " + injObsList.getItemAt(i).toString());
-                    tmpBuffWriter.newLine();
-                }
-            }
-            tmpBuffWriter.newLine();
-            tmpBuffWriter.newLine();
-            tmpBuffWriter.flush();
-            tmpBuffWriter.close();
+            observables.write(new File(myTempDir, "customObs.txt"));
             return true;
-
-
         } catch (IOException ex) {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
             return false;

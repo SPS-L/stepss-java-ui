@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Runs the headless save/load scenario checks against the built classes.
+# Runs the headless observable-picker checks against the built classes.
 # This repository has no unit-test framework; this is the substitute.
 #
-# Like tools/picker-harness.sh, dist/lib is NOT on the classpath: my.stepss.config
+# Like tools/scenario-harness.sh, dist/lib is NOT on the classpath: my.stepss.obs
 # depends on nothing beyond the JDK and Swing, so build/classes alone is enough
 # to load it. It builds controls but never a frame, so it runs headless.
 #
@@ -19,4 +19,4 @@ if [ ! -d build/classes ]; then
     echo "build/classes not found - run 'ant compile' (or 'ant jar') first." >&2
     exit 1
 fi
-exec java -Djava.awt.headless=true -Djava.io.tmpdir="${TMPDIR:-/tmp}" -cp build/classes my.stepss.config.ScenarioHarness
+exec java -Djava.awt.headless=true -Djava.io.tmpdir="${TMPDIR:-/tmp}" -cp build/classes my.stepss.obs.ObservablesHarness
