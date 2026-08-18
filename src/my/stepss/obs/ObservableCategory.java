@@ -120,7 +120,7 @@ public final class ObservableCategory {
         field.setToolTipText(tooltip);
         allBox.setToolTipText("Observe every " + kind.label().toLowerCase(
                 java.util.Locale.ROOT) + " in the network.");
-        removeButton.setEnabled(false);
+        syncRemoveEnabled();
     }
 
     /** Which category this row chooses members of. */

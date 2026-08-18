@@ -72,6 +72,7 @@ public final class ObservablesHarness {
         expect("list emptied", 0, row.list().getItemCount());
         expect("list re-enabled", true, row.list().isEnabled());
         expect("all unticked", false, row.allBox().isSelected());
+        expect("remove disabled after clear", false, row.removeButton().isEnabled());
         expect("names empty", 0, row.names().size());
         expect("isAll false", false, row.isAll());
     }
