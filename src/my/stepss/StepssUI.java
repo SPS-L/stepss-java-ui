@@ -76,6 +76,9 @@ public class StepssUI extends javax.swing.JFrame {
      */
     private static final String WALL_TIME = "Wall Time";
 
+    /** The display types that name no equipment, so a blank field is normal. */
+    private static final String SOLUTIONS = "Injector solutions";
+
     /**
      * Every runtime observable type, in the order the Observables tab lists
      * them, mapped to the keyword RAMSES reads for it in the command file.
@@ -103,12 +106,14 @@ public class StepssUI extends javax.swing.JFrame {
         types.put("Active power-delta of machine", "P-d");
         types.put("Center of Inertia", "COI");
         types.put(WALL_TIME, "RT");
+        types.put(SOLUTIONS, "SOL");
         types.put("Latency", "LAT");
         types.put("Branch Active Power Origin", "BPO");
         types.put("Branch Active Power Extremity", "BPE");
         types.put("Branch Reactive Power Origin", "BQO");
         types.put("Branch Reactive Power Extremity", "BQE");
         types.put("Injector Observable", "ON");
+        types.put("Two-port injector Observable", "TO");
         return Collections.unmodifiableMap(types);
     }
 
@@ -2101,7 +2106,7 @@ public class StepssUI extends javax.swing.JFrame {
         runtimeObsType.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType.setName("runtimeObsType"); // NOI18N
 
-        runtimeObsName.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
+        runtimeObsName.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName.setName("runtimeObsName"); // NOI18N
 
         jLabel30.setText("<html><b>Runtime observables</b></html>");
@@ -2126,13 +2131,13 @@ public class StepssUI extends javax.swing.JFrame {
         runtimeObsType1.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType1.setName("runtimeObsType1"); // NOI18N
 
-        runtimeObsName1.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
+        runtimeObsName1.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName1.setName("runtimeObsName1"); // NOI18N
 
         runtimeObsType2.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType2.setName("runtimeObsType2"); // NOI18N
 
-        runtimeObsName2.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
+        runtimeObsName2.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName2.setName("runtimeObsName2"); // NOI18N
 
         javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
@@ -3270,15 +3275,19 @@ public class StepssUI extends javax.swing.JFrame {
      */
     private String writeObservable(BufferedWriter out, JComboBox type, JTextField name) throws IOException {
         String label = String.valueOf(type.getSelectedItem());
-        boolean wallTime = WALL_TIME.equals(label);
-        if (name.getText().isEmpty() && !wallTime) {
+        // RT and SOL name no equipment. RAMSES treats both as a "Special
+        // Display" reading a single token, so a blank field is how they are
+        // normally left and must not be read as an unused row.
+        boolean noEquipment = WALL_TIME.equals(label) || SOLUTIONS.equals(label);
+        if (name.getText().isEmpty() && !noEquipment) {
             return null;
         }
         String keyword = OBSERVABLE_TYPES.get(label);
         if (keyword == null) {
             return "The command file could not be written.";
         }
-        out.append(wallTime ? keyword + " RT" : keyword + " " + name.getText());
+        out.append(noEquipment ? keyword + " " + keyword
+                : keyword + " " + name.getText());
         out.newLine();
         return null;
     }
