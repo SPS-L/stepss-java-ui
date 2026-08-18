@@ -1434,7 +1434,7 @@ public class StepssUI extends javax.swing.JFrame {
             }
         });
 
-        jLabel9.setText("<html><b>Disturbance file</b> (required)</html>");
+        jLabel9.setText("<html><b>Disturbance file</b> (optional)</html>");
         jLabel9.setName("jLabel9"); // NOI18N
 
         loadData6.setText("Load file");

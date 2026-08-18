@@ -15,7 +15,7 @@ PLATFORMS = ("windows", "linux", "macos")
 # They are pinned like uramses - source archive plus a content manifest - but
 # their packed payload names carry no version, so unlike every component here
 # they need no Toolchain.java rewrite and appear in no `renames` map.
-EXAMPLES = ("kundur", "nordic", "five-bus")
+EXAMPLES = ("kundur", "nordic", "five-bus", "six-bus")
 
 VERSION_TOKEN = "@VERSION@"
 PAYLOAD_PREFIX = "payload/"

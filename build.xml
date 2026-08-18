@@ -317,6 +317,7 @@
   <fetch-example id="kundur"   version="${kundur.version}"   url="${kundur.source.url}"/>
   <fetch-example id="nordic"   version="${nordic.version}"   url="${nordic.source.url}"/>
   <fetch-example id="five-bus" version="${five-bus.version}" url="${five-bus.source.url}"/>
+  <fetch-example id="six-bus"  version="${six-bus.version}"  url="${six-bus.source.url}"/>
  </target>
 
  <!-- `init` is build-impl.xml's property-loading chain, and this target needs
@@ -382,6 +383,8 @@
                 sha256="${nordic.manifest.sha256}"/>
   <pack-example id="five-bus" version="${five-bus.version}"
                 sha256="${five-bus.manifest.sha256}"/>
+  <pack-example id="six-bus"  version="${six-bus.version}"
+                sha256="${six-bus.manifest.sha256}"/>
  </target>
 
  <target name="-pre-compile" depends="stage-payloads"/>
