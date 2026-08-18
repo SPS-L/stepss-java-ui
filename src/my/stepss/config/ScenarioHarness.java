@@ -77,6 +77,8 @@ public final class ScenarioHarness {
 
     public static void main(String[] args) throws IOException {
         checkRoundTripThroughANestedTree();
+        checkTheDiagramSlotRoundTrips();
+        checkAnEmptyDiagramSlotStaysEmpty();
         checkEveryLoadedPathIsAbsolute();
         checkPathsInsideTheFolderAreStoredRelative();
         checkPathsOutsideTheFolderStayAbsolute();
@@ -156,6 +158,44 @@ public final class ScenarioHarness {
         expect("save continuous trace came back", false, form.continuous.isSelected());
         expect("save discrete trace came back", true, form.discrete.isSelected());
         expect("save dump came back", true, form.dump.isSelected());
+    }
+
+    /**
+     * The one-line diagram path survives a save and a load.
+     *
+     * <p>It is part of a scenario for the same reason every other path is:
+     * {@code createPFCCommandFile()} reads it, so a scenario that round-trips
+     * is a run that reproduces.
+     */
+    private static void checkTheDiagramSlotRoundTrips() throws IOException {
+        File dir = tempDir("diagram");
+        Form form = new Form();
+        form.data[0].setText(touch(dir, "6bus.dat"));
+        String svg = touch(dir, "6bus.svg");
+        form.diagram.setText(svg);
+
+        File cfg = temp(dir, "case.cfg");
+        ScenarioFile.save(form.binding.read(), cfg, dir, "3.75.0");
+
+        form.blank();
+        expect("the form was blanked", "", form.diagram.getText());
+
+        ScenarioFile.Loaded loaded = ScenarioFile.load(cfg);
+        form.binding.apply(loaded.scenario());
+        expect("the diagram slot comes back", svg, form.diagram.getText());
+        expect("a clean load reports no problems", true, loaded.problems().isEmpty());
+    }
+
+    /** An empty diagram slot round-trips as empty, not as the .cfg's directory. */
+    private static void checkAnEmptyDiagramSlotStaysEmpty() throws IOException {
+        File dir = tempDir("nodiagram");
+        Form form = new Form();
+        File cfg = temp(dir, "case.cfg");
+        ScenarioFile.save(form.binding.read(), cfg, dir, "3.75.0");
+
+        ScenarioFile.Loaded loaded = ScenarioFile.load(cfg);
+        form.binding.apply(loaded.scenario());
+        expect("an unset diagram slot loads empty", "", form.diagram.getText());
     }
 
     /**
@@ -383,9 +423,9 @@ public final class ScenarioHarness {
         Form form = new Form();
         try {
             new ScenarioBinding(Arrays.copyOf(form.data, Scenario.DATA_SLOTS - 1),
-                    form.disturbance, form.observables, form.wizard, form.types,
-                    form.names, form.trajectory, form.continuous, form.discrete,
-                    form.dump);
+                    form.disturbance, form.observables, form.diagram, form.wizard,
+                    form.types, form.names, form.trajectory, form.continuous,
+                    form.discrete, form.dump);
             fail("a binding wired one field short is refused: no exception");
         } catch (IllegalArgumentException expected) {
             expect("a binding wired one field short is refused", true,
@@ -405,6 +445,7 @@ public final class ScenarioHarness {
         private final JTextField[] data = new JTextField[Scenario.DATA_SLOTS];
         private final JTextField disturbance = new JTextField();
         private final JTextField observables = new JTextField();
+        private final JTextField diagram = new JTextField();
         private final JCheckBox wizard = new JCheckBox();
         private final JComboBox<?>[] types = new JComboBox<?>[Scenario.RUNTIME_ROWS];
         private final JTextField[] names = new JTextField[Scenario.RUNTIME_ROWS];
@@ -425,12 +466,12 @@ public final class ScenarioHarness {
                 names[row] = new JTextField();
                 content.add(row(types[row], names[row]));
             }
-            content.add(row(disturbance, observables, wizard));
+            content.add(row(disturbance, observables, diagram, wizard));
             content.add(row(trajectory, continuous, discrete, dump));
             // The third level, and the one that broke the old walk.
             new JScrollPane(content);
-            binding = new ScenarioBinding(data, disturbance, observables, wizard,
-                    types, names, trajectory, continuous, discrete, dump);
+            binding = new ScenarioBinding(data, disturbance, observables, diagram,
+                    wizard, types, names, trajectory, continuous, discrete, dump);
         }
 
         private static JPanel row(java.awt.Component... controls) {
@@ -447,6 +488,7 @@ public final class ScenarioHarness {
             }
             disturbance.setText("");
             observables.setText("");
+            diagram.setText("");
             wizard.setSelected(false);
             for (int row = 0; row < Scenario.RUNTIME_ROWS; row++) {
                 types[row].setSelectedIndex(0);

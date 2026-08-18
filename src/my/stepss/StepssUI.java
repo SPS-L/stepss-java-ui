@@ -524,7 +524,7 @@ public class StepssUI extends javax.swing.JFrame {
         return new ScenarioBinding(
                 new JTextField[]{fileData1, fileData2, fileData3, fileData4, fileData5,
                     fileData6, fileData7, fileData8, fileData9, fileData10},
-                fileDist, fileObs, observFileWizButton,
+                fileDist, fileObs, fileDiagram, observFileWizButton,
                 new JComboBox<?>[]{runtimeObsType, runtimeObsType1, runtimeObsType2},
                 new JTextField[]{runtimeObsName, runtimeObsName1, runtimeObsName2},
                 saveOutputTrajButton, saveContTrace, saveDiscTrace, saveDumpButton);
