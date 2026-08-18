@@ -3,9 +3,12 @@ package my.stepss.platform;
 import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteException;
@@ -14,10 +17,11 @@ import org.apache.commons.exec.ShutdownHookProcessDestroyer;
 import org.apache.commons.exec.environment.EnvironmentUtils;
 
 /**
- * Launches external programs (editor, terminal, file manager) and kills stray
- * processes by name, in a platform-appropriate way. Replaces the bundled
- * Notepad++ (run under Wine on Linux) and the assorted taskkill/killall
- * branches that used to be scattered across the UI code.
+ * Launches external programs (editor, terminal, file manager, browser) and
+ * kills stray processes by name, in a platform-appropriate way. Replaces the
+ * bundled Notepad++ (run under Wine on Linux), the assorted taskkill/killall
+ * branches that used to be scattered across the UI code, and the public-domain
+ * BareBonesBrowserLaunch utility that opened every URL.
  */
 public final class PlatformLauncher {
 
@@ -125,6 +129,119 @@ public final class PlatformLauncher {
         }
         cmd.addArgument(file.getAbsolutePath(), false);
         return cmd;
+    }
+
+    /**
+     * The per-platform command that hands {@code url} to the user's browser.
+     *
+     * <p>Split out of {@link #openUrl} for the reason {@link #editorCommand}
+     * gives: it can be checked without launching anything, which is what
+     * {@link UrlLaunchCheck} does.
+     *
+     * <p>Windows gets the shell's own {@code start}, not the
+     * {@code rundll32 url.dll,FileProtocolHandler} the utility this replaced
+     * used. That call reports success whether or not anything opens, so a
+     * profile with no {@code https} association got a silent no-op and an exit
+     * status of zero: one of the two silent failures behind issue #18.
+     */
+    public static CommandLine urlCommand(Platform p, String url) {
+        CommandLine cmd;
+        if (p == Platform.WINDOWS_X86_64) {
+            cmd = new CommandLine("cmd.exe");
+            cmd.addArgument("/c");
+            cmd.addArgument("start");
+            // start treats its first quoted argument as the window title, so
+            // an address in quotes with nothing before it opens a console
+            // instead of the page. The empty title is what stops that.
+            cmd.addArgument("\"\"", false);
+            // The address is quoted for a second reason: cmd.exe reads & as a
+            // command separator, so an unquoted query string would be
+            // truncated at the first parameter and its tail run as a command.
+            cmd.addArgument("\"" + url + "\"", false);
+        } else if (p == Platform.MACOS_ARM64) {
+            cmd = new CommandLine("open");
+            cmd.addArgument(url, false);
+        } else {
+            cmd = new CommandLine("xdg-open");
+            cmd.addArgument(url, false);
+        }
+        return cmd;
+    }
+
+    /**
+     * Opens {@code url} in whatever browser the desktop uses.
+     *
+     * <p>Never throws, because every one of its callers is an action listener
+     * with nothing useful to do with an exception. A failure no fallback
+     * recovers from is reported through {@link #setUrlFailureListener}
+     * instead, which is the whole point of the method: the utility this
+     * replaced caught the failure into {@code catch (Exception ignore)} and
+     * left the user looking at a menu item that did nothing.
+     *
+     * <p>Runs on the calling thread, as {@link #openInEditor} does. Only the
+     * Desktop attempt is synchronous; the per-platform command is launched
+     * asynchronously by {@link #run}.
+     */
+    public static void openUrl(String url) {
+        final URI uri;
+        try {
+            uri = new URI(url);
+        } catch (URISyntaxException ex) {
+            reportUrlFailure(url, ex);
+            return;
+        }
+        if (browseWithDesktop(uri)) {
+            return;
+        }
+        try {
+            run(urlCommand(platformOrThrow(), url), null,
+                    cause -> reportUrlFailure(url, cause));
+        } catch (IOException ex) {
+            reportUrlFailure(url, ex);
+        }
+    }
+
+    /**
+     * Hands {@code uri} to the AWT Desktop API. Returns false, never throws,
+     * so the caller can fall back to a per-platform command.
+     *
+     * <p>Catching the {@code IOException} out of {@code browse} and returning
+     * false rather than letting it escape is the fix for issue #18, and it is
+     * the case that reading the API at face value gets wrong. Windows reports
+     * {@code BROWSE} as supported whenever the Desktop peer loads at all, so
+     * "supported" says nothing about whether a browser is actually reachable:
+     * a profile with no {@code https} association, or a default browser
+     * installed as a Store app that fails to launch, answers true to
+     * {@code isSupported} and then throws from {@code browse}. Choosing
+     * between Desktop and the fallback on {@code isSupported} alone therefore
+     * leaves exactly the machine that needs the fallback without one.
+     *
+     * <p>The unchecked catch is the one {@link #tryDesktop} documents:
+     * {@code isDesktopSupported()}/{@code getDesktop()} throw
+     * HeadlessException or UnsupportedOperationException on headless hosts and
+     * some minimal Linux desktops, and {@code browse} throws
+     * IllegalArgumentException for an address with no scheme.
+     */
+    private static boolean browseWithDesktop(URI uri) {
+        try {
+            if (!Desktop.isDesktopSupported()) {
+                return false;
+            }
+            Desktop desktop = Desktop.getDesktop();
+            if (!desktop.isSupported(Desktop.Action.BROWSE)) {
+                return false;
+            }
+            desktop.browse(uri);
+            return true;
+        } catch (IOException | RuntimeException ex) {
+            // Logged rather than swallowed: this is the half of the failure
+            // that used to be discarded, and on the machine in issue #18 it
+            // is the half that says why. Not shown to the user, because the
+            // per-platform command below may well succeed.
+            System.err.println("PlatformLauncher.openUrl: Desktop could not open "
+                    + uri + ": " + ex);
+            return false;
+        }
     }
 
     /** Hands the file to the user's default editor. Replaces bundled Notepad++. */
@@ -399,11 +516,58 @@ public final class PlatformLauncher {
     }
 
     /**
+     * Notified when {@link #openUrl} has run out of ways to reach a browser.
+     * Separate from {@link #launchFailureListener} because the useful thing to
+     * do about it is not the useful thing to do about a terminal that would
+     * not start: the address is the one piece of information the user needs,
+     * and they need it in a form they can copy.
+     */
+    private static volatile BiConsumer<String, Throwable> urlFailureListener;
+
+    /**
+     * Registers the callback that tells the user a URL could not be opened.
+     * Called back on whatever thread the failure surfaced on, which for an
+     * async launch is a Commons Exec worker and not the EDT; implementations
+     * that touch Swing must hop back themselves.
+     */
+    public static void setUrlFailureListener(BiConsumer<String, Throwable> listener) {
+        urlFailureListener = listener;
+    }
+
+    private static void reportUrlFailure(String url, Throwable cause) {
+        BiConsumer<String, Throwable> listener = urlFailureListener;
+        if (listener != null) {
+            listener.accept(url, cause);
+        } else {
+            System.err.println("PlatformLauncher: could not open " + url + ": " + cause);
+        }
+    }
+
+    /**
      * Launches {@code cmd} without blocking the caller. {@code description}
      * is a short present-tense fragment ("open a terminal") used only if the
      * launch fails, to name what was being attempted.
      */
     private static void run(CommandLine cmd, File workingDir, String description) throws IOException {
+        run(cmd, workingDir, cause -> {
+            BiConsumer<String, Throwable> listener = launchFailureListener;
+            if (listener != null) {
+                listener.accept(description, cause);
+            } else {
+                System.err.println("PlatformLauncher: could not " + description
+                        + ": " + cause.getMessage());
+            }
+        });
+    }
+
+    /**
+     * As {@link #run(CommandLine, File, String)}, but reports the failure to
+     * {@code onFailure} rather than to {@link #launchFailureListener}. Used by
+     * {@link #openUrl}, whose failure has its own listener and its own dialog,
+     * and which has no use for a description because the address says it.
+     */
+    private static void run(CommandLine cmd, File workingDir,
+            Consumer<Throwable> onFailure) throws IOException {
         DefaultExecutor executor = new DefaultExecutor();
         executor.setProcessDestroyer(new ShutdownHookProcessDestroyer());
         if (workingDir != null && workingDir.isDirectory()) {
@@ -417,13 +581,7 @@ public final class PlatformLauncher {
 
             @Override
             public void onProcessFailed(ExecuteException e) {
-                BiConsumer<String, Throwable> listener = launchFailureListener;
-                if (listener != null) {
-                    listener.accept(description, e);
-                } else {
-                    System.err.println("PlatformLauncher: could not " + description
-                            + ": " + e.getMessage());
-                }
+                onFailure.accept(e);
             }
         });
     }
