@@ -1609,6 +1609,15 @@ In `createPFCCommandFile()`, insert immediately **before** the `out.append("VT\n
             String template = fileDiagram.getText();
             if (!template.isEmpty()) {
                 File templateFile = new File(template);
+                // Checked here rather than left to Helios, because Helios
+                // handles it by desynchronising the command file. cmd_diagram
+                // prints "This file does not exist !" and returns WITHOUT
+                // consuming the output-name line, so Helios reads that line as
+                // a main-menu command, fails on it, and aborts the whole run
+                // with exit 1. Everything after the diagram block is lost,
+                // including the VT export the completion thread waits on.
+                // Refusing before the file is written costs the user a sentence
+                // instead of a dead run.
                 if (!templateFile.isFile()) {
                     out.close();
                     return "The one-line diagram file " + templateFile.getName()
@@ -1617,10 +1626,10 @@ In `createPFCCommandFile()`, insert immediately **before** the `out.append("VT\n
                 }
                 if (sameFile(templateFile, new File(myTempDir, DIAGRAM_OUTPUT))) {
                     out.close();
-                    return "The one-line diagram template is the file Helios writes"
-                            + " its result to. Helios refuses to overwrite its own"
-                            + " input, so nothing would be drawn. Move the template"
-                            + " or rename it.";
+                    return "The one-line diagram template is the file the power"
+                            + " flow writes its result to, so running would"
+                            + " overwrite your template with its own output."
+                            + " Move it or rename it, then run again.";
                 }
                 out.append(diagramCommands(templateFile.getAbsolutePath(), DIAGRAM_OUTPUT));
             }
@@ -1632,10 +1641,20 @@ and add the comparison helper beside it:
     /**
      * Whether two paths name the same file, canonical paths compared.
      *
-     * <p>Falls back to the absolute paths when either cannot be canonicalised,
-     * which is the safe direction: a false negative here lets Helios say
-     * "output file must be different from input file !" for itself, and that
-     * line now reaches the console.
+     * <p>Canonical and not textual, because Helios' own guard is textual and
+     * therefore misses this. {@code cmd_diagram} compares the two strings it
+     * was handed, so an absolute template and the relative output name slip
+     * past it and it overwrites the template with the annotated copy. Measured:
+     * a run given {@code /abs/dir/template.svg} in and {@code template.svg} out
+     * printed its usual success line, exited 0, and left the template holding
+     * the solved values with every placeholder gone. The user's source file was
+     * destroyed. This check is what stops that, so it is not belt and braces.
+     *
+     * <p>Falls back to the absolute paths when either cannot be canonicalised.
+     * That direction is the safe one only because the output name is fixed and
+     * lives in the working directory, so the two are almost always both
+     * canonicalisable, and a residual false negative costs the template rather
+     * than the run. There is nothing downstream to catch it.
      */
     private static boolean sameFile(File a, File b) {
         try {

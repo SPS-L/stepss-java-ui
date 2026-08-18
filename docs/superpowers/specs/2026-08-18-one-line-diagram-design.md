@@ -6,7 +6,44 @@ window of its own so two runs can be compared side by side. Make the
 disturbance file optional, so a power-flow-only case is a first class thing to
 load. Bundle the 6-bus microgrid as the example that demonstrates all of it.
 
-Status: approved 2026-08-18.
+Status: approved 2026-08-18, with five corrections made during execution after
+probing the real engine and the real renderer. They are recorded here rather
+than edited into the body, so this stays a record of what was approved. The
+implementation plan carries the corrected code.
+
+- **The strict SVG DOM refuses the bundled example, and Part 5 as approved
+  could not render it.** `6bus.svg` carries `<version>1.0</version>` inside
+  `<desc>`, left by WinFIG, which inherits the SVG default namespace and is not
+  an SVG element. Batik throws away the whole drawing over it. This is not
+  peculiar to the file: Helios does text substitution and does not parse XML,
+  so the element survives into `in_diagram.svg` and the feature would fail on
+  its own demo case on every run. `SvgImage` now installs a lenient DOM
+  implementation that remaps an unknown element into the null namespace, where
+  GVT ignores it. Verified: the unmodified file renders identically to a copy
+  with the element deleted.
+- **Part 5's external-resource check asserted the wrong outcome.** Batik's
+  default user agent refuses the fetch *and* aborts the render, so such a
+  document does not render at all. The security property is free, as approved,
+  but a template referencing an external image now shows the render-failed
+  banner rather than rendering without it.
+- **The Rhino risk in "The risk that is not asserted away" does not exist.**
+  `batik-all` carries no Rhino classes and transcodes without them. The check
+  stays, as what holds that answer in place.
+- **Part 4 says Helios "refuses when input and output are the same path". It
+  does not.** Its guard compares the two typed strings, so an absolute template
+  and the relative output name slip past it and it overwrites the template with
+  its own output. Measured: the template came back with every placeholder
+  substituted and the original destroyed. The canonical-path check Part 4 calls
+  for is what prevents data loss, not merely a blank diagram.
+- **A missing template does worse than print a line.** `cmd_diagram` returns
+  without consuming the output-name line, so Helios reads that line as a
+  main-menu command and aborts the run with exit 1, losing the `VT` export the
+  completion thread waits on. The existence check must happen before the
+  command file is written, as Part 4 has it.
+
+Part 5 also gained a resize listener: as approved, the panel re-rendered only
+on a gesture or the first paint, so growing the window left the previous image
+scaled up and soft.
 
 ## Why
 
