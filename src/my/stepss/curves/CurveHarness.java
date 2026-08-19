@@ -1,5 +1,7 @@
 package my.stepss.curves;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -35,7 +37,7 @@ public final class CurveHarness {
         "sync mach GEN1: rotor speed (pu)",
         "branch BR1-2: P (MW) entering at FROM end");
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         readsEveryColumn();
         stripsTheTrailingSemicolon();
         parsesThreeDigitExponents();
@@ -55,6 +57,7 @@ public final class CurveHarness {
         csvCarriesEveryColumnAndQuotesLabels();
         toleratesRamsesCommentsAboveTheHeader();
         checkHeader();
+        checkTail();
 
         if (failures > 0) {
             System.err.println(failures + " curve check(s) FAILED");
@@ -548,6 +551,84 @@ public final class CurveHarness {
             check("and which the records actually cover", "true",
                     String.valueOf(ex.getMessage().contains("cover 5")));
         }
+    }
+
+    /**
+     * CurTail: the offset-based reader a live viewer polls once per flush.
+     * Writes real files into a temporary directory, because the whole point
+     * of the class is file mechanics.
+     */
+    private static void checkTail() throws IOException {
+        File dir = java.nio.file.Files.createTempDirectory("curtail").toFile();
+        File cur = new File(dir, "temp_display.cur");
+        try {
+            CurTail tail = new CurTail(cur);
+            check("a file that does not exist yet is not an error", "false",
+                    String.valueOf(tail.exists()));
+            check("and yields nothing", "0", String.valueOf(tail.poll().size()));
+
+            append(cur, "# stepss-cur 1\n# ncol 2\n");
+            check("the header arrives as lines", "[# stepss-cur 1, # ncol 2]",
+                    tail.poll().toString());
+            check("and is not delivered twice", "[]", tail.poll().toString());
+
+            // A torn final line is the normal state of a file being written:
+            // the reader must hold it back until its newline arrives.
+            append(cur, " 1.0 2.0\n 3.0 4");
+            check("a complete row is delivered and a torn one held back",
+                    "[ 1.0 2.0]", tail.poll().toString());
+            append(cur, ".0\n");
+            check("the held-back row arrives once it is terminated",
+                    "[ 3.0 4.0]", tail.poll().toString());
+
+            // status='replace' truncates, which is what a re-run does. An
+            // offset kept across that would skip the new run's header and
+            // then misparse whatever byte it landed on.
+            write(cur, "# stepss-cur 1\n");
+            List<String> afterRerun = tail.poll();
+            check("a shrunk file is read from the top again",
+                    "[# stepss-cur 1]", afterRerun.toString());
+            check("and the reset is reported so a reader can drop its state",
+                    "true", String.valueOf(tail.truncatedSinceLastPoll()));
+            check("the reset flag clears on the next poll", "false",
+                    String.valueOf(tail.poll().isEmpty() ? tail.truncatedSinceLastPoll() : true));
+
+            // The offset must advance rather than the file being re-read: a
+            // full re-read each second is quadratic over a run.
+            long before = tail.offset();
+            // Nine bytes: space, 9, dot, 0, space, 9, dot, 0, newline. Count
+            // the literal rather than trusting this comment, and if it
+            // disagrees fix the expected value, never the class: an offset
+            // that advances by the wrong amount is the bug this pins.
+            append(cur, " 9.0 9.0\n");
+            tail.poll();
+            check("the offset advances by exactly what was appended",
+                    String.valueOf(before + 9), String.valueOf(tail.offset()));
+        } finally {
+            deleteRecursively(dir);
+        }
+    }
+
+    private static void append(File f, String s) throws IOException {
+        try (java.io.OutputStream out = new java.io.FileOutputStream(f, true)) {
+            out.write(s.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+        }
+    }
+
+    private static void write(File f, String s) throws IOException {
+        try (java.io.OutputStream out = new java.io.FileOutputStream(f, false)) {
+            out.write(s.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+        }
+    }
+
+    private static void deleteRecursively(File f) {
+        File[] kids = f.listFiles();
+        if (kids != null) {
+            for (File kid : kids) {
+                deleteRecursively(kid);
+            }
+        }
+        f.delete();
     }
 
     /**
