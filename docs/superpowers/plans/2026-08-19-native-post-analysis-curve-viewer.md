@@ -2156,6 +2156,21 @@ with:
         lastExtractionBase = outputBase;
 ```
 
+**Then correct `startPlotRun`'s own javadoc, which this step falsifies.** It
+currently reads "The output base is the fixed, absolute `<temp>/tempGnupOut`:
+not a free parameter, because viewCurvesButton opens tempGnupOut.plt by name
+and saveCurrentCurveButton rewrites the .plt by string-replacing the absolute
+tempGnupOut.cur path inside it." After this step the base is per-extraction, so
+that paragraph is false. Replace it with why it changed: several extractions
+stay open at once, so each needs its own files, and the two buttons that used to
+depend on the frozen name now read `lastExtractionBase` instead. Leave the rest
+of the javadoc alone; the paragraph about line 1 of the replay file being the
+bare trajectory name is still true and still load-bearing.
+
+The nearby comment "a re-run must not leave them pointing at the stale
+tempGnupOut.plt and .cur" also needs its name generalised, since there is no
+single stale pair any more.
+
 - [ ] **Step 3: Open a window when the extraction succeeds**
 
 In the same method, inside the `onFinished` callback's `if (exitCode == 0)` branch, after the two `setEnabled(true)` calls, insert:
