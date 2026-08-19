@@ -754,6 +754,11 @@ public final class CurveHarness {
                 "# obs 3 5 1 MS g6"));
         LiveModel model = new LiveModel(h);
         check("one panel per observable", "3", String.valueOf(model.panelCount()));
+        // The value pollMillis would be handed, once a live window reads it
+        // off the model to reschedule its poller: checked here because this
+        // link in that chain runs with no window and no poller.
+        check("the model surfaces the header's own refresh rate", "1.0",
+                String.valueOf(model.refresh()));
 
         model.accept(Arrays.asList(
                 " 0.000000E+00  1.010000E+00  1.000000E+00  0.100000E+00  1.000000E+00 ",
@@ -836,7 +841,17 @@ public final class CurveHarness {
     }
 
     private static void checkLiveWindow() {
-        check("the poll interval comes from the header's refresh rate", "1000",
+        // pollMillis is the pure arithmetic a refresh rate goes through; these
+        // four checks pin that arithmetic alone. Whether tick() actually calls
+        // it with the header's own refresh() and reschedules the live poller
+        // is integration behaviour this harness cannot exercise: that wiring
+        // only runs inside a live LiveCurveWindow with a live poller thread,
+        // and constructing one here would throw, this JVM being headless.
+        // checkLiveModel's "the model surfaces the header's own refresh rate"
+        // covers the one link in that chain that is checkable without a
+        // window: that a parsed header's refresh value actually reaches the
+        // caller who would pass it to pollMillis.
+        check("pollMillis derives a poll interval from a refresh rate", "1000",
                 String.valueOf(LiveCurveWindow.pollMillis(1.0)));
         check("a slower flush is polled more slowly", "5000",
                 String.valueOf(LiveCurveWindow.pollMillis(5.0)));

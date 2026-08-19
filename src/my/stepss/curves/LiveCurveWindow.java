@@ -44,12 +44,25 @@ public final class LiveCurveWindow extends JFrame {
                 t.setDaemon(true);
                 return t;
             });
+    /**
+     * The currently scheduled poll, held so it can be replaced once the
+     * header's own refresh rate is known.
+     */
+    private java.util.concurrent.ScheduledFuture<?> ticker;
 
-    private LiveModel model;
+    private volatile LiveModel model;
     private String refusal;
     private int emptyPolls;
     private boolean built;
     private boolean stopped;
+    /**
+     * Set by {@link #finish()} so the last tick stops waiting for more header.
+     *
+     * <p>Waiting is right while the engine might still be writing. Once it has
+     * exited there is no more coming, so a header that still will not parse is
+     * a verdict rather than a race, and the user is owed the reason.
+     */
+    private boolean lastTick;
     /**
      * Lines read before the header could be parsed.
      *
@@ -125,7 +138,7 @@ public final class LiveCurveWindow extends JFrame {
     private void start() {
         // One second until the header says otherwise, which is also the
         // engine's own default, so the common case never reschedules.
-        poller.scheduleWithFixedDelay(this::tick, 0L, 1000L, TimeUnit.MILLISECONDS);
+        ticker = poller.scheduleWithFixedDelay(this::tick, 0L, 1000L, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -151,21 +164,22 @@ public final class LiveCurveWindow extends JFrame {
         }
         try {
             poller.execute(() -> {
-                tick();
-                stopped = true;
-                poller.shutdown();
-                SwingUtilities.invokeLater(() -> setTitle(getTitle() + " (finished)"));
+                lastTick = true;
+                // A bug inside tick() must not abort before the poller is
+                // marked stopped and shut down: the finally is what makes that
+                // a guarantee rather than something that merely usually holds.
+                try {
+                    tick();
+                    SwingUtilities.invokeLater(() -> setTitle(getTitle() + " (finished)"));
+                } finally {
+                    stopped = true;
+                    poller.shutdown();
+                }
             });
         } catch (java.util.concurrent.RejectedExecutionException windowClosed) {
             // The window went away between the check above and this call. There
             // is nothing left to read and nothing left to freeze.
         }
-    }
-
-    /** Disposes the window and its poller. */
-    public void close() {
-        poller.shutdownNow();
-        dispose();
     }
 
     /**
@@ -181,16 +195,21 @@ public final class LiveCurveWindow extends JFrame {
             if (tail.truncatedSinceLastPoll()) {
                 // status='replace' from a re-run in the same directory. The
                 // header is about to arrive again, so throw the old run away
-                // rather than drawing the two on one axis. The panels stay:
-                // a re-run in the same window cannot have a different
-                // observable set, because Task 7 gives every run its own
-                // window and stops this one's poller before that.
+                // rather than drawing the two on one axis.
                 pending.clear();
-                if (model != null) {
-                    model.reset();
-                }
+                // The whole header, not just the buffers: the new run writes its
+                // own, and a kept header maps the new run's columns through the
+                // old observable list. accept() discards # lines, so nothing
+                // else would ever notice.
+                model = null;
+                emptyPolls = 0;
+                SwingUtilities.invokeLater(this::discardPanels);
             }
-            if (lines.isEmpty()) {
+            // On the last tick, buffered header lines with no model must still
+            // reach the parse attempt below: that is what lets a header that
+            // never completed be reported with the engine's own message
+            // instead of leaving the window blank forever.
+            if (lines.isEmpty() && !(lastTick && model == null && !pending.isEmpty())) {
                 if (model == null && ++emptyPolls == 5) {
                     say("The engine has not written any run-time observable data yet.");
                 }
@@ -207,13 +226,26 @@ public final class LiveCurveWindow extends JFrame {
                     // flushes once at the end. Refusing here would tell the
                     // user their engine is too old on the strength of a poll
                     // that landed mid-write. After a data row there is no more
-                    // header coming, so the same failure is real.
-                    if (headerFailureIsFinal(pending)) {
+                    // header coming, so the same failure is real. Once the
+                    // engine has exited (lastTick), there is no more header
+                    // coming either, whatever the lines look like, and the
+                    // user is owed the engine's own explanation rather than a
+                    // window that stays blank forever.
+                    if (lastTick || headerFailureIsFinal(pending)) {
                         refuse(unsupported.getMessage());
                     }
                     return;
                 }
                 SwingUtilities.invokeLater(this::buildPanels);
+                // The engine flushes on its own cadence, so poll at that rather
+                // than at a guess. Rescheduled rather than set up front because
+                // the rate is only known once the header has been read.
+                long wanted = pollMillis(model.refresh());
+                if (wanted != 1000L && ticker != null) {
+                    ticker.cancel(false);
+                    ticker = poller.scheduleWithFixedDelay(
+                            this::tick, wanted, wanted, TimeUnit.MILLISECONDS);
+                }
                 // The data rows that arrived while the header was still
                 // incomplete, replayed in order so nothing is lost.
                 lines = new ArrayList<String>(pending);
@@ -229,6 +261,12 @@ public final class LiveCurveWindow extends JFrame {
             SwingUtilities.invokeLater(() -> publish(snapshots, samples, skipped));
         } catch (IOException ex) {
             refuse("temp_display.cur could not be read: " + ex.getMessage());
+        } catch (RuntimeException ex) {
+            // scheduleWithFixedDelay swallows an unchecked throw into a future
+            // nobody reads and stops re-scheduling, so without this the live
+            // view freezes on its last snapshot with nothing said. A bug here
+            // must be visible, not quiet.
+            refuse("Run-time curves stopped: " + ex);
         }
     }
 
@@ -245,6 +283,16 @@ public final class LiveCurveWindow extends JFrame {
             stack.add(panel);
         }
         stack.revalidate();
+        stack.repaint();
+    }
+
+    /** On the EDT: drop the panels so the next header builds its own. */
+    private void discardPanels() {
+        built = false;
+        panels.clear();
+        stack.removeAll();
+        stack.revalidate();
+        stack.repaint();
     }
 
     /** On the EDT: the snapshots the poller finished. */

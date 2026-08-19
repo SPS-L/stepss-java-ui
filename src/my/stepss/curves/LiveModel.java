@@ -41,8 +41,16 @@ public final class LiveModel {
             this.obs = obs;
             this.axes = axesFor(obs, tstop);
             String type = obs.type.toUpperCase(Locale.ROOT);
-            this.phasePlane = "O-D".equals(type) || "P-D".equals(type);
-            this.weighted = "LAT".equals(type);
+            // The type says what the second column MEANS; columnCount says
+            // whether it is actually there. A header is self-consistent as
+            // long as firstColumn/columnCount line up with ncol, so a
+            // one-column "obs ... LAT eq1" or "obs ... o-d g6" is a header
+            // CurHeader accepts, and append() would read row[first + 1] past
+            // the end of the row without this guard. Degrading to plotting
+            // the first column is safe; reading past the row is not.
+            this.phasePlane = ("O-D".equals(type) || "P-D".equals(type))
+                    && obs.columnCount >= 2;
+            this.weighted = "LAT".equals(type) && obs.columnCount >= 2;
             if (weighted) {
                 this.w = new double[256];
             }
@@ -96,6 +104,11 @@ public final class LiveModel {
 
     public int panelCount() {
         return panels.size();
+    }
+
+    /** The header's declared flush cadence, in seconds. */
+    public double refresh() {
+        return header.refresh;
     }
 
     public CurveAxes axesOf(int panel) {
