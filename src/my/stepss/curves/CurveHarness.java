@@ -37,7 +37,7 @@ public final class CurveHarness {
         "sync mach GEN1: rotor speed (pu)",
         "branch BR1-2: P (MW) entering at FROM end");
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, CurHeader.Unsupported {
         readsEveryColumn();
         stripsTheTrailingSemicolon();
         parsesThreeDigitExponents();
@@ -59,6 +59,7 @@ public final class CurveHarness {
         checkHeader();
         checkTail();
         checkAxes();
+        checkLiveModel();
 
         if (failures > 0) {
             System.err.println(failures + " curve check(s) FAILED");
@@ -741,6 +742,95 @@ public final class CurveHarness {
         // legend on a shaded panel broke it for no real reason.
         check("no plain polyline is drawn for a shaded series", "false",
                 String.valueOf(latSvg.contains("<polyline")));
+    }
+
+    private static void checkLiveModel() throws CurHeader.Unsupported {
+        CurHeader h = CurHeader.parse(java.util.Arrays.asList(
+                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 5",
+                "# obs 1 2 1 BV 4044",
+                "# obs 2 3 2 o-d g6",
+                "# obs 3 5 1 MS g6"));
+        LiveModel model = new LiveModel(h);
+        check("one panel per observable", "3", String.valueOf(model.panelCount()));
+
+        model.accept(java.util.Arrays.asList(
+                " 0.000000E+00  1.010000E+00  1.000000E+00  0.100000E+00  1.000000E+00 ",
+                " 1.000000E-02  1.020000E+00  1.001000E+00  0.200000E+00  1.002000E+00 "));
+        check("no row is skipped when the count matches ncol", "0",
+                String.valueOf(model.skippedRows()));
+        check("both samples land", "2", String.valueOf(model.samples()));
+
+        CurveData bv = model.snapshot(0);
+        check("a one-column observable yields one series", "1",
+                String.valueOf(bv.series.size()));
+        check("its x is time", "0.01", String.valueOf(bv.series.get(0).t[1]));
+        check("its y is its own column", "1.02",
+                String.valueOf(bv.series.get(0).v[1]));
+
+        // o-d is a phase plane: gnuplot.f90:147 plots varcol+1 against varcol,
+        // and simul_decomp.f90:2318-2319 writes omega then delta, so x is the
+        // SECOND of the pair and y is the first.
+        CurveData od = model.snapshot(1);
+        check("a phase-plane observable takes x from its second column", "0.2",
+                String.valueOf(od.series.get(0).t[1]));
+        check("and y from its first", "1.001",
+                String.valueOf(od.series.get(0).v[1]));
+        check("a phase plane does not fix x to the run length", "false",
+                String.valueOf(model.axesOf(1).xFixed()));
+        check("a time series does fix x to the run length", "true",
+                String.valueOf(model.axesOf(0).xFixed()));
+        check("and fixes it at tstop", "30.0",
+                String.valueOf(model.axesOf(0).xHi));
+
+        // A short row is the torn last line the writer leaves mid-flush. It is
+        // counted, not drawn, and never grows a buffer.
+        model.accept(java.util.Arrays.asList(" 2.000000E-02  1.03"));
+        check("a short row is counted rather than drawn", "1",
+                String.valueOf(model.skippedRows()));
+        check("and does not extend the curves", "2",
+                String.valueOf(model.samples()));
+
+        // A re-run truncates the file, so the model must be able to forget.
+        model.reset();
+        check("a reset empties the buffers", "0", String.valueOf(model.samples()));
+        check("but keeps the panels", "3", String.valueOf(model.panelCount()));
+
+        // The display-type table, which is the whole of what a user reads on
+        // each panel. Values from gnuplot.f90:84-133.
+        check("BV titles its panel with the bus", "BUS 4044",
+                LiveModel.axesFor(h.observables.get(0), 30.0).title);
+        check("BV labels y in per unit volts", "V (pu)",
+                LiveModel.axesFor(h.observables.get(0), 30.0).yLabel);
+        check("a phase plane labels x with delta", "delta (pu)",
+                LiveModel.axesFor(h.observables.get(1), 30.0).xLabel);
+        check("MS titles its panel with the machine", "Machine g6",
+                LiveModel.axesFor(h.observables.get(2), 30.0).title);
+        check("RT asks for the identity line", "true",
+                String.valueOf(LiveModel.axesFor(
+                        new CurHeader.Obs(1, 2, 1, "RT", "RT", ""), 30.0).identity));
+        check("SOL does not", "false",
+                String.valueOf(LiveModel.axesFor(
+                        new CurHeader.Obs(1, 2, 1, "SOL", "SOL", ""), 30.0).identity));
+        check("a lower-case display type is read the same as upper", "BUS 4044",
+                LiveModel.axesFor(
+                        new CurHeader.Obs(1, 2, 1, "bv", "4044", ""), 30.0).title);
+        check("an unknown display type still gets a usable frame", "t (s)",
+                LiveModel.axesFor(
+                        new CurHeader.Obs(1, 2, 1, "ZZZ", "x", ""), 30.0).xLabel);
+
+        // LAT carries the activity flag through to the series, which is the
+        // only reason CurveSeries has a weight array at all.
+        CurHeader lat = CurHeader.parse(java.util.Arrays.asList(
+                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 3",
+                "# obs 1 2 2 LAT 4041"));
+        LiveModel latModel = new LiveModel(lat);
+        latModel.accept(java.util.Arrays.asList(
+                " 0.000000E+00  1.500000E+02  0 ",
+                " 1.000000E-02  1.510000E+02  1 "));
+        check("the latency flag reaches the series", "[0.0, 1.0]",
+                java.util.Arrays.toString(latModel.snapshot(0).series.get(0).w));
+        check("and the apparent power is the y value", "151.0",
+                String.valueOf(latModel.snapshot(0).series.get(0).v[1]));
     }
 
     /**
