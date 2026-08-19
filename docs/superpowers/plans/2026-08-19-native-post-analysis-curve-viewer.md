@@ -1513,17 +1513,30 @@ In `src/my/stepss/curves/CurveHarness.java`, add to `main`:
 and the methods before `round`:
 
 ```java
+    /**
+     * The flag and the polyline count are not enough on their own: both pass
+     * unchanged if bounds() ignores `zoom` entirely, which is the one failure
+     * this method exists to catch. readoutAt is the instrument that sees the
+     * override, because it goes through bounds(). Difference and restoration
+     * are compared rather than exact values, because the padding constants are
+     * private and an expected number would couple this harness to them.
+     */
     private static void zoomNarrowsTheAxesAndResets() {
         CurvePanel panel = new CurvePanel();
         panel.setData(CurReader.parse(SMOKE, null, SMOKE_LABELS));
+        panel.setSize(600, 400);
         check("starts unzoomed", false, panel.zoomed());
+        String unzoomed = panel.readoutAt(300, 200);
         panel.setZoom(0.0, 0.25, 1.0, 1.25);
         check("zoom is recorded", true, panel.zoomed());
-        String zoomedSvg = panel.toSvg(600, 400);
+        check("zooming changes what a device point reads", false,
+                unzoomed.equals(panel.readoutAt(300, 200)));
         check("still one polyline per curve when zoomed", 4,
-                count(zoomedSvg, "<polyline"));
+                count(panel.toSvg(600, 400), "<polyline"));
         panel.resetZoom();
         check("reset clears it", false, panel.zoomed());
+        check("resetting restores what the point read before", unzoomed,
+                panel.readoutAt(300, 200));
     }
 
     private static void readoutIsNullOutsideThePlotArea() {
