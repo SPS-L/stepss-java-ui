@@ -13,7 +13,21 @@ public final class CurveSeries {
     public final String label;
     /** The unit from the label's first parenthesised group, or "" if it has none. */
     public final String unit;
+    /**
+     * The time samples, paired index-for-index with {@link #v}.
+     *
+     * <p>Exposed as a raw mutable array rather than copied or wrapped: these
+     * arrays are the render hot path, and a defensive copy would double peak
+     * allocation for the largest extraction a window holds, for no present
+     * benefit, while an accessor would put a method call inside the paint
+     * loop for every sample. Consumers must not mutate this array. Nothing
+     * does today: {@link CurReader} is the only producer, and it never
+     * retains a reference to an array once it hands ownership to a {@code
+     * CurveSeries}. A future consumer that wants to decimate or reuse a
+     * buffer must copy first.
+     */
     public final double[] t;
+    /** The value samples; see {@link #t} for the mutability contract. */
     public final double[] v;
 
     public CurveSeries(String label, String unit, double[] t, double[] v) {
