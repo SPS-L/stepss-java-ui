@@ -89,6 +89,8 @@ public final class PlotHarness {
                 PlotStyle.seriesClass(PlotStyle.SERIES_COLOURS));
         check("wraps twice round", "series1",
                 PlotStyle.seriesClass(PlotStyle.SERIES_COLOURS * 2 + 1));
+        check("wraps a negative index", "series" + (PlotStyle.SERIES_COLOURS - 1),
+                PlotStyle.seriesClass(-1));
     }
 
     /** The style block is generated from ENTRIES, so every class must appear. */
