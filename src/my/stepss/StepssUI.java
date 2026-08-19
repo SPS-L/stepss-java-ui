@@ -4431,13 +4431,13 @@ public class StepssUI extends javax.swing.JFrame {
         int returnVal = fileChooser.showSaveDialog(this);
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             try {
-                File srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut.plt");
+                File srcFile = new File(lastExtractionBase.getAbsolutePath() + ".plt");
                 File dstFile = new File(fileChooser.getSelectedFile().getAbsolutePath() + ".plt");
                 if (srcFile.exists()) {
                     FileInputStream srcFileIn = new FileInputStream(srcFile);
                     String content = IOUtils.toString(srcFileIn, "UTF-8");
                     IOUtils.closeQuietly(srcFileIn);
-                    String file_str = myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut.cur";
+                    String file_str = lastExtractionBase.getAbsolutePath() + ".cur";
                     content = content.replaceAll(Pattern.quote(file_str),
                             Matcher.quoteReplacement(fileChooser.getSelectedFile().getName() + ".cur"));
                     FileOutputStream srcFileOut = new FileOutputStream(srcFile);
@@ -4445,13 +4445,13 @@ public class StepssUI extends javax.swing.JFrame {
                     IOUtils.closeQuietly(srcFileOut);
                     fileOps.copyFiletoFile(srcFile, dstFile);
                 }
-                srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut.cur");
+                srcFile = new File(lastExtractionBase.getAbsolutePath() + ".cur");
                 dstFile = new File(fileChooser.getSelectedFile().getAbsolutePath() + ".cur");
                 if (srcFile.exists()) {
                     fileOps.copyFiletoFile(srcFile, dstFile);
                     srcFile.delete();
                 }
-                srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut.png");
+                srcFile = new File(lastExtractionBase.getAbsolutePath() + ".png");
                 dstFile = new File(fileChooser.getSelectedFile().getAbsolutePath() + ".png");
                 if (srcFile.exists()) {
                     fileOps.copyFiletoFile(srcFile, dstFile);
@@ -4516,7 +4516,7 @@ public class StepssUI extends javax.swing.JFrame {
             if (gnuplotExec != null && gnuplotExec.exists()) {
                 CommandLine command = new CommandLine(gnuplotExec.getAbsolutePath());
                 command.addArgument("-persist");
-                command.addArgument(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut.plt");
+                command.addArgument(lastExtractionBase.getAbsolutePath() + ".plt");
                 DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
                 DefaultExecutor exec = new DefaultExecutor();
                 ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
@@ -4646,12 +4646,13 @@ public class StepssUI extends javax.swing.JFrame {
     /**
      * Writes the replay file and starts the non-interactive {@code -t} run.
      *
-     * <p>The output base is the fixed, absolute {@code <temp>/tempGnupOut}:
-     * not a free parameter, because viewCurvesButton opens tempGnupOut.plt
-     * by name and saveCurrentCurveButton rewrites the .plt by
-     * string-replacing the absolute tempGnupOut.cur path inside it. A
-     * relative base, or any other name, still plots correctly and silently
-     * breaks both buttons.
+     * <p>The output base is per-extraction rather than the fixed
+     * {@code tempGnupOut} it used to be, because several extractions can now
+     * stay open in their own windows at once and each needs files the next
+     * extraction will not overwrite. viewCurvesButton and
+     * saveCurrentCurveButton no longer open that name by hand; both read
+     * {@link #lastExtractionBase}, which this method sets to the base it
+     * just built.
      *
      * <p>Line 1 of the replay file is the trajectory's bare name
      * ({@code trajectory.getName()}, always {@code "output.trj"}), not its
@@ -4666,7 +4667,18 @@ public class StepssUI extends javax.swing.JFrame {
     private void startPlotRun(DyngraphRunner runner, File trajectory,
             java.util.List<Selection> selections) {
         File selCmd = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "sel.cmd");
-        File outputBase = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "tempGnupOut");
+        // One basename per extraction, so a second extraction cannot overwrite
+        // the files a window opened on the first is still showing, and so Save
+        // in that window keeps meaning its own data. The first is still called
+        // tempGnupOut, so anything that has ever looked for that name by hand
+        // still finds the newest single-extraction session's files.
+        extractionCount++;
+        String base = extractionCount == 1
+                ? "tempGnupOut"
+                : "tempGnupOut-" + extractionCount;
+        File outputBase = new File(myTempDir.getAbsolutePath()
+                + System.getProperty("file.separator") + base);
+        lastExtractionBase = outputBase;
         try {
             // sel.cmd is written into the temp directory and left there
             // after the run, like output.trj and tempGnupOut.*: it is the
@@ -4682,8 +4694,8 @@ public class StepssUI extends javax.swing.JFrame {
         }
         // Disabled before the run starts, not merely left alone: after a
         // previous successful extraction they are enabled, and a failed
-        // re-run must not leave them pointing at the stale tempGnupOut.plt
-        // and .cur that DYNGRAPH may have truncated or half-written.
+        // re-run must not leave them pointing at a stale .plt and .cur pair
+        // that DYNGRAPH may have truncated or half-written.
         viewCurvesButton.setEnabled(false);
         saveCurrentCurveButton.setEnabled(false);
         runDyngraphButton.setEnabled(false);
@@ -4698,6 +4710,7 @@ public class StepssUI extends javax.swing.JFrame {
                                 // result buttons light up and that is all.
                                 viewCurvesButton.setEnabled(true);
                                 saveCurrentCurveButton.setEnabled(true);
+                                openCurveWindow(outputBase, selections);
                             } else {
                                 JOptionPane.showMessageDialog(StepssUI.this,
                                         "<html>Curve extraction failed (exit " + exitCode
@@ -4715,6 +4728,40 @@ public class StepssUI extends javax.swing.JFrame {
                     "<html>Could not start <B>dyngraph</B>:<br>"
                     + escapeHtml(String.valueOf(ex.getMessage())) + "</html>",
                     "Extract Curves failed", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * Shows one extraction natively. Every successful extraction opens a new
+     * window rather than replacing the last, because two are opened precisely
+     * in order to compare them; WindowCascade keeps them from landing on top
+     * of each other.
+     *
+     * <p>The labels come from the selection list the picker returned, not from
+     * the generated .plt. Selection.label() reproduces DYNGRAPH's desc_obs
+     * curve titles byte for byte, and selection order is column order in the
+     * .cur, so the .plt carries nothing this does not already have.
+     */
+    private void openCurveWindow(File outputBase, java.util.List<Selection> selections) {
+        java.util.List<String> labels = new java.util.ArrayList<String>();
+        for (Selection selection : selections) {
+            labels.add(selection.label());
+        }
+        File cur = new File(outputBase.getAbsolutePath() + ".cur");
+        try {
+            my.stepss.curves.CurveData data =
+                    my.stepss.curves.CurReader.read(cur, labels);
+            my.stepss.curves.CurveWindow.open(this, data,
+                    "Curves - " + outputBase.getName() + " - " + labels.size()
+                    + " observable(s)");
+        } catch (IOException ex) {
+            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this,
+                    "<html>Curves were extracted but could not be read back:<br>"
+                    + escapeHtml(String.valueOf(ex.getMessage()))
+                    + "<br><br>The file is " + escapeHtml(cur.getAbsolutePath())
+                    + "</html>",
+                    "Show curves failed", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -6713,6 +6760,19 @@ public class StepssUI extends javax.swing.JFrame {
     private File heliosExec = null;
     private File dyngraphExec = null;
     private File gnuplotExec = null;
+
+    /**
+     * The output base of the most recent extraction. Was a constant while one
+     * extraction at a time existed and both View curves and Save extracted
+     * curve opened tempGnupOut by name; now that each extraction keeps its own
+     * files so several windows can stay open, those two buttons act on the
+     * newest, which is what they always did.
+     */
+    private File lastExtractionBase;
+
+    /** How many extractions this session has run, which names their files. */
+    private int extractionCount;
+
     private File codegenExec = null;
     private ModelCompiler modelCompiler = null;
     // EDT-only: set at the top of CompileActionPerformed, cleared in every
