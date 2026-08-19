@@ -1184,7 +1184,7 @@ public class StepssUI extends javax.swing.JFrame {
         selWorkDirButton = new javax.swing.JMenuItem();
         openExplButton = new javax.swing.JMenuItem();
         openTermButton = new javax.swing.JMenuItem();
-        killAllGnupMenuItem = new javax.swing.JMenuItem();
+        closeCurveWindowsMenuItem = new javax.swing.JMenuItem();
         helpMenu = new javax.swing.JMenu();
         showChangeLogButton = new javax.swing.JMenuItem();
         showUserGuideButton = new javax.swing.JMenuItem();
@@ -2660,15 +2660,15 @@ public class StepssUI extends javax.swing.JFrame {
         });
         toolsMenu.add(openTermButton);
 
-        killAllGnupMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        killAllGnupMenuItem.setText("Close all curve windows");
-        killAllGnupMenuItem.setName("killAllGnupMenuItem"); // NOI18N
-        killAllGnupMenuItem.addActionListener(new java.awt.event.ActionListener() {
+        closeCurveWindowsMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G, java.awt.event.InputEvent.CTRL_DOWN_MASK));
+        closeCurveWindowsMenuItem.setText("Close all curve windows");
+        closeCurveWindowsMenuItem.setName("closeCurveWindowsMenuItem"); // NOI18N
+        closeCurveWindowsMenuItem.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                killAllGnupMenuItemActionPerformed(evt);
+                closeCurveWindowsMenuItemActionPerformed(evt);
             }
         });
-        toolsMenu.add(killAllGnupMenuItem);
+        toolsMenu.add(closeCurveWindowsMenuItem);
 
         menuBar.add(toolsMenu);
 
@@ -3986,20 +3986,20 @@ public class StepssUI extends javax.swing.JFrame {
         try {
             InputStream in;
             in = StepssUI.class.getResourceAsStream("apacheLicense.txt");
-            File gnupCopyrightFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "apacheLicense.txt");
-            OutputStream streamOut = FileUtils.openOutputStream(gnupCopyrightFile);
+            File licenseFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "apacheLicense.txt");
+            OutputStream streamOut = FileUtils.openOutputStream(licenseFile);
             IOUtils.copy(in, streamOut);
             in.close();
             streamOut.close();
-            PlatformLauncher.openInEditor(gnupCopyrightFile);
+            PlatformLauncher.openInEditor(licenseFile);
         } catch (IOException ex) {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
         }
     }//GEN-LAST:event_showApacheLicenseButtonActionPerformed
 
-    private void killAllGnupMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_killAllGnupMenuItemActionPerformed
+    private void closeCurveWindowsMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_closeCurveWindowsMenuItemActionPerformed
         closeCurveWindowsButtonActionPerformed(evt);
-    }//GEN-LAST:event_killAllGnupMenuItemActionPerformed
+    }//GEN-LAST:event_closeCurveWindowsMenuItemActionPerformed
 
     private void showKLULicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showKLULicenseButtonActionPerformed
         try {
@@ -6949,7 +6949,7 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JTabbedPane jTabbedPane1;
-    private javax.swing.JMenuItem killAllGnupMenuItem;
+    private javax.swing.JMenuItem closeCurveWindowsMenuItem;
     private javax.swing.JButton loadBusOverview;
     private javax.swing.JButton loadCodegenFiles;
     private javax.swing.JMenuItem loadConfigMenuItem;
