@@ -708,9 +708,9 @@ Create `tools/curve-harness.sh`:
 # Runs the headless curve-viewer checks against the built classes.
 # This repository has no unit-test framework; this is the substitute.
 #
-# Like tools/ssa-harness.sh, dist/lib is NOT on the classpath: my.stepss.curves
-# depends on my.stepss.plot and the JDK and on nothing that launches a process,
-# so build/classes alone is enough to load it.
+# Like tools/ssa-harness.sh, dist/lib is NOT on the classpath: nothing in
+# my.stepss.curves launches a process or references commons-exec types, so
+# build/classes alone is enough to load it.
 set -eu
 cd "$(dirname "$0")/.."
 if [ ! -d build/classes ]; then
@@ -749,7 +749,21 @@ public final class CurveSeries {
     public final String label;
     /** The unit from the label's first parenthesised group, or "" if it has none. */
     public final String unit;
+
+    /**
+     * The sample times, and the values at them.
+     *
+     * <p><strong>Consumers must not mutate either array.</strong> They are
+     * exposed raw rather than copied deliberately: they are the render hot
+     * path, so wrapping them in accessors would put a method call per sample
+     * inside the paint loop, and copying them on construction would double the
+     * peak allocation for the largest data a window holds. That is safe today
+     * only because {@link CurReader} is the sole producer and never retains a
+     * reference to what it hands over. A consumer that wants to decimate,
+     * smooth, or reuse buffers must copy first.
+     */
     public final double[] t;
+    /** @see #t */
     public final double[] v;
 
     public CurveSeries(String label, String unit, double[] t, double[] v) {
