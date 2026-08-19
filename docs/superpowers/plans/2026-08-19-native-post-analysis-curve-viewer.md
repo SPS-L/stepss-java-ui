@@ -284,7 +284,10 @@ public final class PlotHarness {
     }
 
     private static void check(String what, Object expected, Object actual) {
-        if (!expected.equals(actual)) {
+        // Objects.equals, not expected.equals: a check whose expected value is
+        // null would otherwise throw out of main() instead of reporting a FAIL,
+        // and readoutAt is specified to return null outside the plot area.
+        if (!java.util.Objects.equals(expected, actual)) {
             System.err.println("FAIL " + what + ": expected " + expected
                     + ", got " + actual);
             failures++;
@@ -692,7 +695,10 @@ public final class CurveHarness {
     }
 
     private static void check(String what, Object expected, Object actual) {
-        if (!expected.equals(actual)) {
+        // Objects.equals, not expected.equals: a check whose expected value is
+        // null would otherwise throw out of main() instead of reporting a FAIL,
+        // and readoutAt is specified to return null outside the plot area.
+        if (!java.util.Objects.equals(expected, actual)) {
             System.err.println("FAIL " + what + ": expected " + expected
                     + ", got " + actual);
             failures++;
@@ -1559,6 +1565,11 @@ Run: `ant compile`
 Expected: FAIL, `cannot find symbol: method zoomed()`.
 
 - [ ] **Step 3: Add the zoom state and the readout**
+
+> **This step does not compile on its own.** `readoutAt` calls `Bounds.t` and
+> `Bounds.v`, which Step 5 adds. Step 4's compile checkpoint therefore only
+> passes once Step 5 is also applied. Apply Steps 3 to 5 as one unit and take
+> the checkpoint after Step 5.
 
 In `src/my/stepss/curves/CurvePanel.java`, add fields after `data`:
 
