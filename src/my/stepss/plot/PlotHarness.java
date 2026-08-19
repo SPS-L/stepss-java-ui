@@ -23,6 +23,9 @@ public final class PlotHarness {
         seriesClassesResolve();
         seriesClassesWrap();
         seriesClassesReachTheSvgStyleBlock();
+        niceStepPicksTheOneTwoFiveLadder();
+        niceBoundsRoundOutward();
+        degenerateCasesStillAdvance();
 
         if (failures > 0) {
             System.err.println(failures + " plot check(s) FAILED");
@@ -100,6 +103,39 @@ public final class PlotHarness {
             check("style block declares series" + i, true,
                     svg.contains(".series" + i));
         }
+    }
+
+    /** Ticks land on 1, 2 or 5 times a power of ten, never on 3.7. */
+    private static void niceStepPicksTheOneTwoFiveLadder() {
+        check("span 1 into 5", 0.2, NiceScale.step(1.0, 5));
+        // 30/5 is 6, which is above 5 on the ladder, so it rounds up to 10.
+        check("span 30 into 5", 10.0, NiceScale.step(30.0, 5));
+        check("span 0.004 into 4", 0.001, NiceScale.step(0.004, 4));
+        check("span 7000 into 5", 2000.0, NiceScale.step(7000.0, 5));
+        // A flat curve has zero span and must still yield a usable step
+        // rather than 0, which would divide by zero when placing ticks.
+        check("zero span", 1.0, NiceScale.step(0.0, 5));
+    }
+
+    private static void niceBoundsRoundOutward() {
+        double[] b = NiceScale.bounds(0.83, 1.04, 0.05);
+        check("low rounds down", 0.80, round(b[0]));
+        check("high rounds up", 1.05, round(b[1]));
+        double[] flat = NiceScale.bounds(1.0, 1.0, 1.0);
+        check("flat data still spans", true, flat[1] > flat[0]);
+    }
+
+    /** Cases CurveHarness could not reach because they need no panel. */
+    private static void degenerateCasesStillAdvance() {
+        check("a zero span still yields an advancing step",
+                "1.0", String.valueOf(NiceScale.step(0.0, 6)));
+        check("a flat range is widened by one step either side",
+                "[4.0, 6.0]",
+                java.util.Arrays.toString(NiceScale.bounds(5.0, 5.0, 1.0)));
+    }
+
+    private static double round(double value) {
+        return Math.round(value * 1e6) / 1e6;
     }
 
     private static int count(String haystack, String needle) {

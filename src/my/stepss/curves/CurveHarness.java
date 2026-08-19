@@ -45,8 +45,6 @@ public final class CurveHarness {
         skipsNonFiniteRows();
         skipsBlankLines();
         toleratesTheDegenerateTimeOnlyFile();
-        niceStepPicksTheOneTwoFiveLadder();
-        niceBoundsRoundOutward();
         twoPointsLandOnTheDerivedPixels();
         rendersOnePolylinePerSeries();
         namesTheSharedUnitAndFlagsMixedOnes();
@@ -175,26 +173,6 @@ public final class CurveHarness {
         check("no rows skipped", 0, data.skippedRows);
     }
 
-    /** Ticks land on 1, 2 or 5 times a power of ten, never on 3.7. */
-    private static void niceStepPicksTheOneTwoFiveLadder() {
-        check("span 1 into 5", 0.2, CurvePanel.niceStep(1.0, 5));
-        // 30/5 is 6, which is above 5 on the ladder, so it rounds up to 10.
-        check("span 30 into 5", 10.0, CurvePanel.niceStep(30.0, 5));
-        check("span 0.004 into 4", 0.001, CurvePanel.niceStep(0.004, 4));
-        check("span 7000 into 5", 2000.0, CurvePanel.niceStep(7000.0, 5));
-        // A flat curve has zero span and must still yield a usable step
-        // rather than 0, which would divide by zero when placing ticks.
-        check("zero span", 1.0, CurvePanel.niceStep(0.0, 5));
-    }
-
-    private static void niceBoundsRoundOutward() {
-        double[] b = CurvePanel.niceBounds(0.83, 1.04, 0.05);
-        check("low rounds down", 0.80, round(b[0]));
-        check("high rounds up", 1.05, round(b[1]));
-        double[] flat = CurvePanel.niceBounds(1.0, 1.0, 1.0);
-        check("flat data still spans", true, flat[1] > flat[0]);
-    }
-
     /**
      * The one SVG output pinned byte for byte that the design spec's
      * Verification section asks for, kept to the two coordinates that carry
@@ -207,15 +185,15 @@ public final class CurveHarness {
      *
      * <pre>
      *   plot area   390 - 70 - 20 = 300 wide, 180 - 30 - 50 = 100 high
-     *   t span 4    niceStep(4, 6) = 1.0, niceBounds(0.5, 4.5, 1) = {0, 5}
-     *   v span 4    niceStep(4, 5) = 1.0, niceBounds(0.25, 4.25, 1) = {0, 5}
+     *   t span 4    NiceScale.step(4, 6) = 1.0, NiceScale.bounds(0.5, 4.5, 1) = {0, 5}
+     *   v span 4    NiceScale.step(4, 5) = 1.0, NiceScale.bounds(0.25, 4.25, 1) = {0, 5}
      *   px(0.50) = 70 + (0.50 / 5) * 300 = 70 + 30 = 100
      *   px(4.50) = 70 + (4.50 / 5) * 300 = 70 + 270 = 340
      *   py(0.25) = 180 - 50 - (0.25 / 5) * 100 = 130 - 5 = 125
      *   py(4.25) = 180 - 50 - (4.25 / 5) * 100 = 130 - 85 = 45
      * </pre>
      *
-     * <p>niceBounds widens both axes past the data on purpose, so neither
+     * <p>NiceScale.bounds widens both axes past the data on purpose, so neither
      * point sits on a frame edge where a fraction of 0 or 1 would hide an
      * error in the scaling, and the x and y numbers are all different, so
      * transposing px and py cannot pass. All four padding constants appear in
@@ -473,10 +451,6 @@ public final class CurveHarness {
 
     private static double number(String half) {
         return Double.parseDouble(half.substring(half.indexOf('=') + 1).trim());
-    }
-
-    private static double round(double value) {
-        return Math.round(value * 1e6) / 1e6;
     }
 
     private static int count(String haystack, String needle) {
