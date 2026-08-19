@@ -53,6 +53,8 @@ public final class CurveHarness {
         readoutIsNullOutsideThePlotArea();
         curvesAreClippedToTheFrame();
         csvCarriesEveryColumnAndQuotesLabels();
+        toleratesRamsesCommentsAboveTheHeader();
+        checkHeader();
 
         if (failures > 0) {
             System.err.println(failures + " curve check(s) FAILED");
@@ -171,6 +173,28 @@ public final class CurveHarness {
                 new ArrayList<String>());
         check("no series", 0, data.series.size());
         check("no rows skipped", 0, data.skippedRows);
+    }
+
+    /**
+     * Fed a headed RAMSES file, the DYNGRAPH reader must treat the seven
+     * comment lines as comments. Counting them as unreadable rows made
+     * CurveWindow's header report damage over undamaged data.
+     */
+    private static void toleratesRamsesCommentsAboveTheHeader() {
+        CurveData headed = CurReader.parse(Arrays.asList(
+                "# stepss-cur 1",
+                "# tstop      240.000",
+                "# refresh        1.000",
+                "# ncol 3",
+                "# obs 1 2 1 BV 1041",
+                "# obs 2 3 1 MS g6",
+                " 0.000000E+00  1.012404E+00  1.000000E+00 ",
+                " 1.000000E-02  1.012000E+00  1.000100E+00 "),
+                null, Arrays.asList("bus voltage (pu)", "speed (pu)"));
+        check("a clean headed file reports no damage", "0",
+                String.valueOf(headed.skippedRows));
+        check("and every data row survives", "2",
+                String.valueOf(headed.series.get(0).v.length));
     }
 
     /**
@@ -431,6 +455,90 @@ public final class CurveHarness {
                 Arrays.asList("bus A,B: voltage magnitude (pu)")));
         check("comma in a label stays inside its quotes", true,
                 odd.split("\n")[0].contains("\"bus A,B: voltage magnitude (pu)\""));
+    }
+
+    private static void checkHeader() {
+        // The real capture from a locally built engine, reproduced byte for
+        // byte apart from the leading indentation of the data row.
+        List<String> real = java.util.Arrays.asList(
+                "# stepss-cur 1",
+                "# tstop      240.000",
+                "# refresh        1.000",
+                "# ncol 5",
+                "# obs 1 2 1 BV 1041",
+                "# obs 2 3 2 o-d g6",
+                "# obs 3 5 1 MS g6",
+                " 0.000000E+00  1.012404E+00  1.000000E+00  6.018289E+00  1.000000E+00 ");
+
+        CurHeader h;
+        try {
+            h = CurHeader.parse(real);
+        } catch (CurHeader.Unsupported ex) {
+            check("the real capture parses", "no exception", ex.getMessage());
+            return;
+        }
+        check("tstop comes off the padded f12.3 field", "240.0", String.valueOf(h.tstop));
+        check("refresh comes off the padded f12.3 field", "1.0", String.valueOf(h.refresh));
+        check("ncol is the total column count including time", "5", String.valueOf(h.ncol));
+        check("one record per observable", "3", String.valueOf(h.observables.size()));
+        check("the o-d observable spans two columns", "2",
+                String.valueOf(h.observables.get(1).columnCount));
+        check("the o-d observable starts at column three", "3",
+                String.valueOf(h.observables.get(1).firstColumn));
+        check("the display type is carried so the mapping is checkable", "o-d",
+                h.observables.get(1).type);
+        check("a one-name observable has an empty second name", "",
+                h.observables.get(1).name2);
+
+        // ON and TO legitimately carry two names, space delimited, unquoted.
+        List<String> twoNames = java.util.Arrays.asList(
+                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 2",
+                "# obs 1 2 1 ON myinj myobs");
+        try {
+            check("the second name of an ON observable is read", "myobs",
+                    CurHeader.parse(twoNames).observables.get(0).name2);
+        } catch (CurHeader.Unsupported ex) {
+            check("the two-name header parses", "no exception", ex.getMessage());
+        }
+
+        // A version this build does not know is a loud refusal, never a guess.
+        List<String> future = java.util.Arrays.asList(
+                "# stepss-cur 2", "# tstop 30.000", "# refresh 1.000", "# ncol 2",
+                "# obs 1 2 1 BV 4044");
+        try {
+            CurHeader.parse(future);
+            check("an unknown version marker refuses", "Unsupported thrown", "parsed anyway");
+        } catch (CurHeader.Unsupported ex) {
+            check("an unknown version marker names the version it found",
+                    "true", String.valueOf(ex.getMessage().contains("2")));
+        }
+
+        // No header at all is the state of every engine older than the map.
+        try {
+            CurHeader.parse(java.util.Arrays.asList(
+                    " 0.000000E+00  1.012404E+00 "));
+            check("a headerless file refuses", "Unsupported thrown", "parsed anyway");
+        } catch (CurHeader.Unsupported ex) {
+            check("a headerless file says so rather than guessing columns",
+                    "true", String.valueOf(ex.getMessage().toLowerCase(
+                            java.util.Locale.ROOT).contains("no run-time header")));
+        }
+
+        // The columns the records claim must add up to what ncol states, or
+        // the reader is about to draw one observable's data under another's
+        // name. ncol 5 with records covering 2..5 is consistent; ncol 6 is not.
+        List<String> inconsistent = java.util.Arrays.asList(
+                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 6",
+                "# obs 1 2 1 BV 4044", "# obs 2 3 2 o-d g6", "# obs 3 5 1 MS g6");
+        try {
+            CurHeader.parse(inconsistent);
+            check("ncol disagreeing with the records refuses",
+                    "Unsupported thrown", "parsed anyway");
+        } catch (CurHeader.Unsupported ex) {
+            check("the ncol disagreement names both numbers", "true",
+                    String.valueOf(ex.getMessage().contains("6")
+                            && ex.getMessage().contains("5")));
+        }
     }
 
     /**
