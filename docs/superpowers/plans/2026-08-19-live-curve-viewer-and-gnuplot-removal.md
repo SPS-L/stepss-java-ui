@@ -871,12 +871,26 @@ Expected: all tail checks pass.
 
 One at a time, reverting after each:
 
-1. Delete the `if (length < offset)` block. Expected red: "a shrunk file is
-   read from the top again".
+1. Inside the `if (length < offset)` block, change `offset = 0L;` to
+   `offset = 1L;`. Expected red: "a shrunk file is read from the top again",
+   reporting `got [ stepss-cur 1]`.
+
+   **Not** by deleting the whole block, which is the obvious mutation and the
+   wrong one: with `length < offset` the buffer is sized
+   `(int) Math.min(length - offset, 1 << 20)`, which is negative, so the run
+   dies of `NegativeArraySizeException` before the assertion is reached. That
+   still goes red, but it demonstrates nothing about the check. Changing the
+   reset target exercises the same guard and lands on the assertion.
 2. Replace the partial-line retention with `partial.setLength(0);` after the
    loop. Expected red: "the held-back row arrives once it is terminated".
-3. Change `raf.seek(offset)` to `raf.seek(0)`. Expected red: "and is not
-   delivered twice".
+3. Delete `offset += read;`. Expected red: "and is not delivered twice".
+
+   **Not** `raf.seek(offset)` to `raf.seek(0)`, which was this plan's first
+   choice: it turns two other checks red first, and the one it was meant to
+   demonstrate short-circuits before reaching a seek at that point in the
+   sequence. Dropping the offset advance is what makes a second poll re-deliver
+   what the first already returned, which is precisely what that check asserts
+   against.
 
 Record all three in the report.
 
