@@ -42,10 +42,12 @@ public final class CurveHarness {
         derivesUnitsFromLabels();
         skipsShortRows();
         skipsNonNumericRows();
+        skipsNonFiniteRows();
         skipsBlankLines();
         toleratesTheDegenerateTimeOnlyFile();
         niceStepPicksTheOneTwoFiveLadder();
         niceBoundsRoundOutward();
+        twoPointsLandOnTheDerivedPixels();
         rendersOnePolylinePerSeries();
         namesTheSharedUnitAndFlagsMixedOnes();
         curvesWearTheirOwnColourInOrder();
@@ -126,6 +128,31 @@ public final class CurveHarness {
         check("unparseable row not stored", 3, data.series.get(0).v.length);
     }
 
+    /**
+     * A field that parses and is still not data. gfortran writes NaN and
+     * Infinity into an E15.7E3 field for a non-finite value, and
+     * Double.parseDouble reads all of those spellings back as a number, so
+     * this row cannot be caught by the NumberFormatException path above.
+     *
+     * <p>The second half of the check is why it matters: one kept NaN travels
+     * through bounds() into every y coordinate, so the axis lines themselves
+     * are emitted as y1="NaN" and the whole figure is blank.
+     */
+    private static void skipsNonFiniteRows() {
+        List<String> lines = new ArrayList<String>(SMOKE);
+        lines.add(" 0.7500000E+000  NaN  0.1E+001  0.1E+001  0.1E+001  ;");
+        lines.add(" 0.1000000E+001  Infinity  0.1E+001  0.1E+001  0.1E+001  ;");
+        lines.add(" 0.1250000E+001  +Infinity  0.1E+001  0.1E+001  0.1E+001  ;");
+        lines.add(" 0.1500000E+001  -Infinity  0.1E+001  0.1E+001  0.1E+001  ;");
+        CurveData data = CurReader.parse(lines, null, SMOKE_LABELS);
+        check("non-finite rows counted", 4, data.skippedRows);
+        check("non-finite rows not stored", 3, data.series.get(0).v.length);
+        CurvePanel panel = new CurvePanel();
+        panel.setData(data);
+        check("no coordinate in the figure is NaN", false,
+                panel.toSvg(600, 400).contains("NaN"));
+    }
+
     /** Blank lines are not rows and must not inflate the skipped count. */
     private static void skipsBlankLines() {
         List<String> lines = new ArrayList<String>(SMOKE);
@@ -166,6 +193,50 @@ public final class CurveHarness {
         check("high rounds up", 1.05, round(b[1]));
         double[] flat = CurvePanel.niceBounds(1.0, 1.0, 1.0);
         check("flat data still spans", true, flat[1] > flat[0]);
+    }
+
+    /**
+     * The one SVG output pinned byte for byte that the design spec's
+     * Verification section asks for, kept to the two coordinates that carry
+     * the geometry rather than to a whole document, because a whole-document
+     * golden breaks on every cosmetic change and gets deleted by whoever it
+     * next inconveniences.
+     *
+     * <p>Two points and one series, at a size chosen so every step of the
+     * mapping is exact in binary and can be re-derived by hand:
+     *
+     * <pre>
+     *   plot area   390 - 70 - 20 = 300 wide, 180 - 30 - 50 = 100 high
+     *   t span 4    niceStep(4, 6) = 1.0, niceBounds(0.5, 4.5, 1) = {0, 5}
+     *   v span 4    niceStep(4, 5) = 1.0, niceBounds(0.25, 4.25, 1) = {0, 5}
+     *   px(0.50) = 70 + (0.50 / 5) * 300 = 70 + 30 = 100
+     *   px(4.50) = 70 + (4.50 / 5) * 300 = 70 + 270 = 340
+     *   py(0.25) = 180 - 50 - (0.25 / 5) * 100 = 130 - 5 = 125
+     *   py(4.25) = 180 - 50 - (4.25 / 5) * 100 = 130 - 85 = 45
+     * </pre>
+     *
+     * <p>niceBounds widens both axes past the data on purpose, so neither
+     * point sits on a frame edge where a fraction of 0 or 1 would hide an
+     * error in the scaling, and the x and y numbers are all different, so
+     * transposing px and py cannot pass. All four padding constants appear in
+     * the arithmetic above, so all four are pinned.
+     *
+     * <p>Derived from the constants first and confirmed against the code
+     * second, never the other way round: a golden captured from the
+     * implementation proves only that the implementation agrees with itself.
+     */
+    private static void twoPointsLandOnTheDerivedPixels() {
+        CurveSeries one = new CurveSeries("bus BUS1: voltage magnitude (pu)",
+                "pu", new double[] {0.5, 4.5}, new double[] {0.25, 4.25});
+        CurvePanel panel = new CurvePanel();
+        panel.setData(new CurveData(Arrays.asList(one), null, 0));
+        String svg = panel.toSvg(390, 180);
+        check("exactly one polyline to pin", 1, count(svg, "<polyline"));
+        int at = svg.indexOf("points=\"");
+        check("the polyline carries a points list", true, at >= 0);
+        check("the two samples land on the derived pixels",
+                "points=\"100.00,125.00 340.00,45.00\"",
+                svg.substring(at, svg.indexOf('"', at + 8) + 1));
     }
 
     private static void rendersOnePolylinePerSeries() {
@@ -217,22 +288,90 @@ public final class CurveHarness {
         CurveData same = CurReader.parse(
                 Arrays.asList(" 0.0E+000  0.1E+001  0.1E+001  ;"), null, pu);
         check("one unit is the common one", "pu", same.commonUnit());
+        check("one unit is one distinct unit", 1, same.distinctUnits());
         CurvePanel plain = new CurvePanel();
         plain.setData(same);
+        String plainSvg = plain.toSvg(600, 400);
         check("no warning when units agree", false,
-                plain.toSvg(600, 400).contains("mixed units"));
+                plainSvg.contains("mixed units"));
+        // The other direction of the same property: a genuinely single-unit
+        // extraction must still get its axis label. Written as the whole text
+        // element so a legend label ending in "(pu)" cannot satisfy it.
+        check("the shared unit labels the y axis", true,
+                plainSvg.contains(">pu</text>"));
+
+        // A unit against no unit at all. Counting only non-empty units made
+        // this one distinct unit with no common unit, so render drew neither
+        // the axis label nor the note, which is the case that needs the note
+        // most: a 0/1 relay state against a 1.0 pu voltage is the flat-curve
+        // confusion the note exists to explain.
+        CurveData someUnitless = CurReader.parse(
+                Arrays.asList(" 0.0E+000  0.1E+001  0.0E+000  ;"), null,
+                Arrays.asList(
+                    "bus BUS1: voltage magnitude (pu)",
+                    "DCTL relay1: state"));
+        check("a unit against no unit is two distinct units", 2,
+                someUnitless.distinctUnits());
+        check("and there is no common unit", "", someUnitless.commonUnit());
+        CurvePanel halfUnitless = new CurvePanel();
+        halfUnitless.setData(someUnitless);
+        String halfSvg = halfUnitless.toSvg(600, 400);
+        check("pu against a unitless state is called out", true,
+                halfSvg.contains("mixed units"));
+        check("and no unit is claimed for the y axis", false,
+                halfSvg.contains(">pu</text>"));
+
+        // No curve has a unit: one distinct unit, so not mixed. These curves
+        // do share a scale, they just have no name for it, and a note telling
+        // the user to extract them separately would be wrong.
+        CurveData noUnits = CurReader.parse(
+                Arrays.asList(" 0.0E+000  0.1E+001  0.0E+000  ;"), null,
+                Arrays.asList("DCTL relay1: state", "DCTL relay2: state"));
+        check("no units at all is one distinct unit", 1,
+                noUnits.distinctUnits());
+        CurvePanel unitless = new CurvePanel();
+        unitless.setData(noUnits);
+        check("no note when nothing has a unit", false,
+                unitless.toSvg(600, 400).contains("mixed units"));
     }
 
+    /**
+     * Zoom must NARROW the window, which needs three things a single readout
+     * cannot see.
+     *
+     * <p>Reading one device point before and after says only that something
+     * changed: a zoom that widened the window four times over changes every
+     * readout too. So the span between two device points is read on each axis
+     * and required to shrink.
+     *
+     * <p>A span shrinking is still not enough, because transposing the axes in
+     * CurvePanel.bounds (tLo = zoom[2] and so on, an index typo that zooms
+     * time to the value range) shrinks both spans as well. So the readout at
+     * the panel midpoint is required to land inside the SMOKE fixture's own
+     * ranges, t in 0 to 0.5 and value in 1.0 to 17.5. Transposed, the
+     * midpoint reads t of about 1.11, which is off the end of a 0.5 s run.
+     */
     private static void zoomNarrowsTheAxesAndResets() {
         CurvePanel panel = new CurvePanel();
         panel.setData(CurReader.parse(SMOKE, null, SMOKE_LABELS));
         check("starts unzoomed", false, panel.zoomed());
         panel.setSize(600, 400);
         String unzoomed = panel.readoutAt(300, 200);
+        double wideT = readout(panel, 400, 200)[0] - readout(panel, 200, 200)[0];
+        double wideV = readout(panel, 300, 100)[1] - readout(panel, 300, 300)[1];
         panel.setZoom(0.0, 0.25, 1.0, 1.25);
         check("zoom is recorded", true, panel.zoomed());
         check("zooming changes what a device point reads", false,
                 unzoomed.equals(panel.readoutAt(300, 200)));
+        check("the same two device x values now span less time", true,
+                readout(panel, 400, 200)[0] - readout(panel, 200, 200)[0] < wideT);
+        check("the same two device y values now span fewer units", true,
+                readout(panel, 300, 100)[1] - readout(panel, 300, 300)[1] < wideV);
+        double[] middle = readout(panel, 300, 200);
+        check("the zoomed midpoint reads a time the run contains", true,
+                middle[0] >= 0.0 && middle[0] <= 0.5);
+        check("the zoomed midpoint reads a value the curves contain", true,
+                middle[1] >= 1.0 && middle[1] <= 17.5);
         check("still one polyline per curve when zoomed", 4,
                 count(panel.toSvg(600, 400), "<polyline"));
         panel.resetZoom();
@@ -254,6 +393,21 @@ public final class CurveHarness {
     /**
      * Without a clip, a zoomed curve paints over the axes and the legend. The
      * clip is what makes zoom look like zoom rather than like a defect.
+     *
+     * <p>The property is CONTAINMENT: the curves inside the clip group, the
+     * legend outside it. Document position is not the same thing, and
+     * asserting position is what let two separate mutations pass. Deleting
+     * {@code sink.endClip()} in CurvePanel.render leaves the legend nested in
+     * the clip group, so the legend is clipped, which is the exact defect this
+     * method claims to prevent; moving the {@code clipRect} call to after the
+     * curves group leaves it wrapping nothing, so every curve is unclipped.
+     * Both keep one clipPath declaration, the clip-path attribute, and the
+     * order of id="curves" and id="legend" intact.
+     *
+     * <p>So the clip is required to OPEN before the curves group, which kills
+     * the second, and exactly two {@code </g>} are required between the two
+     * group ids, which kills the first: one closing the curves group and one
+     * closing the clip group, and nothing else can sit between them.
      */
     private static void curvesAreClippedToTheFrame() {
         CurvePanel panel = new CurvePanel();
@@ -270,7 +424,17 @@ public final class CurveHarness {
         int legendAt = svg.indexOf("id=\"legend\"");
         check("the curves group exists", true, curvesAt >= 0);
         check("the legend group exists", true, legendAt >= 0);
-        check("the legend is outside the clip", true, legendAt > curvesAt);
+        // Document order next, because it is what makes the substring below
+        // well formed. On its own it says nothing about containment.
+        check("the legend group comes after the curves group", true,
+                legendAt > curvesAt);
+        int clipOpen = svg.indexOf("clip-path=\"url(#clip1)\"");
+        check("the clip opens before the curves", true,
+                clipOpen >= 0 && clipOpen < curvesAt);
+        // Two closes between them: one for the curves group, one for the clip
+        // group.
+        check("the clip closes before the legend", 2,
+                count(svg.substring(curvesAt, legendAt), "</g>"));
     }
 
     private static void csvCarriesEveryColumnAndQuotesLabels() {
@@ -289,6 +453,26 @@ public final class CurveHarness {
                 Arrays.asList("bus A,B: voltage magnitude (pu)")));
         check("comma in a label stays inside its quotes", true,
                 odd.split("\n")[0].contains("\"bus A,B: voltage magnitude (pu)\""));
+    }
+
+    /**
+     * The two numbers behind {@code readoutAt}'s "t = %.4g, value = %.6g", as
+     * {t, value}.
+     *
+     * <p>Parsed out of the formatted string rather than read from new
+     * accessors on CurvePanel: the readout is the whole of what the panel
+     * publishes about its mapping, and widening that surface to make a check
+     * easier to write would put geometry into the public API that the window
+     * does not use. Splitting on the comma is safe because the format carries
+     * Locale.ROOT, so no grouping separator can appear inside a number.
+     */
+    private static double[] readout(CurvePanel panel, int px, int py) {
+        String[] halves = panel.readoutAt(px, py).split(",", 2);
+        return new double[] {number(halves[0]), number(halves[1])};
+    }
+
+    private static double number(String half) {
+        return Double.parseDouble(half.substring(half.indexOf('=') + 1).trim());
     }
 
     private static double round(double value) {

@@ -113,7 +113,14 @@ public final class PlotHarness {
     }
 
     private static void check(String what, Object expected, Object actual) {
-        if (!expected.equals(actual)) {
+        // java.util.Objects.equals rather than expected.equals(actual): a
+        // check written against a null expected value NPEs on the bare call
+        // before it ever gets to compare, so the failure reads as a crash in
+        // the harness rather than as the assertion it was. CurveHarness's
+        // readoutIsNullOutsideThePlotArea is one such check; this file has
+        // none yet, and the guard belongs here before the first one is
+        // written rather than after it has thrown.
+        if (!java.util.Objects.equals(expected, actual)) {
             System.err.println("FAIL " + what + ": expected " + expected
                     + ", got " + actual);
             failures++;
