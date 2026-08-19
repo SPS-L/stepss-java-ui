@@ -937,14 +937,20 @@ without a display.
         live.setData(one);
         String liveSvg = live.toSvg(800, 500);
         check("a fixed x range reaches the far tick", "true",
-                String.valueOf(liveSvg.contains(">30.000<")
-                        || liveSvg.contains(">30.0<")));
+                String.valueOf(liveSvg.contains(">30.0<")));
         check("a data-fitting tick is absent, so the range is not autoscaled",
                 "false", String.valueOf(liveSvg.contains(">2.000<")));
         check("the panel title is drawn", "true",
                 String.valueOf(liveSvg.contains("BUS 4044")));
         check("and the legend is suppressed", "false",
                 String.valueOf(liveSvg.contains("legend")));
+        // The title gets a line of its own above the y unit. Both were drawn
+        // at PAD_TOP - 12 in the first draft of this task, one centred and one
+        // left-anchored: that does not collide at 800px wide and does on a
+        // stacked panel a third that wide.
+        check("the title sits above the y unit rather than on it", "true",
+                String.valueOf(textY(liveSvg, "BUS 4044")
+                        < textY(liveSvg, "V (pu)")));
 
         // RT overlays y = x so a user sees at a glance whether the simulation
         // is keeping up with the wall clock, matching gnuplot.f90:143 which
@@ -953,8 +959,15 @@ without a display.
         rt.setAxes(new CurveAxes("Simulated VS Real time", "simulation time (s)",
                 "elapsed time (s)", 0.0, 10.0, false, true));
         rt.setData(one);
-        check("the identity line is drawn as its own group", "true",
-                String.valueOf(rt.toSvg(800, 500).contains("id=\"identity\"")));
+        String rtSvg = rt.toSvg(800, 500);
+        // On the dash pattern, not on the group id: a group is emitted whether
+        // or not anything lands inside it, so asserting on the id alone cannot
+        // tell "drawn" from "opened and closed empty". Nothing else in this
+        // panel calls dashedLine.
+        check("the identity line is actually drawn", "true",
+                String.valueOf(rtSvg.contains("stroke-dasharray")));
+        check("and a panel that did not ask for one has none", "false",
+                String.valueOf(postSvg.contains("stroke-dasharray")));
 
         // LAT's second column is a 0/1 activity flag, so a segment is drawn
         // in one of exactly two classes.
@@ -975,6 +988,20 @@ without a display.
                 String.valueOf(latSvg.contains("class=\"active\"")));
         check("and no single-colour series class is used for it", "false",
                 String.valueOf(latSvg.contains("class=\"series0\"")));
+    }
+
+    /**
+     * The y coordinate of the SVG text element carrying {@code content}, or
+     * NaN when there is none.
+     *
+     * <p>Reads the attribute rather than matching a formatted number, so a
+     * check about relative position does not also pin the coordinate format.
+     */
+    private static double textY(String svg, String content) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "<text x=\"[^\"]*\" y=\"([^\"]*)\"[^>]*>"
+                        + java.util.regex.Pattern.quote(content) + "</text>").matcher(svg);
+        return m.find() ? Double.parseDouble(m.group(1)) : Double.NaN;
     }
 ```
 
@@ -1162,17 +1189,48 @@ with
         String unit = axes.yLabel.isEmpty() ? data.commonUnit() : axes.yLabel;
 ```
 
-3. The title, drawn only when the spec carries one, immediately after the
-`axis-titles` group closes:
+3. The title, on a line of its own above the y unit. The unit is drawn
+left-anchored at `PAD_TOP - 12.0` today, so a centred title at the same y
+collides on a narrow panel. Give a titled panel a taller top margin instead of
+sharing the line.
+
+`PAD_TOP` becomes the untitled value and `Bounds` carries the effective one, so
+an untitled panel keeps byte-identical geometry and the pinned SVG from step 2
+still matches. In `Bounds`, replace every use of the constant `PAD_TOP` with a
+field:
+
+```java
+        private final double padTop;
+```
+
+set from a new last constructor parameter, and used in `py` and `v` where
+`PAD_TOP` appears now. Add an accessor `double padTop() { return padTop; }` so
+`render` can place text against it.
+
+In `bounds`, compute it and pass it:
+
+```java
+        // A titled panel needs a line for the title above the one the y unit
+        // occupies. 18px is the label row height the legend already uses.
+        double padTop = axes.title.isEmpty() ? PAD_TOP : PAD_TOP + 18.0;
+        return new Bounds(x[0], x[1], y[0], y[1], xStep, yStep, width, height, padTop);
+```
+
+In `render`, the y unit and the mixed-units notice move from `PAD_TOP - 12.0`
+to `b.padTop() - 12.0`, and the title goes above them:
 
 ```java
         if (!axes.title.isEmpty()) {
             sink.group("title");
-            sink.text((b.px(b.xLo) + b.px(b.xHi)) / 2.0, PAD_TOP - 12.0,
+            sink.text((b.px(b.xLo) + b.px(b.xHi)) / 2.0, b.padTop() - 30.0,
                     axes.title, "middle", "title");
             sink.endGroup();
         }
 ```
+
+The legend's `double ly = PAD_TOP + LEGEND_ROW;` becomes `b.padTop() +
+LEGEND_ROW`, which is unchanged for the untitled post-analysis panel and right
+for a titled one.
 
 4. The identity line and the latency shading, inside the existing clip so
 neither paints over the furniture. Replace the body of the `curves` group's
@@ -1254,9 +1312,11 @@ One at a time, reverting after each:
 3. Change `one.w[i] >= 0.5` to `false`. Expected red: "an active segment is
    drawn in the active class".
 4. Change `if (axes.identity)` to `if (false)`. Expected red: "the identity
-   line is drawn as its own group".
+   line is actually drawn".
+5. Change the title's y from `b.padTop() - 30.0` to `b.padTop() - 12.0`.
+   Expected red: "the title sits above the y unit rather than on it".
 
-Record all four in the report.
+Record all five in the report.
 
 - [ ] **Step 9: Commit**
 
@@ -2166,8 +2226,9 @@ In `DyngraphRunner.java` drop the `environment` parameter, the field, its
 (`executor.execute(cmd, handler)`). Update the class Javadoc where it mentions
 `PlatformLauncher.execEnvironment` (`:62`).
 
-`:4527` is inside the handler this task is about to delete; if Step 5 removes
-it first, skip that one.
+`:4527` sat inside `viewCurvesButtonActionPerformed`, which Task 7 already
+deleted, so that call site will not be there. If it is, Task 7 was incomplete
+and that is the finding, not this line.
 
 - [ ] **Step 3: The startup probe and the banner**
 
