@@ -1,4 +1,4 @@
-package my.stepss.ssa;
+package my.stepss.plot;
 
 import java.awt.Color;
 
@@ -21,14 +21,14 @@ import java.awt.Color;
  * a white page, and it should not come out inverted because of what the
  * application happened to be wearing when the button was pressed.
  */
-final class PlotStyle {
+public final class PlotStyle {
 
-    static final class Entry {
-        final String cls;
-        final String lightHex;
-        final String darkHex;
-        final float width;
-        final Integer fontPx;
+    public static final class Entry {
+        public final String cls;
+        public final String lightHex;
+        public final String darkHex;
+        public final float width;
+        public final Integer fontPx;
 
         Entry(String cls, String lightHex, String darkHex, float width, Integer fontPx) {
             this.cls = cls;
@@ -39,7 +39,7 @@ final class PlotStyle {
         }
 
         /** This class's colour on the ground in use. */
-        String hex(boolean dark) {
+        public String hex(boolean dark) {
             return dark ? darkHex : lightHex;
         }
     }
@@ -59,7 +59,7 @@ final class PlotStyle {
      * would make the guides louder in dark than in light, which is the same
      * kind of untruth as leaving them invisible.
      */
-    static final Entry[] ENTRIES = {
+    public static final Entry[] ENTRIES = {
         new Entry("axis", "#333333", "#d0d4d6", 1.0f, null),
         new Entry("grid", "#cccccc", "#64686a", 0.5f, null),
         new Entry("bound", "#dc143c", "#ff6b83", 1.5f, null),
@@ -72,12 +72,12 @@ final class PlotStyle {
     };
 
     /** The ground a saved figure is drawn on, whatever the application wears. */
-    static final String EXPORT_BACKGROUND = "#ffffff";
+    public static final String EXPORT_BACKGROUND = "#ffffff";
 
     /**
      * The entry for cls, or the axis default when unknown.
      */
-    static Entry of(String cls) {
+    public static Entry of(String cls) {
         for (Entry e : ENTRIES) {
             if (e.cls.equals(cls)) {
                 return e;
@@ -87,7 +87,7 @@ final class PlotStyle {
     }
 
     /** A "#rrggbb" from the table above as a Color. */
-    static Color color(String hex) {
+    public static Color color(String hex) {
         return new Color(Integer.parseInt(hex.substring(1), 16));
     }
 
@@ -97,7 +97,7 @@ final class PlotStyle {
      * the system fallback too, which is neither of the two FlatLaf themes and
      * can be either brightness.
      */
-    static boolean isDark(Color background) {
+    public static boolean isDark(Color background) {
         if (background == null) {
             return false;
         }

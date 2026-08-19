@@ -1,4 +1,4 @@
-package my.stepss.ssa;
+package my.stepss.plot;
 
 import java.awt.BasicStroke;
 import java.awt.Font;
@@ -12,7 +12,7 @@ import java.awt.geom.Line2D;
  * class means, though not always on its hex: this one follows the theme and
  * the SVG does not, which is the one difference between them.
  */
-final class SwingSink implements PlotSink {
+public final class SwingSink implements PlotSink {
 
     private final Graphics2D g;
     private final boolean dark;
@@ -22,7 +22,7 @@ final class SwingSink implements PlotSink {
      *     the caller off the ground it is painting on rather than asked of
      *     the look and feel
      */
-    SwingSink(Graphics2D g, boolean dark) {
+    public SwingSink(Graphics2D g, boolean dark) {
         this.g = g;
         this.dark = dark;
     }

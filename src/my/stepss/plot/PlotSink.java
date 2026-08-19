@@ -1,4 +1,4 @@
-package my.stepss.ssa;
+package my.stepss.plot;
 
 /**
  * The drawing primitives both plots need, in device coordinates.
@@ -9,7 +9,7 @@ package my.stepss.ssa;
  * colour, which is what makes the exported file restylable by editing one
  * rule instead of every element.
  */
-interface PlotSink {
+public interface PlotSink {
 
     void group(String id);
 

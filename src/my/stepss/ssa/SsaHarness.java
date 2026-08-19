@@ -1,5 +1,8 @@
 package my.stepss.ssa;
 
+import my.stepss.plot.PlotStyle;
+import my.stepss.plot.SvgSink;
+
 /**
  * Headless checks for the SSA results pipeline: fixture -> parse -> query.
  * This repository has no unit-test framework and is not gaining one, so this

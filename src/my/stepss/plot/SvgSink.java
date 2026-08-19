@@ -1,4 +1,4 @@
-package my.stepss.ssa;
+package my.stepss.plot;
 
 /**
  * A PlotSink that emits SVG written to be edited afterwards: real text
@@ -12,14 +12,14 @@ package my.stepss.ssa;
  * cannot reproduce from the same results. The on-screen panels follow the
  * theme, and {@link SwingSink} is where that happens.
  */
-final class SvgSink implements PlotSink {
+public final class SvgSink implements PlotSink {
 
     private final StringBuilder body = new StringBuilder();
     private final int width;
     private final int height;
     private int openGroups;
 
-    SvgSink(int width, int height) {
+    public SvgSink(int width, int height) {
         this.width = width;
         this.height = height;
     }
@@ -96,7 +96,7 @@ final class SvgSink implements PlotSink {
                 .append(escape(s)).append("</text>\n");
     }
 
-    String toSvg() {
+    public String toSvg() {
         while (openGroups > 0) {
             endGroup();
         }
