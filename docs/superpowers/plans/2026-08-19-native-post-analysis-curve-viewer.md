@@ -637,8 +637,15 @@ public final class CurveHarness {
     private static void derivesUnitsFromLabels() {
         check("trailing parenthesis is the unit", "pu",
                 CurveSeries.unitOf("bus BUS1: voltage magnitude (pu)"));
-        check("unit with a space", "MW",
+        check("a unit mid-label is still found", "MW",
                 CurveSeries.unitOf("branch BR1-2: P (MW) entering at FROM end"));
+        // The case above has ONE parenthesised group, so indexOf and
+        // lastIndexOf agree on it and it cannot pin the choice between them.
+        // This one has two, so it can. Synthetic on purpose: no real
+        // obstypes.f90 label carries two groups, so nothing in the corpus
+        // exercises the distinction.
+        check("takes the first group when a label has two", "MW",
+                CurveSeries.unitOf("branch X: P (MW) measured at bus (HV)"));
         check("no parenthesis means no unit", "",
                 CurveSeries.unitOf("DCTL relay1: state"));
         check("empty parentheses mean no unit", "",
@@ -740,7 +747,7 @@ public final class CurveSeries {
 
     /** The desc_obs-format label, as {@code Selection.label()} composes it. */
     public final String label;
-    /** The unit from the label's last parenthesised group, or "" if it has none. */
+    /** The unit from the label's first parenthesised group, or "" if it has none. */
     public final String unit;
     public final double[] t;
     public final double[] v;
@@ -766,8 +773,13 @@ public final class CurveSeries {
      * carry units separately.
      *
      * <p>The FIRST parenthesised group, not the last: "P (MW) entering at FROM
-     * end" puts the unit in the middle, and no label in obstypes.f90 has a
-     * second group. A label with no group, or an empty one, has no unit.
+     * end" puts the unit in the middle. A label with no group, or an empty one,
+     * has no unit.
+     *
+     * <p>No label in obstypes.f90 carries a second group, so nothing in the
+     * real corpus distinguishes first from last. CurveHarness pins the choice
+     * with a synthetic two-group label anyway, so that changing it later is a
+     * visible decision rather than a silent drift.
      */
     public static String unitOf(String label) {
         int open = label.indexOf('(');
