@@ -1,4 +1,4 @@
-package my.stepss.ssa;
+package my.stepss.plot;
 
 /**
  * A PlotSink that emits SVG written to be edited afterwards: real text
@@ -12,14 +12,15 @@ package my.stepss.ssa;
  * cannot reproduce from the same results. The on-screen panels follow the
  * theme, and {@link SwingSink} is where that happens.
  */
-final class SvgSink implements PlotSink {
+public final class SvgSink implements PlotSink {
 
     private final StringBuilder body = new StringBuilder();
     private final int width;
     private final int height;
     private int openGroups;
+    private int clipCount;
 
-    SvgSink(int width, int height) {
+    public SvgSink(int width, int height) {
         this.width = width;
         this.height = height;
     }
@@ -70,6 +71,42 @@ final class SvgSink implements PlotSink {
     }
 
     @Override
+    public void polyline(double[] xs, double[] ys, int n, String cls) {
+        if (n < 2) {
+            return;
+        }
+        body.append("    <polyline points=\"");
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                body.append(' ');
+            }
+            body.append(fmt(xs[i])).append(',').append(fmt(ys[i]));
+        }
+        body.append("\" class=\"").append(escape(cls)).append("\"/>\n");
+    }
+
+    @Override
+    public void clipRect(double x, double y, double w, double h) {
+        clipCount++;
+        String id = "clip" + clipCount;
+        body.append("  <clipPath id=\"").append(id).append("\">\n")
+                .append("    <rect x=\"").append(fmt(x))
+                .append("\" y=\"").append(fmt(y))
+                .append("\" width=\"").append(fmt(w))
+                .append("\" height=\"").append(fmt(h))
+                .append("\"/>\n  </clipPath>\n");
+        // Counted as a group, so toSvg's auto-close covers an unbalanced clip
+        // exactly as it already covers an unbalanced group.
+        body.append("  <g clip-path=\"url(#").append(id).append(")\">\n");
+        openGroups++;
+    }
+
+    @Override
+    public void endClip() {
+        endGroup();
+    }
+
+    @Override
     public void cross(double cx, double cy, double r, String cls) {
         emitLine(cx - r, cy - r, cx + r, cy + r, cls, null);
         emitLine(cx - r, cy + r, cx + r, cy - r, cls, null);
@@ -96,7 +133,7 @@ final class SvgSink implements PlotSink {
                 .append(escape(s)).append("</text>\n");
     }
 
-    String toSvg() {
+    public String toSvg() {
         while (openGroups > 0) {
             endGroup();
         }

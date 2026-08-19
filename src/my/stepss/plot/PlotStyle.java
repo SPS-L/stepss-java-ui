@@ -1,4 +1,4 @@
-package my.stepss.ssa;
+package my.stepss.plot;
 
 import java.awt.Color;
 
@@ -21,14 +21,14 @@ import java.awt.Color;
  * a white page, and it should not come out inverted because of what the
  * application happened to be wearing when the button was pressed.
  */
-final class PlotStyle {
+public final class PlotStyle {
 
-    static final class Entry {
-        final String cls;
-        final String lightHex;
-        final String darkHex;
-        final float width;
-        final Integer fontPx;
+    public static final class Entry {
+        public final String cls;
+        public final String lightHex;
+        public final String darkHex;
+        public final float width;
+        public final Integer fontPx;
 
         Entry(String cls, String lightHex, String darkHex, float width, Integer fontPx) {
             this.cls = cls;
@@ -39,7 +39,7 @@ final class PlotStyle {
         }
 
         /** This class's colour on the ground in use. */
-        String hex(boolean dark) {
+        public String hex(boolean dark) {
             return dark ? darkHex : lightHex;
         }
     }
@@ -59,7 +59,7 @@ final class PlotStyle {
      * would make the guides louder in dark than in light, which is the same
      * kind of untruth as leaving them invisible.
      */
-    static final Entry[] ENTRIES = {
+    public static final Entry[] ENTRIES = {
         new Entry("axis", "#333333", "#d0d4d6", 1.0f, null),
         new Entry("grid", "#cccccc", "#64686a", 0.5f, null),
         new Entry("bound", "#dc143c", "#ff6b83", 1.5f, null),
@@ -69,15 +69,58 @@ final class PlotStyle {
         new Entry("shape", "#1f77b4", "#5fa8dc", 2.0f, null),
         new Entry("label", "#333333", "#d0d4d6", 0.0f, 11),
         new Entry("title", "#333333", "#d0d4d6", 0.0f, 13),
+        new Entry("series0", "#0072b2", "#6cb8e6", 1.5f, null),
+        new Entry("series1", "#d55e00", "#f59457", 1.5f, null),
+        new Entry("series2", "#009e73", "#4fd1a8", 1.5f, null),
+        new Entry("series3", "#cc79a7", "#e2a6c6", 1.5f, null),
+        new Entry("series4", "#e69f00", "#f2c14e", 1.5f, null),
+        new Entry("series5", "#56b4e9", "#9ad4f2", 1.5f, null),
+        new Entry("series6", "#8b4513", "#c58a5e", 1.5f, null),
+        new Entry("series7", "#6a3d9a", "#b18ad6", 1.5f, null),
     };
 
     /** The ground a saved figure is drawn on, whatever the application wears. */
-    static final String EXPORT_BACKGROUND = "#ffffff";
+    public static final String EXPORT_BACKGROUND = "#ffffff";
+
+    /**
+     * How many distinct curve colours exist before the cycle repeats.
+     *
+     * <p>Slots 0 to 5 are Okabe-Ito, which is distinguishable under the common
+     * forms of colour blindness. Its yellow and black are deliberately not
+     * here: yellow is illegible on the light ground exports always use, and
+     * black is what the axis furniture is drawn in, so a curve wearing it
+     * would read as part of the frame.
+     *
+     * <p>Removing those two leaves six, so slots 6 and 7 are not Okabe-Ito at
+     * all. {@code series6} ({@code #8b4513}, saddle brown) and {@code series7}
+     * ({@code #6a3d9a}, violet) are unverified extensions: neither has been
+     * put through a colour-vision-deficiency simulator, and saddle brown
+     * against the vermillion of {@code series1} ({@code #d55e00}) is a
+     * plausible confusion pair under protanopia and deuteranopia.
+     *
+     * <p>That is recorded rather than fixed, deliberately. Beyond about six
+     * hues the distinctions genuinely run out, so a guessed replacement is no
+     * better than what is here, and choosing a real one needs a simulator
+     * rather than a judgement call. A reader comparing seven or eight traces
+     * is better served by extracting them in smaller groups, which the
+     * one-window-per-extraction design already supports.
+     */
+    public static final int SERIES_COLOURS = 8;
+
+    /**
+     * The style class for curve {@code index}, wrapping when an extraction has
+     * more curves than the palette has colours. Wrapping rather than
+     * generating a colour keeps every drawn hex inside {@link #ENTRIES}, which
+     * is what makes an exported figure restylable by editing one rule.
+     */
+    public static String seriesClass(int index) {
+        return "series" + Math.floorMod(index, SERIES_COLOURS);
+    }
 
     /**
      * The entry for cls, or the axis default when unknown.
      */
-    static Entry of(String cls) {
+    public static Entry of(String cls) {
         for (Entry e : ENTRIES) {
             if (e.cls.equals(cls)) {
                 return e;
@@ -87,7 +130,7 @@ final class PlotStyle {
     }
 
     /** A "#rrggbb" from the table above as a Color. */
-    static Color color(String hex) {
+    public static Color color(String hex) {
         return new Color(Integer.parseInt(hex.substring(1), 16));
     }
 
@@ -97,7 +140,7 @@ final class PlotStyle {
      * the system fallback too, which is neither of the two FlatLaf themes and
      * can be either brightness.
      */
-    static boolean isDark(Color background) {
+    public static boolean isDark(Color background) {
         if (background == null) {
             return false;
         }

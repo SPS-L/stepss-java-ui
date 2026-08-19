@@ -26,6 +26,7 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableRowSorter;
+import my.stepss.plot.PlotStyle;
 
 /**
  * One small-signal run, displayed. Non-modal and independent, so several can

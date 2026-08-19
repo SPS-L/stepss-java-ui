@@ -11,22 +11,22 @@
 
 Neither edition wraps the other, and a case built in one runs unchanged in the other.
 
-This one is a Java (Swing) desktop application. It bundles the complete simulation toolchain (RAMSES, Helios, CODEGEN, DYNGRAPH, gnuplot) into a single jar, so a network can be loaded, simulated statically and dynamically, and analysed without touching the command line. **CODEGEN makes this the edition for building your own models**: it is the one component the Python edition does not carry.
+This one is a Java (Swing) desktop application. It bundles the complete simulation toolchain (RAMSES, Helios, CODEGEN, DYNGRAPH, and on Windows gnuplot) into a single jar, so a network can be loaded, simulated statically and dynamically, and analysed without touching the command line. **CODEGEN makes this the edition for building your own models**: it is the one component the Python edition does not carry.
 
 ## Features
 
 - **Complete workflow in tabs**: System Data, Observables, Power Flow Simulation, Dynamic Simulation, Analysis, and Codegen
-- **Bundled examples**: *File -> Open Examples* extracts a ready-to-run test system (Kundur two-area, IEEE Nordic, or the 5-bus tutorial) into your examples directory and fills in the case, so there is something to run on a fresh install
+- **Bundled examples**: *File → Open Examples* extracts a ready-to-run test system (Kundur two-area, IEEE Nordic, or the 5-bus tutorial) into your examples directory and fills in the case, so there is something to run on a fresh install
 - **Dynamic simulation**: runs the bundled RAMSES engine on the loaded data and disturbance files
 - **Power flow**: drives the bundled Helios power-flow engine
 - **Real-time plotting**: live curves during simulation via gnuplot (bus voltages, machine speeds, branch flows, wall time, and more)
-- **Result extraction**: "Extract Curves" launches the bundled DYNGRAPH viewer on saved output trajectories
+- **Result extraction**: *Extract Curves* drives the bundled DYNGRAPH over a saved trajectory and draws the result in a curve window of its own, one per extraction, so two extractions can be put side by side and compared. Zoom by dragging a box, reset with a double-click, and save the figure as PNG, SVG or CSV
 - **Analysis tools**: Jacobian matrix extraction, and small-signal stability analysis computed by the engine itself (see `examples/kundur-ssa/`)
 - **User models**: the Codegen tab generates user-written model source with CODEGEN and compiles it into a custom simulator with gfortran
 - **Observable wizard**: dialog for selecting buses, machines, shunts, branches, and injectors to record
 - **Integrated editing**: opens data and disturbance files in the operating system's default editor
 - **Built-in help**: online user guide, release notes, and update checker
-- **Light and dark themes**: toggled from *Tools -> Dark theme*, remembered between sessions, and applied to the title bar as well as the window; the window icon and the About lockup come in the variant that matches
+- **Light and dark themes**: toggled from *Tools → Dark theme*, remembered between sessions, and applied to the title bar as well as the window; the window icon and the About lockup come in the variant that matches
 - **Cross-platform**: Windows, Linux, and macOS (Apple Silicon), with menu shortcuts on each platform's own modifier
 
 ## Installation
@@ -43,7 +43,7 @@ cd stepss-java-ui
 ant jar
 ```
 
-The build (a NetBeans/Ant project) produces `dist/stepss.jar`, a self-contained jar with the Commons Exec, Commons IO and FlatLaf libraries merged in.
+The build (a NetBeans/Ant project) produces `dist/stepss.jar`, a self-contained jar with the Commons Exec, Commons IO, FlatLaf and Batik libraries merged in (Batik brings xmlgraphics-commons and xml-apis-ext with it).
 
 Building fetches the pinned RAMSES, Helios, DYNGRAPH, and CODEGEN binaries for all three platforms (`ant fetch-payloads`, run automatically as part of `ant jar`) from their releases in the SPS-L GitHub organisation. Those component repositories are private, so the first build needs network access and the [`gh` CLI](https://cli.github.com/) authenticated with SPS-L access (`gh auth login`); downloaded archives are checksum-verified against `versions.properties` and cached in `payload-cache/`, so later builds only need network again when a pinned version changes. CI authenticates the same way, through this repository's `STEPSS_TOKEN` secret, because Actions' default `GITHUB_TOKEN` is scoped to this repo alone and cannot reach the component repos.
 
@@ -55,7 +55,7 @@ Compiling custom models is optional and needs a Fortran toolchain on your machin
 
 ### Refreshing the application's marks
 
-The window icon and the About lockup are PNGs in `src/my/stepss/`, rendered from the SVG sources in [stepss-docs](https://github.com/SPS-L/stepss-docs) `src/assets`, in a light and a dark variant each. They are stored rasterised so that nothing has to render vectors at runtime and no SVG library is on the classpath; the cost is that they go stale when the artwork changes, and the build does not notice. Re-export all fourteen with:
+The window icon and the About lockup are PNGs in `src/my/stepss/`, rendered from the SVG sources in [stepss-docs](https://github.com/SPS-L/stepss-docs) `src/assets`, in a light and a dark variant each. They are stored rasterised so that nothing renders vectors while the window is being built; the cost is that they go stale when the artwork changes, and the build does not notice. This used to buy something further, that no SVG library shipped at all, which stopped being true when Batik arrived to draw the one-line diagram. Re-export all fourteen with:
 
 ```bash
 tools/refresh-marks.sh                       # expects ../stepss-docs/src/assets
@@ -93,9 +93,9 @@ Releases are cut automatically. RAMSES, Helios, DYNGRAPH and CODEGEN dispatch to
 
 The bundled example test systems are re-pinned by the same run, but they never trigger one: they are reported as `refreshed` rather than `changed`, and only `changed` decides whether to publish. An example repository being tagged is not a reason to publish a new STEPSS, so a refreshed example rides along with the next release instead.
 
-STEPSS checks for a newer release when it starts and says so on the banner across the top of the window, with a link to the release page. It never blocks startup on that check and says nothing when it cannot reach github.com. Turn it off under **Tools > Check for updates at startup**.
+STEPSS checks for a newer release when it starts and says so on the banner across the top of the window, with a link to the release page. It never blocks startup on that check and says nothing when it cannot reach github.com. Turn it off under **Tools → Check for updates at startup**.
 
-Nothing is published until the build and the toolchain check have both passed. The commit that re-pins the build is pushed immediately before the release is created, and the tag is created by the same API call that creates the release, so a run that fails leaves no tag and no release behind, and re-running it publishes under the same version number. Any failure opens an issue.
+Nothing is published until the build and the toolchain check have both passed. The commit that re-pins the build is pushed immediately before the draft is created, and because a draft carries no tag (see [Native installers](#native-installers) for why the release is drafted rather than published outright), a run that fails leaves no tag and no release behind, and re-running it publishes under the same version number. Any failure opens an issue.
 
 Release numbers follow the pinned RAMSES version, with a counter for releases driven by the other components: `v3.55`, then `v3.55.1`, `v3.55.2`, and so on until RAMSES itself moves.
 
@@ -116,7 +116,7 @@ Then, in the GUI:
 3. Optionally, name a **one-line diagram** template (`.svg`) in the same *System Data* tab: it carries placeholder codes, and every **Run Power Flow** fills them in with the solved values and opens the result in a window of its own (placeholder table in the [user guide](https://stepss.sps-lab.org/user-guide/power-flow/))
 4. Select observables to record (*Observables* tab or the Observable dialog)
 5. Run the simulation from the *Dynamic Simulation* tab
-6. Plot results with **Extract Curves** (DYNGRAPH) or watch the real-time gnuplot curves
+6. Plot results with **Extract Curves**, which opens a curve window of its own, or watch the real-time gnuplot curves during the run
 
 ## Bundled tools
 
@@ -132,13 +132,13 @@ The jar embeds the toolchain executables for the platform it runs on and extract
 | gnuplot | Real-time plotting | bundled | resolved from `PATH` | resolved from `PATH` |
 | Data file editing | OS default editor | yes | yes | yes |
 
-DYNGRAPH is the same console program on all three platforms, but Extract Curves no longer opens it in a terminal window: STEPSS reads the trajectory's observables with `dyngraph --list`, presents them in a selection dialog, and drives the extraction through a generated command file (`-t`). Running DYNGRAPH by hand, outside STEPSS, still gives the console prompts.
+DYNGRAPH is the same console program on all three platforms, but Extract Curves no longer opens it in a terminal window: STEPSS reads the trajectory's observables with `dyngraph --list`, presents them in a selection dialog, drives the extraction through a generated command file (`-t`), and then draws the extracted curves itself. Running DYNGRAPH by hand, outside STEPSS, still gives the console prompts.
 
 The bundled RAMSES runs limited (up to 1000 buses, 2 cores) unless a `LICENSE` record is supplied among the data files. There is only one engine build; the limit is lifted by the licence the engine itself reads, not by a different binary, so STEPSS cannot tell which of the two you are running and does not claim to. The engine's own banner in the simulation output reports it.
 
 On first run STEPSS shows the RAMSES licence and asks you to accept it. Declining exits.
 
-In addition, the application distributes the following third-party Java libraries (merged into `stepss.jar` and shipped in `dist/lib/`): Apache Commons Exec, Apache Commons IO, and FlatLaf (all Apache License 2.0). FlatLaf is the look and feel; it renders the same on all three platforms, scales on HiDPI, and provides the dark theme offered under **Tools -> Dark theme**. Because it is a multi-release jar, `manifest.mf` declares `Multi-Release: true`.
+In addition, the application distributes the following third-party Java libraries (merged into `stepss.jar` and shipped in `dist/lib/`), all under the Apache License 2.0: Apache Commons Exec, Apache Commons IO, FlatLaf, and Batik with its own dependencies xmlgraphics-commons and xml-apis-ext. FlatLaf is the look and feel; it renders the same on all three platforms, scales on HiDPI, and provides the dark theme offered under **Tools → Dark theme**. Because it is a multi-release jar, `manifest.mf` declares `Multi-Release: true`. Batik rasterises the annotated one-line diagram that every power flow run produces.
 
 ## Related Projects
 
@@ -154,9 +154,18 @@ In addition, the application distributes the following third-party Java librarie
 
 ## License
 
-STEPSS is distributed under the **Apache License 2.0**. See [LICENSE](LICENSE). Copyright © Petros Aristidou.
+**The Java source in this repository is under the Apache License 2.0.** See [LICENSE](LICENSE). Copyright © Petros Aristidou.
 
-The Apache license covers the Java source code in this repository only. The bundled RAMSES, Helios, CODEGEN, and DYNGRAPH executables are proprietary components under their own terms, and the bundled third-party tools and libraries (gnuplot, KLU, Apache Commons Exec/IO, FlatLaf) remain under their respective licenses. The license text of each bundled component is embedded in the application and viewable from the About dialog.
+STEPSS taken as a whole is not, and should never be described that way: it is an umbrella over components under different licences, and the engines it bundles are not Apache 2.0.
+
+| Component | Terms |
+|---|---|
+| This Java interface, and DYNGRAPH | Apache License 2.0 |
+| **RAMSES** | Property of the University of Liège. Proprietary, free for non-commercial use only, and the free version is capped at 1000 buses and 2 cores |
+| **Helios**, **CODEGEN** | Academic Public Licence: free for academic, research and educational use, commercial use by separate agreement |
+| Bundled third-party tools and libraries | Their own terms: gnuplot, KLU, Batik, Apache Commons Exec/IO, FlatLaf |
+
+The authoritative statement of what governs what is the [licence page](https://stepss.sps-lab.org/getting-started/license/). The table above is a summary of it and must not grow into a second copy. The licence text of each bundled component is embedded in the application and viewable from the About dialog.
 
 ## Authors
 

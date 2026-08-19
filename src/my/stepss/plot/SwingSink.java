@@ -1,10 +1,11 @@
-package my.stepss.ssa;
+package my.stepss.plot;
 
 import java.awt.BasicStroke;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
+import java.awt.geom.Path2D;
 
 /**
  * A PlotSink over Graphics2D. Class names map to the same colours the SVG
@@ -12,17 +13,18 @@ import java.awt.geom.Line2D;
  * class means, though not always on its hex: this one follows the theme and
  * the SVG does not, which is the one difference between them.
  */
-final class SwingSink implements PlotSink {
+public final class SwingSink implements PlotSink {
 
     private final Graphics2D g;
     private final boolean dark;
+    private java.awt.Shape savedClip;
 
     /**
      * @param dark which column of {@link PlotStyle} to draw in, measured by
      *     the caller off the ground it is painting on rather than asked of
      *     the look and feel
      */
-    SwingSink(Graphics2D g, boolean dark) {
+    public SwingSink(Graphics2D g, boolean dark) {
         this.g = g;
         this.dark = dark;
     }
@@ -60,6 +62,32 @@ final class SwingSink implements PlotSink {
     public void circle(double cx, double cy, double r, String cls) {
         style(cls, false);
         g.draw(new Ellipse2D.Double(cx - r, cy - r, 2 * r, 2 * r));
+    }
+
+    @Override
+    public void polyline(double[] xs, double[] ys, int n, String cls) {
+        if (n < 2) {
+            return;
+        }
+        style(cls, false);
+        Path2D.Double path = new Path2D.Double();
+        path.moveTo(xs[0], ys[0]);
+        for (int i = 1; i < n; i++) {
+            path.lineTo(xs[i], ys[i]);
+        }
+        g.draw(path);
+    }
+
+    @Override
+    public void clipRect(double x, double y, double w, double h) {
+        savedClip = g.getClip();
+        g.clip(new java.awt.geom.Rectangle2D.Double(x, y, w, h));
+    }
+
+    @Override
+    public void endClip() {
+        g.setClip(savedClip);
+        savedClip = null;
     }
 
     @Override
