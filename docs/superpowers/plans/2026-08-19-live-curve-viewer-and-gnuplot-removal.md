@@ -2039,12 +2039,29 @@ public final class LiveCurveWindow extends JFrame {
      * the previous tick.
      */
     public void finish() {
-        poller.execute(() -> {
-            tick();
-            stopped = true;
-            poller.shutdown();
-            SwingUtilities.invokeLater(() -> setTitle(getTitle() + " (finished)"));
-        });
+        // Never throws, and that is load-bearing rather than defensive habit.
+        // Closing the window shuts the poller down, so a user who closes the
+        // live view before the run ends leaves this executor terminated. The
+        // caller is the run watcher thread, which calls this and then re-enables
+        // the Run button through invokeLater: a RejectedExecutionException here
+        // would kill that thread before it got there and leave the button
+        // disabled for the rest of the session, with no error a user could act
+        // on. The isShutdown check handles the common case and the catch handles
+        // losing the race with a close, because the two cannot be made atomic.
+        if (poller.isShutdown()) {
+            return;
+        }
+        try {
+            poller.execute(() -> {
+                tick();
+                stopped = true;
+                poller.shutdown();
+                SwingUtilities.invokeLater(() -> setTitle(getTitle() + " (finished)"));
+            });
+        } catch (java.util.concurrent.RejectedExecutionException windowClosed) {
+            // The window went away between the check above and this call. There
+            // is nothing left to read and nothing left to freeze.
+        }
     }
 
     /** Disposes the window and its poller. */
