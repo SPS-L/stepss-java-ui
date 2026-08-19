@@ -454,7 +454,6 @@ public class StepssUI extends javax.swing.JFrame {
         content.add(heading(jLabel4), span(row++));
         content.add(ActionBar.create()
                 .add(runDyngraphButton)
-                .add(saveCurrentCurveButton)
                 .separate()
                 .add(saveTrajToFileButton)
                 .add(loadTrajToFileButton)
@@ -1143,7 +1142,6 @@ public class StepssUI extends javax.swing.JFrame {
         runDyngraphButton = new javax.swing.JButton();
         saveTrajToFileButton = new javax.swing.JButton();
         closeCurveWindowsButton = new javax.swing.JButton();
-        saveCurrentCurveButton = new javax.swing.JButton();
         loadTrajToFileButton = new javax.swing.JButton();
         saveDynJac = new javax.swing.JButton();
         loadDynJac = new javax.swing.JButton();
@@ -2236,15 +2234,6 @@ public class StepssUI extends javax.swing.JFrame {
             }
         });
 
-        saveCurrentCurveButton.setText("Save gnuplot files");
-        saveCurrentCurveButton.setToolTipText("Saves the extracted .cur and .plt, for opening in gnuplot yourself.");
-        saveCurrentCurveButton.setEnabled(false);
-        saveCurrentCurveButton.setName("saveCurrentCurveButton"); // NOI18N
-        saveCurrentCurveButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                saveCurrentCurveButtonActionPerformed(evt);
-            }
-        });
 
         loadTrajToFileButton.setText("Load trajectory");
         loadTrajToFileButton.setToolTipText("Click to load a trajectory file that you saved from a previous simulation.");
@@ -2348,10 +2337,7 @@ public class StepssUI extends javax.swing.JFrame {
                         .addComponent(ssaDirectory))
                     .addGroup(jPanel8Layout.createSequentialGroup()
                         .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(jPanel8Layout.createSequentialGroup()
-                                .addComponent(runDyngraphButton)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(saveCurrentCurveButton))
+                            .addComponent(runDyngraphButton)
                             .addComponent(closeCurveWindowsButton)
                             .addGroup(jPanel8Layout.createSequentialGroup()
                                 .addComponent(saveTrajToFileButton)
@@ -2396,7 +2382,6 @@ public class StepssUI extends javax.swing.JFrame {
                     .addComponent(loadTrajToFileButton))
                 .addGap(12, 12, 12)
                 .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(saveCurrentCurveButton)
                     .addComponent(runDyngraphButton))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(closeCurveWindowsButton)
@@ -4401,45 +4386,6 @@ public class StepssUI extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_loadTrajToFileButtonActionPerformed
 
-    private void saveCurrentCurveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveCurrentCurveButtonActionPerformed
-        fileChooser.setSelectedFile(new File(""));
-        fileChooser.setDialogTitle("Choose Save File");
-        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-        int returnVal = fileChooser.showSaveDialog(this);
-        if (returnVal == JFileChooser.APPROVE_OPTION) {
-            try {
-                File srcFile = new File(lastExtractionBase.getAbsolutePath() + ".plt");
-                File dstFile = new File(fileChooser.getSelectedFile().getAbsolutePath() + ".plt");
-                if (srcFile.exists()) {
-                    FileInputStream srcFileIn = new FileInputStream(srcFile);
-                    String content = IOUtils.toString(srcFileIn, "UTF-8");
-                    IOUtils.closeQuietly(srcFileIn);
-                    String file_str = lastExtractionBase.getAbsolutePath() + ".cur";
-                    content = content.replaceAll(Pattern.quote(file_str),
-                            Matcher.quoteReplacement(fileChooser.getSelectedFile().getName() + ".cur"));
-                    FileOutputStream srcFileOut = new FileOutputStream(srcFile);
-                    IOUtils.write(content, srcFileOut, "UTF-8");
-                    IOUtils.closeQuietly(srcFileOut);
-                    fileOps.copyFiletoFile(srcFile, dstFile);
-                }
-                srcFile = new File(lastExtractionBase.getAbsolutePath() + ".cur");
-                dstFile = new File(fileChooser.getSelectedFile().getAbsolutePath() + ".cur");
-                if (srcFile.exists()) {
-                    fileOps.copyFiletoFile(srcFile, dstFile);
-                    srcFile.delete();
-                }
-                srcFile = new File(lastExtractionBase.getAbsolutePath() + ".png");
-                dstFile = new File(fileChooser.getSelectedFile().getAbsolutePath() + ".png");
-                if (srcFile.exists()) {
-                    fileOps.copyFiletoFile(srcFile, dstFile);
-                    srcFile.delete();
-                }
-            } catch (IOException ex) {
-                Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
-        }
-    }//GEN-LAST:event_saveCurrentCurveButtonActionPerformed
 
     private void closeCurveWindowsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_closeCurveWindowsButtonActionPerformed
         for (java.awt.Window window : curveWindows) {
@@ -4604,9 +4550,9 @@ public class StepssUI extends javax.swing.JFrame {
      * <p>The output base is per-extraction rather than the fixed
      * {@code tempGnupOut} it used to be, because several extractions can now
      * stay open in their own windows at once and each needs files the next
-     * extraction will not overwrite. saveCurrentCurveButton no longer opens
-     * that name by hand; it reads {@link #lastExtractionBase}, which this
-     * method sets to the base it just built.
+     * extraction will not overwrite. Saving the gnuplot pair is a window
+     * action rather than a tab-bar one for the same reason: each window knows
+     * the .cur it parsed, so it cannot save a different extraction's files.
      *
      * <p>Line 1 of the replay file is the trajectory's bare name
      * ({@code trajectory.getName()}, always {@code "output.trj"}), not its
@@ -4650,7 +4596,6 @@ public class StepssUI extends javax.swing.JFrame {
         // previous successful extraction it is enabled, and a failed
         // re-run must not leave it pointing at a stale .plt and .cur pair
         // that DYNGRAPH may have truncated or half-written.
-        saveCurrentCurveButton.setEnabled(false);
         runDyngraphButton.setEnabled(false);
         try {
             runner.plot(selCmd, outputBase, new DyngraphRunner.PlotListener() {
@@ -4661,7 +4606,6 @@ public class StepssUI extends javax.swing.JFrame {
                             if (exitCode == 0) {
                                 // Success is silent, exactly as today: the
                                 // result button lights up and that is all.
-                                saveCurrentCurveButton.setEnabled(true);
                                 openCurveWindow(outputBase, selections);
                             } else {
                                 JOptionPane.showMessageDialog(StepssUI.this,
@@ -5025,6 +4969,27 @@ public class StepssUI extends javax.swing.JFrame {
         }
         simulExecutor.setWorkingDirectory(myTempDir);
         simulExecutor.setProcessDestroyer(processDestroyer);
+        final File runtimeCur = new File(myTempDir, "temp_display.cur");
+        if (runtimeCurves) {
+            // Before the launch, not after it. execute() returns before the
+            // child is forked, so deleting afterwards races the engine: if the
+            // engine won, the unlink would take a file it already holds open,
+            // the reader would see no file for the whole run, and the window
+            // would sit on "no data yet" and then freeze. Java wins by a wide
+            // margin in practice, because the engine only opens this file after
+            // parsing settings, data and disturbances, but the ordering costs
+            // nothing to get right.
+            //
+            // Deleting at all: the poller's first read happens immediately,
+            // while the engine is still starting, so a file left by an earlier
+            // run would be read as though it belonged to this one.
+            if (runtimeCur.exists() && !runtimeCur.delete()) {
+                Logger.getLogger(StepssUI.class.getName()).log(Level.WARNING,
+                        "Could not delete the previous run''s {0}; the run-time"
+                        + " window may briefly show the previous run.",
+                        runtimeCur.getName());
+            }
+        }
         try {
             simulExecutor.execute(command, simulExecutorResultHandler);
             statusBar.running("Simulating");
@@ -5050,26 +5015,6 @@ public class StepssUI extends javax.swing.JFrame {
         // engine has produced no data yet is more useful than a run that
         // silently plots nothing.
         if (runtimeCurves) {
-            File runtimeCur = new File(myTempDir, "temp_display.cur");
-            // Delete the previous run's file before watching for this one's.
-            // The poller's first tick fires immediately while the engine is
-            // still starting up, so a stale file left in the working directory
-            // is read as though it were this run: the window would show the
-            // previous run's curves until the engine truncated the file and the
-            // reader noticed. The engine recreates it with status='replace'
-            // anyway, so removing it here costs nothing and is the difference
-            // between a clean empty window and a misleading full one.
-            if (runtimeCur.exists() && !runtimeCur.delete()) {
-                // Not fatal: the engine is about to replace it regardless.
-                // Logged rather than printed, because every other diagnostic in
-                // this class goes through the logger and a packaged launch has no
-                // console to print to, which is exactly the Windows held-handle
-                // case this is here to record.
-                Logger.getLogger(StepssUI.class.getName()).log(Level.WARNING,
-                        "Could not delete the previous run''s {0}; the run-time"
-                        + " window may briefly show the previous run.",
-                        runtimeCur.getName());
-            }
             opened = my.stepss.curves.LiveCurveWindow.open(this, runtimeCur,
                     "Run-time curves");
             trackCurveWindow(opened);
@@ -6804,11 +6749,12 @@ public class StepssUI extends javax.swing.JFrame {
     private File dyngraphExec = null;
 
     /**
-     * The output base of the most recent extraction. Was a constant while one
-     * extraction at a time existed and saveCurrentCurveButton opened
-     * tempGnupOut by name; now that each extraction keeps its own files so
-     * several windows can stay open, that button acts on the newest, which is
-     * what it always did.
+     * The output base of the most recent extraction.
+     *
+     * <p>Was a constant while one extraction at a time existed. Each extraction
+     * now keeps its own files so several windows can stay open, and saving the
+     * gnuplot pair moved into the window that owns them, so nothing reads this
+     * to decide which files to write any more.
      */
     private File lastExtractionBase;
 
@@ -7010,7 +6956,6 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JMenuItem saveCommandFileMenuItem;
     private javax.swing.JMenuItem saveConfigMenuItem;
     private javax.swing.JCheckBox saveContTrace;
-    private javax.swing.JButton saveCurrentCurveButton;
     private javax.swing.JCheckBox saveDiscTrace;
     private javax.swing.JCheckBox saveDumpButton;
     private javax.swing.JMenuItem saveObsFileMenuItem;

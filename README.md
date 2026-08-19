@@ -19,8 +19,8 @@ This one is a Java (Swing) desktop application. It bundles the complete simulati
 - **Bundled examples**: *File → Open Examples* extracts a ready-to-run test system (Kundur two-area, IEEE Nordic, or the 5-bus tutorial) into your examples directory and fills in the case, so there is something to run on a fresh install
 - **Dynamic simulation**: runs the bundled RAMSES engine on the loaded data and disturbance files
 - **Power flow**: drives the bundled Helios power-flow engine
-- **Real-time plotting**: a curve window opens with each run and follows the engine as it writes, one stacked panel per observable (bus voltages, machine speeds, branch flows, latency, phase-plane trajectories, wall time against simulation time, and more). It stops when the run does and stays open as a static chart, so two runs can be compared side by side. Drawn by STEPSS itself: no external plotting program is needed or bundled
-- **Result extraction**: *Extract Curves* drives the bundled DYNGRAPH over a saved trajectory and draws the result in a curve window of its own, one per extraction, so two extractions can be put side by side and compared. Zoom by dragging a box, reset with a double-click, and save the figure as PNG, SVG or CSV. *Save gnuplot files* keeps the extraction's `.cur` and `.plt` pair, which STEPSS writes but never reads, for anyone who would rather plot it in gnuplot themselves
+- **Real-time plotting**: fill in a run-time observable and a curve window opens with the run and follows the engine as it writes, one stacked panel per observable (bus voltages, machine speeds, branch flows, latency, phase-plane trajectories, wall time against simulation time, and more). It stops when the run does and stays open as a static chart, so two runs can be compared side by side, and saves as PNG or CSV. That export is the only route out for the phase-plane and latency observables, which exist only during a run and have no *Extract Curves* equivalent. Drawn by STEPSS itself: no external plotting program is needed or bundled
+- **Result extraction**: *Extract Curves* drives the bundled DYNGRAPH over a saved trajectory and draws the result in a curve window of its own, one per extraction, so two extractions can be put side by side and compared. Zoom by dragging a box, reset with a double-click, and save the figure as PNG, SVG or CSV. *Save gnuplot pair* keeps that window's own `.cur` and `.plt`, which STEPSS writes but never reads, for anyone who would rather plot it in gnuplot themselves. It is a window action rather than a tab-bar one so that it always saves the extraction you are looking at
 - **Analysis tools**: Jacobian matrix extraction, and small-signal stability analysis computed by the engine itself (see `examples/kundur-ssa/`)
 - **User models**: the Codegen tab generates user-written model source with CODEGEN and compiles it into a custom simulator with gfortran
 - **Observable wizard**: dialog for selecting buses, machines, shunts, branches, and injectors to record
@@ -126,13 +126,13 @@ DYNGRAPH's output, which needs no header.
 
 ## Bundled tools
 
-The jar embeds the toolchain executables for the platform it runs on and extracts them at runtime. RAMSES, Helios, DYNGRAPH, and CODEGEN are fetched from their pinned SPS-L releases at build time (see [Installation](#installation)) on all three platforms. Every payload now arrives that way: no binary is committed to this repository.
+The jar embeds the toolchain executables for the platform it runs on and extracts them at runtime. RAMSES, Helios, DYNGRAPH, and CODEGEN are fetched from their pinned SPS-L releases at build time (see [Installation](#installation)) on all three platforms. Every toolchain payload now arrives that way: none is committed to this repository. The only binaries tracked here are the application's own icons and marks, and the third-party jars under `lib/`.
 
 | Tool | Role | Windows | Linux | macOS (Apple Silicon) |
 |---|---|---|---|---|
 | RAMSES (`dynsim`) | Dynamic simulation | yes | yes | yes |
 | Helios | Power flow | yes | yes | yes |
-| DYNGRAPH | Curve viewer | yes | yes | yes |
+| DYNGRAPH | Curve extraction | yes | yes | yes |
 | CODEGEN | Model generation | yes | yes | yes |
 | Model compilation | Custom models | yes (MSYS2/MinGW) | yes (gfortran) | yes (Homebrew gcc) |
 | Data file editing | OS default editor | yes | yes | yes |

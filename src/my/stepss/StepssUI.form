@@ -1656,11 +1656,7 @@
                               </Group>
                               <Group type="102" attributes="0">
                                   <Group type="103" groupAlignment="0" attributes="0">
-                                      <Group type="102" alignment="0" attributes="0">
-                                          <Component id="runDyngraphButton" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                                          <Component id="saveCurrentCurveButton" min="-2" max="-2" attributes="0"/>
-                                      </Group>
+                                      <Component id="runDyngraphButton" alignment="0" min="-2" max="-2" attributes="0"/>
                                       <Component id="closeCurveWindowsButton" alignment="0" min="-2" max="-2" attributes="0"/>
                                       <Group type="102" alignment="0" attributes="0">
                                           <Component id="saveTrajToFileButton" min="-2" max="-2" attributes="0"/>
@@ -1713,10 +1709,7 @@
                               <Component id="loadTrajToFileButton" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace min="-2" pref="12" max="-2" attributes="0"/>
-                          <Group type="103" groupAlignment="3" attributes="0">
-                              <Component id="saveCurrentCurveButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                              <Component id="runDyngraphButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                          </Group>
+                          <Component id="runDyngraphButton" min="-2" max="-2" attributes="0"/>
                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
                           <Component id="closeCurveWindowsButton" min="-2" max="-2" attributes="0"/>
                           <EmptySpace type="separate" max="-2" attributes="0"/>
@@ -1781,17 +1774,6 @@
                   </Properties>
                   <Events>
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="closeCurveWindowsButtonActionPerformed"/>
-                  </Events>
-                </Component>
-                <Component class="javax.swing.JButton" name="saveCurrentCurveButton">
-                  <Properties>
-                    <Property name="text" type="java.lang.String" value="Save gnuplot files"/>
-                    <Property name="toolTipText" type="java.lang.String" value="Saves the extracted .cur and .plt, for opening in gnuplot yourself."/>
-                    <Property name="enabled" type="boolean" value="false"/>
-                    <Property name="name" type="java.lang.String" value="saveCurrentCurveButton" noResource="true"/>
-                  </Properties>
-                  <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="saveCurrentCurveButtonActionPerformed"/>
                   </Events>
                 </Component>
                 <Component class="javax.swing.JButton" name="loadTrajToFileButton">

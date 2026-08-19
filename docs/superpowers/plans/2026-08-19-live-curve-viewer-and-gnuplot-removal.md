@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 11 (`javac.source=11`), Swing, FlatLaf, Apache Commons Exec, Ant. No test framework: headless `*Harness` main classes plus `tools/*-harness.sh`.
 
-**Spec:** `docs/superpowers/specs/2026-08-19-remove-gnuplot-dependency-design.md` — sections *The `.cur` header*, *Existing file formats*, *Live viewer*, *The chart component*, *Deletion inventory → stepss-java-ui*, *Verification*. This is step 4 of that document's six-step release sequence.
+**Spec:** `docs/superpowers/specs/2026-08-19-remove-gnuplot-dependency-design.md`, sections *The `.cur` header*, *Existing file formats*, *Live viewer*, *The chart component*, *Deletion inventory → stepss-java-ui*, *Verification*. This is step 4 of that document's six-step release sequence.
 
 ## Global Constraints
 

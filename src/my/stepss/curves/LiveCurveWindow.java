@@ -55,6 +55,14 @@ public final class LiveCurveWindow extends JFrame {
     private final JPanel stack = new JPanel();
     private final JLabel status = new JLabel(" ");
     private final List<CurvePanel> panels = new ArrayList<CurvePanel>();
+    /**
+     * The snapshots the EDT was last handed, kept so an export reads finished
+     * immutable data instead of reaching back into the poller's live buffers.
+     * EDT-only, like {@link #panels}.
+     */
+    private final List<CurveData> published = new ArrayList<CurveData>();
+    /** Panel titles, captured on the EDT when the panels are built. */
+    private final List<String> titles = new ArrayList<String>();
     private final ScheduledExecutorService poller = Executors.newSingleThreadScheduledExecutor(
             runnable -> {
                 Thread t = new Thread(runnable, "live-curve-poller");
@@ -117,6 +125,7 @@ public final class LiveCurveWindow extends JFrame {
         stack.setLayout(new GridLayout(0, 1));
         status.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
         add(stack, BorderLayout.CENTER);
+        add(toolbar(), BorderLayout.NORTH);
         add(status, BorderLayout.SOUTH);
         setSize(720, 560);
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -125,6 +134,127 @@ public final class LiveCurveWindow extends JFrame {
                 poller.shutdownNow();
             }
         });
+    }
+
+    /**
+     * PNG and CSV of whatever is on screen.
+     *
+     * <p>Not decoration: {@code o-d}, {@code P-d} and {@code LAT} are run-time
+     * display types with no DYNGRAPH equivalent, so without this there is no
+     * route at all for getting a phase-plane trajectory or a latency trace out
+     * of STEPSS. The post-analysis window's own exports do not help, because
+     * they only ever show what DYNGRAPH could extract.
+     *
+     * <p>No SVG here, deliberately. {@link my.stepss.plot.SvgSink} emits a whole
+     * document in one panel's coordinate space, so stacking several would mean
+     * composing documents, which is real work and belongs with a sink that
+     * understands panels rather than being improvised here.
+     */
+    private javax.swing.JPanel toolbar() {
+        javax.swing.JPanel bar = new javax.swing.JPanel();
+        javax.swing.JButton png = new javax.swing.JButton("Save PNG...");
+        png.addActionListener(event -> savePng());
+        javax.swing.JButton csv = new javax.swing.JButton("Save CSV...");
+        csv.addActionListener(event -> saveCsv());
+        bar.add(png);
+        bar.add(csv);
+        return bar;
+    }
+
+    /**
+     * The panels one under another, each drawn through the same export path the
+     * post-analysis window uses, so a saved figure is on the light ground
+     * whatever theme the application is wearing.
+     */
+    private void savePng() {
+        if (panels.isEmpty()) {
+            return;
+        }
+        int width = Math.max(stack.getWidth(), 800);
+        int height = Math.max(panels.get(0).getHeight(), 260);
+        java.awt.image.BufferedImage sheet = new java.awt.image.BufferedImage(
+                width, height * panels.size(),
+                java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D g = sheet.createGraphics();
+        try {
+            for (int i = 0; i < panels.size(); i++) {
+                g.drawImage(panels.get(i).toPng(width, height), 0, i * height, null);
+            }
+        } finally {
+            g.dispose();
+        }
+        File target = chooseTarget("png");
+        if (target == null) {
+            return;
+        }
+        try {
+            javax.imageio.ImageIO.write(sheet, "png", target);
+        } catch (IOException ex) {
+            failed(target, ex);
+        }
+    }
+
+    /**
+     * Every panel's samples in one file, one block per observable.
+     *
+     * <p>One file rather than one per panel because the panels share a run, and
+     * blocks rather than columns because a phase-plane panel's x is delta while
+     * a time series panel's x is t, so there is no shared first column to key
+     * them on.
+     */
+    private void saveCsv() {
+        // From what the EDT was last handed, NOT from LiveModel.snapshot(). This
+        // runs on the EDT, and snapshot() reads the growable buffers the poller
+        // thread appends to: calling it here would race a copyOf against a grow
+        // and could write a column of trailing zeros into the user's file. The
+        // published snapshots are already immutable and already on this thread.
+        if (published.isEmpty()) {
+            return;
+        }
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < published.size(); i++) {
+            if (i > 0) {
+                text.append('\n');
+            }
+            String title = i < titles.size() ? titles.get(i) : "";
+            text.append("# ").append(title.isEmpty()
+                    ? "observable " + (i + 1) : title).append('\n');
+            text.append(CurveWindow.toCsv(published.get(i)));
+        }
+        File target = chooseTarget("csv");
+        if (target == null) {
+            return;
+        }
+        try {
+            java.nio.file.Files.write(target.toPath(),
+                    text.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            failed(target, ex);
+        }
+    }
+
+    private File chooseTarget(String extension) {
+        javax.swing.JFileChooser chooser =
+                new javax.swing.JFileChooser(cur.getParentFile());
+        chooser.setDialogTitle("Save run-time curves as " + extension.toUpperCase(
+                java.util.Locale.ROOT));
+        chooser.setSelectedFile(new File("runtime-curves." + extension));
+        if (chooser.showSaveDialog(this) != javax.swing.JFileChooser.APPROVE_OPTION) {
+            return null;
+        }
+        File target = chooser.getSelectedFile();
+        if (!target.getName().toLowerCase(java.util.Locale.ROOT)
+                .endsWith("." + extension)) {
+            target = new File(target.getParentFile(),
+                    target.getName() + "." + extension);
+        }
+        return target;
+    }
+
+    private void failed(File target, IOException ex) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+                "Could not write " + target + "\n\n" + ex.getMessage(),
+                "Save run-time curves", javax.swing.JOptionPane.ERROR_MESSAGE);
     }
 
     /** The poll period for a header refresh rate in seconds. */
@@ -348,6 +478,7 @@ public final class LiveCurveWindow extends JFrame {
             CurvePanel panel = new CurvePanel();
             panel.setAxes(current.axesOf(i));
             panels.add(panel);
+            titles.add(current.axesOf(i).title);
             stack.add(panel);
         }
         stack.revalidate();
@@ -372,6 +503,8 @@ public final class LiveCurveWindow extends JFrame {
     private void discardPanels() {
         built = false;
         panels.clear();
+        titles.clear();
+        published.clear();
         stack.removeAll();
         stack.revalidate();
         stack.repaint();
@@ -383,6 +516,8 @@ public final class LiveCurveWindow extends JFrame {
         for (int i = 0; i < panels.size() && i < snapshots.size(); i++) {
             panels.get(i).setData(snapshots.get(i));
         }
+        published.clear();
+        published.addAll(snapshots);
         StringBuilder text = new StringBuilder();
         text.append(samples).append(" samples");
         // Once, at the end of the line, rather than a per-row storm: a torn
