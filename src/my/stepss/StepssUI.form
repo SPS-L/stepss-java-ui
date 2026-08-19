@@ -115,7 +115,7 @@
         </Component>
         <Component class="javax.swing.JLabel" name="webpageLabel">
           <Properties>
-            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Webpage:&lt;/b&gt; &lt;a href=&quot;https://stepss.sps-lab.org/&quot;&gt;https://stepss.sps-lab.org/&lt;/a&gt; &lt;/html&gt;"/>
+            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Webpage:&lt;/b&gt; &lt;a href=&quot;https://stepss.sps-lab.org/&quot;&gt;https://stepss.sps-lab.org/&lt;/a&gt;&lt;/html&gt;"/>
             <Property name="name" type="java.lang.String" value="webpageLabel" noResource="true"/>
           </Properties>
           <Events>
@@ -865,7 +865,7 @@
                 </Component>
                 <Component class="javax.swing.JLabel" name="jLabel9">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Disturbance file&lt;/b&gt; (required)&lt;/html&gt;"/>
+                    <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Disturbance file&lt;/b&gt; (optional)&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="jLabel9" noResource="true"/>
                   </Properties>
                 </Component>

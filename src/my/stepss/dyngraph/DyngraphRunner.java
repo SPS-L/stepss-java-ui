@@ -16,8 +16,8 @@ import org.apache.commons.exec.ShutdownHookProcessDestroyer;
  * The two DYNGRAPH invocations behind the observable picker, both with
  * stdout and stderr captured to buffers - the Helios capture precedent
  * (StepssUI's dedicated stderr buffer feeding reportHeliosExitStatus), not
- * viewCurvesButton's no-arg PumpStreamHandler, which inherits the JVM's
- * streams and captures nothing.
+ * a no-arg PumpStreamHandler, which inherits the JVM's streams and captures
+ * nothing.
  *
  * <p><b>Neither call may run on the EDT.</b> get_observ_name rewinds the
  * trajectory several times and the plot run reads the whole time series, so
@@ -101,8 +101,8 @@ public final class DyngraphRunner {
      * Runs {@code dyngraph -c -t <selCmd> -o<outputBase>} asynchronously and
      * reports through {@code listener}. Not interactive under -t, so it gets
      * no terminal window. No {@code -eps}: it would export an EPS file
-     * instead of leaving a .plt that viewCurvesButton can open in a gnuplot
-     * window - the same flag choice as today's Extract Curves.
+     * instead of leaving the .plt beside the .cur, which is what a user who
+     * wants gnuplot opens by hand. The same flag choice as Extract Curves.
      *
      * <p>The trajectory path travels as line 1 of the replay file, so it is
      * never an argv token; -o still carries a possibly-space-containing

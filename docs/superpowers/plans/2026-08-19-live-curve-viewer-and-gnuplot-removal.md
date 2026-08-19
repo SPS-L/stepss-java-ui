@@ -2386,7 +2386,30 @@ Beside `lastExtractionBase` (`:6794`):
     private final java.util.List<java.awt.Window> curveWindows =
             new java.util.ArrayList<java.awt.Window>();
 
-    /** The window tailing the run in progress, or null between runs. */
+    /**
+     * Tracks a curve window, and stops tracking it once the user closes it.
+     *
+     * <p>Without the listener a closed window stays in the list for the rest of
+     * the session, keeping its frame and its whole parsed dataset reachable: a
+     * long session that extracts several large curve sets retains every one of
+     * them. Closing an already-disposed window is a no-op, so the leak was
+     * silent rather than visible.
+     */
+    private void trackCurveWindow(final java.awt.Window window) {
+        curveWindows.add(window);
+        window.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosed(java.awt.event.WindowEvent event) {
+                curveWindows.remove(window);
+            }
+        });
+    }
+
+    /**
+     * The window opened for the most recent run, or null if that run configured
+     * no observables. Not cleared when a run ends normally. Read only on the EDT;
+     * the watcher thread uses its own captured reference instead.
+     */
     private my.stepss.curves.LiveCurveWindow liveCurves;
 ```
 
@@ -2430,16 +2453,19 @@ thread:
             // anyway, so removing it here costs nothing and is the difference
             // between a clean empty window and a misleading full one.
             if (runtimeCur.exists() && !runtimeCur.delete()) {
-                // Not fatal: the engine is about to replace it regardless. Worth
-                // one line on stderr because on Windows it means something still
-                // holds a handle to it.
-                System.err.println("Could not delete the previous run's "
-                        + runtimeCur.getName() + "; the run-time window may"
-                        + " briefly show the previous run.");
+                // Not fatal: the engine is about to replace it regardless.
+                // Logged rather than printed, because every other diagnostic in
+                // this class goes through the logger and a packaged launch has no
+                // console to print to, which is exactly the Windows held-handle
+                // case this is here to record.
+                Logger.getLogger(StepssUI.class.getName()).log(Level.WARNING,
+                        "Could not delete the previous run''s {0}; the run-time"
+                        + " window may briefly show the previous run.",
+                        runtimeCur.getName());
             }
             opened = my.stepss.curves.LiveCurveWindow.open(this, runtimeCur,
                     "Run-time curves");
-            curveWindows.add(opened);
+            trackCurveWindow(opened);
         }
         liveCurves = opened;
         // The watcher thread below must finish THIS run's window, so it captures
@@ -2470,7 +2496,7 @@ And the predicate, beside `writeObservable`:
      * configured with an empty name field.
      */
     private boolean anyRuntimeObservable() {
-        JComboBox[] types = {runtimeObsType, runtimeObsType1, runtimeObsType2};
+        JComboBox<?>[] types = {runtimeObsType, runtimeObsType1, runtimeObsType2};
         JTextField[] names = {runtimeObsName, runtimeObsName1, runtimeObsName2};
         for (int i = 0; i < types.length; i++) {
             String label = String.valueOf(types[i].getSelectedItem());
