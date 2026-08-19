@@ -20,6 +20,9 @@ public final class PlotHarness {
         polylineHonoursCount();
         polylineOnGraphicsDoesNotThrow();
         polylineWithNoPointsIsIgnored();
+        seriesClassesResolve();
+        seriesClassesWrap();
+        seriesClassesReachTheSvgStyleBlock();
 
         if (failures > 0) {
             System.err.println(failures + " plot check(s) FAILED");
@@ -68,6 +71,33 @@ public final class PlotHarness {
         SvgSink sink = new SvgSink(200, 100);
         sink.polyline(new double[0], new double[0], 0, "series0");
         check("no element for an empty series", 0, count(sink.toSvg(), "<polyline"));
+    }
+
+    /** Every cycle slot must be a real entry, not the axis fallback. */
+    private static void seriesClassesResolve() {
+        for (int i = 0; i < PlotStyle.SERIES_COLOURS; i++) {
+            String cls = PlotStyle.seriesClass(i);
+            check("seriesClass(" + i + ") names itself", "series" + i, cls);
+            check(cls + " is a real entry", cls, PlotStyle.of(cls).cls);
+            check(cls + " differs light and dark", false,
+                    PlotStyle.of(cls).lightHex.equals(PlotStyle.of(cls).darkHex));
+        }
+    }
+
+    private static void seriesClassesWrap() {
+        check("wraps past the end", "series0",
+                PlotStyle.seriesClass(PlotStyle.SERIES_COLOURS));
+        check("wraps twice round", "series1",
+                PlotStyle.seriesClass(PlotStyle.SERIES_COLOURS * 2 + 1));
+    }
+
+    /** The style block is generated from ENTRIES, so every class must appear. */
+    private static void seriesClassesReachTheSvgStyleBlock() {
+        String svg = new SvgSink(10, 10).toSvg();
+        for (int i = 0; i < PlotStyle.SERIES_COLOURS; i++) {
+            check("style block declares series" + i, true,
+                    svg.contains(".series" + i));
+        }
     }
 
     private static int count(String haystack, String needle) {

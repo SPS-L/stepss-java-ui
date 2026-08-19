@@ -69,10 +69,39 @@ public final class PlotStyle {
         new Entry("shape", "#1f77b4", "#5fa8dc", 2.0f, null),
         new Entry("label", "#333333", "#d0d4d6", 0.0f, 11),
         new Entry("title", "#333333", "#d0d4d6", 0.0f, 13),
+        new Entry("series0", "#0072b2", "#6cb8e6", 1.5f, null),
+        new Entry("series1", "#d55e00", "#f59457", 1.5f, null),
+        new Entry("series2", "#009e73", "#4fd1a8", 1.5f, null),
+        new Entry("series3", "#cc79a7", "#e2a6c6", 1.5f, null),
+        new Entry("series4", "#e69f00", "#f2c14e", 1.5f, null),
+        new Entry("series5", "#56b4e9", "#9ad4f2", 1.5f, null),
+        new Entry("series6", "#8b4513", "#c58a5e", 1.5f, null),
+        new Entry("series7", "#6a3d9a", "#b18ad6", 1.5f, null),
     };
 
     /** The ground a saved figure is drawn on, whatever the application wears. */
     public static final String EXPORT_BACKGROUND = "#ffffff";
+
+    /**
+     * How many distinct curve colours exist before the cycle repeats.
+     *
+     * <p>Okabe-Ito, which is distinguishable under the common forms of colour
+     * blindness. Its yellow and black are deliberately not here: yellow is
+     * illegible on the light ground exports always use, and black is what the
+     * axis furniture is drawn in, so a curve wearing it would read as part of
+     * the frame.
+     */
+    public static final int SERIES_COLOURS = 8;
+
+    /**
+     * The style class for curve {@code index}, wrapping when an extraction has
+     * more curves than the palette has colours. Wrapping rather than
+     * generating a colour keeps every drawn hex inside {@link #ENTRIES}, which
+     * is what makes an exported figure restylable by editing one rule.
+     */
+    public static String seriesClass(int index) {
+        return "series" + Math.floorMod(index, SERIES_COLOURS);
+    }
 
     /**
      * The entry for cls, or the axis default when unknown.
