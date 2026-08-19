@@ -54,9 +54,34 @@ public final class CurTail {
      * truncates it. A reader that kept its offset across that would skip the
      * new run's header and resume mid-row, so this is how it learns to throw
      * its parsed state away. Cleared by the following poll.
+     *
+     * <p><strong>Length is a heuristic, not proof.</strong> A shorter file is
+     * certainly a replaced one, but a replaced file is not certainly shorter:
+     * if a previous run wrote very little before being cancelled and the next
+     * run has already written past that offset by the time the poll lands, the
+     * file never looks short and the replacement goes unnoticed. The reader
+     * then resumes from a stale offset into a different run's bytes, and
+     * because the file only grows from there, no later poll can rediscover the
+     * mistake. Use {@link #reset()} whenever the caller knows a new run has
+     * started: a caller that knows should never be relying on this inference.
      */
     public boolean truncatedSinceLastPoll() {
         return truncated;
+    }
+
+    /**
+     * Forgets the offset and any held-back partial line, so the next
+     * {@link #poll()} reads from the top.
+     *
+     * <p>The reliable counterpart to the length heuristic documented on
+     * {@link #truncatedSinceLastPoll()}. A caller that knows a new run has
+     * begun should say so rather than leaving the class to infer it from a file
+     * size, which can be wrong in one direction and is then wrong permanently.
+     */
+    public void reset() {
+        offset = 0L;
+        partial.setLength(0);
+        truncated = false;
     }
 
     /**

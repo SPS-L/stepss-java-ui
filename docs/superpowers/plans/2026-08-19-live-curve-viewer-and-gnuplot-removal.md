@@ -803,6 +803,23 @@ public final class CurTail {
     }
 
     /**
+     * Forgets the offset and any held-back partial line, so the next
+     * {@link #poll()} reads from the top.
+     *
+     * <p>The reliable counterpart to the length heuristic: a caller that knows
+     * a new run has begun should say so rather than leaving the class to infer
+     * it from a file size. Length detects a replacement only when the new file
+     * is shorter, and a run cancelled early leaves an offset the next run can
+     * pass before the first poll lands, after which the file only grows and no
+     * later poll can rediscover the mistake.
+     */
+    public void reset() {
+        offset = 0L;
+        partial.setLength(0);
+        truncated = false;
+    }
+
+    /**
      * @return the complete lines appended since the last call, without their
      *     line terminators, oldest first; empty when the file does not exist
      *     yet or nothing whole has been added

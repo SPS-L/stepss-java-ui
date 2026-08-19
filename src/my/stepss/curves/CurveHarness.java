@@ -604,6 +604,30 @@ public final class CurveHarness {
             tail.poll();
             check("the offset advances by exactly what was appended",
                     String.valueOf(before + 9), String.valueOf(tail.offset()));
+
+            // The case the length heuristic cannot see: a replacement whose new
+            // content already reaches past the old offset never looks short, so
+            // poll() reads from a stale position into a different run's bytes
+            // and no later poll can rediscover it. reset() is how a caller that
+            // knows a new run started says so instead of leaving it to
+            // inference.
+            //
+            // These two checks pin the LIMITATION, not the desired behaviour.
+            // If a future change makes replacement detection reliable, these
+            // are the checks to rewrite: do not "fix" them to hide the gap
+            // while it is still there.
+            write(cur, "# stepss-cur 1\n# ncol 2\n 1.0 2.0\n 3.0 4.0\n 5.0 6.0\n");
+            List<String> afterLongerReplacement = tail.poll();
+            check("a replacement longer than the old offset is not detected",
+                    "false", String.valueOf(tail.truncatedSinceLastPoll()));
+            check("so that poll resumes mid-file instead of at the header",
+                    "false",
+                    String.valueOf(afterLongerReplacement.contains("# stepss-cur 1")));
+            tail.reset();
+            check("reset makes the next poll read from the top", "true",
+                    String.valueOf(tail.poll().contains("# stepss-cur 1")));
+            check("and reset reports no truncation of its own", "false",
+                    String.valueOf(tail.truncatedSinceLastPoll()));
         } finally {
             deleteRecursively(dir);
         }
