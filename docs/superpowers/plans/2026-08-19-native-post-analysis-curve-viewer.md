@@ -2211,22 +2211,44 @@ and add the method after `startPlotRun`:
         for (Selection selection : selections) {
             labels.add(selection.label());
         }
-        File cur = new File(outputBase.getAbsolutePath() + ".cur");
-        try {
-            my.stepss.curves.CurveData data =
-                    my.stepss.curves.CurReader.read(cur, labels);
-            my.stepss.curves.CurveWindow.open(this, data,
-                    "Curves - " + outputBase.getName() + " - " + labels.size()
-                    + " observable(s)");
-        } catch (IOException ex) {
-            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
-            JOptionPane.showMessageDialog(this,
-                    "<html>Curves were extracted but could not be read back:<br>"
-                    + escapeHtml(String.valueOf(ex.getMessage()))
-                    + "<br><br>The file is " + escapeHtml(cur.getAbsolutePath())
-                    + "</html>",
-                    "Show curves failed", JOptionPane.ERROR_MESSAGE);
-        }
+        final File cur = new File(outputBase.getAbsolutePath() + ".cur");
+        // Read off the EDT. This method is reached from the invokeLater block
+        // that re-enables the plot buttons, so reading and parsing every row
+        // here would stall the interface at exactly the moment the window is
+        // meant to appear, and a long run with many observables is tens of
+        // thousands of rows. The spec makes the same rule for the live
+        // viewer's poll loop, for the same reason; DyngraphRunner's javadoc
+        // records the project already knowing it.
+        new javax.swing.SwingWorker<my.stepss.curves.CurveData, Void>() {
+            @Override
+            protected my.stepss.curves.CurveData doInBackground() throws IOException {
+                return my.stepss.curves.CurReader.read(cur, labels);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    my.stepss.curves.CurveWindow.open(StepssUI.this, get(),
+                            "Curves - " + outputBase.getName() + " - "
+                            + labels.size() + " observable(s)");
+                } catch (InterruptedException interrupted) {
+                    // Restore the flag rather than swallowing it: something
+                    // above us is trying to shut this thread down.
+                    Thread.currentThread().interrupt();
+                } catch (java.util.concurrent.ExecutionException failed) {
+                    Throwable cause = failed.getCause() != null
+                            ? failed.getCause() : failed;
+                    Logger.getLogger(StepssUI.class.getName())
+                            .log(Level.SEVERE, null, cause);
+                    JOptionPane.showMessageDialog(StepssUI.this,
+                            "<html>Curves were extracted but could not be read back:<br>"
+                            + escapeHtml(String.valueOf(cause.getMessage()))
+                            + "<br><br>The file is " + escapeHtml(cur.getAbsolutePath())
+                            + "</html>",
+                            "Show curves failed", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 ```
 
