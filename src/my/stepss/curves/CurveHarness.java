@@ -842,9 +842,9 @@ public final class CurveHarness {
 
     private static void checkLiveWindow() {
         // pollMillis is the pure arithmetic a refresh rate goes through; these
-        // four checks pin that arithmetic alone. Whether tick() actually calls
-        // it with the header's own refresh() and reschedules the live poller
-        // is integration behaviour this harness cannot exercise: that wiring
+        // four checks pin that arithmetic alone. Whether pump() actually calls
+        // it with the header's own refresh() to time the next poll is
+        // integration behaviour this harness cannot exercise: that wiring
         // only runs inside a live LiveCurveWindow with a live poller thread,
         // and constructing one here would throw, this JVM being headless.
         // checkLiveModel's "the model surfaces the header's own refresh rate"

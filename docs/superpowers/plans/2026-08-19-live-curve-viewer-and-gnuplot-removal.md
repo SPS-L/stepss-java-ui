@@ -2025,9 +2025,43 @@ public final class LiveCurveWindow extends JFrame {
     }
 
     private void start() {
-        // One second until the header says otherwise, which is also the
-        // engine's own default, so the common case never reschedules.
-        poller.scheduleWithFixedDelay(this::tick, 0L, 1000L, TimeUnit.MILLISECONDS);
+        // Zero delay for the first read; every poll then schedules the next one
+        // itself, at the cadence the header asks for. See pump().
+        poller.schedule(this::pump, 0L, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * One poll, then the next scheduled at the interval the header asks for.
+     *
+     * <p>A self-rescheduling one-shot chain rather than
+     * {@code scheduleWithFixedDelay} plus a cancel. The interval is only known
+     * once the header has been read, and re-scheduling a fixed-delay task from
+     * inside its own run needs a handle that the scheduling call has not yet
+     * returned: the first poll fires at zero delay, so it can beat the
+     * assignment of that handle, find it null, and skip the reschedule for the
+     * life of the window. A user's {@code $GP_REFRESH_RATE} would then be
+     * silently ignored, some of the time, depending on how fast the engine wrote
+     * its header. Deciding the next delay at the end of each poll needs no
+     * handle at all, so the race has nowhere to live.
+     */
+    private void pump() {
+        if (stopped) {
+            return;
+        }
+        tick();
+        if (stopped || refusal != null) {
+            // finish() and refuse() both end the chain: there is nothing more to
+            // read, and refuse() has already shut the poller down.
+            return;
+        }
+        LiveModel current = model;
+        long next = current == null
+                ? DEFAULT_POLL_MS : pollMillis(current.refresh());
+        try {
+            poller.schedule(this::pump, next, TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.RejectedExecutionException windowClosed) {
+            // Closed between the poll above and here. Nothing left to schedule.
+        }
     }
 
     /**
@@ -2302,10 +2336,25 @@ thread:
                         + runtimeCur.getName() + "; the run-time window may"
                         + " briefly show the previous run.");
             }
-            liveCurves = my.stepss.curves.LiveCurveWindow.open(this, runtimeCur,
+            opened = my.stepss.curves.LiveCurveWindow.open(this, runtimeCur,
                     "Run-time curves");
-            curveWindows.add(liveCurves);
+            curveWindows.add(opened);
         }
+        liveCurves = opened;
+        // The watcher thread below must finish THIS run's window, so it captures
+        // it here rather than reading the field later. Pressing Stop twice
+        // re-enables Run directly on the EDT without waiting for the watcher, so
+        // a second run can start and overwrite the field while the first
+        // watcher is still sleeping: reading the field then would finish the new
+        // run's window and leave the old one polling forever.
+        final my.stepss.curves.LiveCurveWindow myCurves = opened;
+```
+
+Declare `opened` just above the `if`, because the watcher's capture has to see it
+either way:
+
+```java
+        my.stepss.curves.LiveCurveWindow opened = null;
 ```
 
 And the predicate, beside `writeObservable`:
@@ -2344,10 +2393,15 @@ In the same method's watcher thread, the loop already waits for
 ```java
                 // After the lock has gone, so the engine's final flush has
                 // landed. LiveCurveWindow.finish does one last read on its own
-                // thread rather than here.
-                if (liveCurves != null) {
-                    liveCurves.finish();
-                    liveCurves = null;
+                // thread rather than here, and never throws, which matters
+                // because the invokeLater below is what re-enables the Run
+                // button: see the contract on finish().
+                //
+                // myCurves, not the liveCurves field. This thread belongs to one
+                // run and must finish that run's window even if another run has
+                // since replaced the field.
+                if (myCurves != null) {
+                    myCurves.finish();
                 }
 ```
 
@@ -2366,6 +2420,30 @@ nothing. Change `CurveWindow.open` to return the window it made:
 ```
 
 and in `openCurveWindow`, add the result to `curveWindows`.
+
+- [ ] **Step 4b: Freeze the live window when the user forces a stop**
+
+`stopSimulationButtonActionPerformed` kills the engine and re-enables Run
+immediately on the EDT, without waiting for the watcher thread that owns the
+`finish()` call. That is what lets a second run start while the first watcher is
+still inside its two second sleep, and it is the root of the two-windows-one-run
+problem the amendment above works around. Close it at the source: on the branch
+that deletes `.kill_RAMSES` and kills `dynsim`, after `runSimulation.setEnabled(true);`
+add
+
+```java
+                // The watcher thread will not get here for up to two seconds and
+                // Run is enabled now, so freeze this run's window before another
+                // run can open its own. finish() is idempotent enough for the
+                // watcher to call it again on the same window.
+                if (liveCurves != null) {
+                    liveCurves.finish();
+                    liveCurves = null;
+                }
+```
+
+`finish()` being called twice on one window is harmless: the second call finds
+the poller shut down and returns at its `isShutdown()` guard.
 
 - [ ] **Step 5: Rename the kill-gnuplot control**
 

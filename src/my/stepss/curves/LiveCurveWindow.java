@@ -32,6 +32,11 @@ public final class LiveCurveWindow extends JFrame {
 
     /** Never poll faster than this, whatever the settings file says. */
     private static final long MIN_POLL_MS = 100L;
+    /**
+     * The cadence before the header has been read, which is also the engine's
+     * own {@code $GP_REFRESH_RATE} default, so the usual case never changes it.
+     */
+    private static final long DEFAULT_POLL_MS = 1000L;
 
     private final File cur;
     private final CurTail tail;
@@ -48,7 +53,6 @@ public final class LiveCurveWindow extends JFrame {
      * The currently scheduled poll, held so it can be replaced once the
      * header's own refresh rate is known.
      */
-    private java.util.concurrent.ScheduledFuture<?> ticker;
 
     private volatile LiveModel model;
     private String refusal;
@@ -136,9 +140,43 @@ public final class LiveCurveWindow extends JFrame {
     }
 
     private void start() {
-        // One second until the header says otherwise, which is also the
-        // engine's own default, so the common case never reschedules.
-        ticker = poller.scheduleWithFixedDelay(this::tick, 0L, 1000L, TimeUnit.MILLISECONDS);
+        // Zero delay for the first read; every poll then schedules the next one
+        // itself, at the cadence the header asks for. See pump().
+        poller.schedule(this::pump, 0L, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * One poll, then the next scheduled at the interval the header asks for.
+     *
+     * <p>A self-rescheduling one-shot chain rather than
+     * {@code scheduleWithFixedDelay} plus a cancel. The interval is only known
+     * once the header has been read, and re-scheduling a fixed-delay task from
+     * inside its own run needs a handle that the scheduling call has not yet
+     * returned: the first poll fires at zero delay, so it can beat the
+     * assignment of that handle, find it null, and skip the reschedule for the
+     * life of the window. A user's {@code $GP_REFRESH_RATE} would then be
+     * silently ignored, some of the time, depending on how fast the engine
+     * wrote its header. Deciding the next delay at the end of each poll needs
+     * no handle at all, so the race has nowhere to live.
+     */
+    private void pump() {
+        if (stopped) {
+            return;
+        }
+        tick();
+        if (stopped || refusal != null) {
+            // finish() and refuse() both end the chain: there is nothing more to
+            // read, and refuse() has already shut the poller down.
+            return;
+        }
+        LiveModel current = model;
+        long next = current == null
+                ? DEFAULT_POLL_MS : pollMillis(current.refresh());
+        try {
+            poller.schedule(this::pump, next, TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.RejectedExecutionException windowClosed) {
+            // Closed between the poll above and here. Nothing left to schedule.
+        }
     }
 
     /**
@@ -237,15 +275,6 @@ public final class LiveCurveWindow extends JFrame {
                     return;
                 }
                 SwingUtilities.invokeLater(this::buildPanels);
-                // The engine flushes on its own cadence, so poll at that rather
-                // than at a guess. Rescheduled rather than set up front because
-                // the rate is only known once the header has been read.
-                long wanted = pollMillis(model.refresh());
-                if (wanted != 1000L && ticker != null) {
-                    ticker.cancel(false);
-                    ticker = poller.scheduleWithFixedDelay(
-                            this::tick, wanted, wanted, TimeUnit.MILLISECONDS);
-                }
                 // The data rows that arrived while the header was still
                 // incomplete, replayed in order so nothing is lost.
                 lines = new ArrayList<String>(pending);
