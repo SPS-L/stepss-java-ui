@@ -35,7 +35,15 @@ Pure refactor. The four classes are package-private inside `my.stepss.ssa`, so a
 - Delete: the four originals under `src/my/stepss/ssa/`
 - Modify: `src/my/stepss/ssa/SplanePanel.java` (imports)
 - Modify: `src/my/stepss/ssa/ModeShapePanel.java` (imports)
+- Modify: `src/my/stepss/ssa/SsaResultsWindow.java` (imports — uses `PlotStyle.isDark` at `:353`)
+- Modify: `src/my/stepss/ssa/SsaHarness.java` (imports — 17 `new SvgSink(...)`, plus `PlotStyle.Entry`, `ENTRIES` and `of`)
 - Test: `tools/ssa-harness.sh` (existing, unchanged — it is the regression proof)
+
+**Four files need imports, not two.** All four use these types by simple name
+today, which is legal only while they share the package. `SsaHarness` is the
+one that matters most: it is the class `tools/ssa-harness.sh` runs, so without
+its import this task has no regression proof at all. The operative rule is to
+add an import wherever the compiler needs one inside `my.stepss.ssa`.
 
 **Interfaces:**
 - Consumes: nothing.
@@ -137,9 +145,13 @@ public final class SvgSink implements PlotSink {
 
 The `Entry` constructor stays package-private: only the `ENTRIES` table builds one, and it lives in the same file.
 
-- [ ] **Step 4: Add the imports the two ssa panels now need**
+- [ ] **Step 4: Add the imports the ssa package now needs**
 
-In `src/my/stepss/ssa/SplanePanel.java` and `src/my/stepss/ssa/ModeShapePanel.java`, after the existing `import java.awt...` block:
+`SsaResultsWindow.java` needs `import my.stepss.plot.PlotStyle;` and
+`SsaHarness.java` needs `import my.stepss.plot.SvgSink;` and
+`import my.stepss.plot.PlotStyle;`.
+
+In `src/my/stepss/ssa/SplanePanel.java` and `src/my/stepss/ssa/ModeShapePanel.java`, in alphabetical position, which for `my.stepss.plot` means **after** the `java.util.*` and `javax.swing.*` imports rather than after the `java.awt.*` block. Both files sort their imports strictly today and should keep doing so:
 
 ```java
 import my.stepss.plot.PlotSink;
