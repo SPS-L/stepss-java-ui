@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -60,6 +61,7 @@ public final class CurveHarness {
         checkTail();
         checkAxes();
         checkLiveModel();
+        checkLiveWindow();
 
         if (failures > 0) {
             System.err.println(failures + " curve check(s) FAILED");
@@ -831,6 +833,40 @@ public final class CurveHarness {
                 Arrays.toString(latModel.snapshot(0).series.get(0).w));
         check("and the apparent power is the y value", "151.0",
                 String.valueOf(latModel.snapshot(0).series.get(0).v[1]));
+    }
+
+    private static void checkLiveWindow() {
+        check("the poll interval comes from the header's refresh rate", "1000",
+                String.valueOf(LiveCurveWindow.pollMillis(1.0)));
+        check("a slower flush is polled more slowly", "5000",
+                String.valueOf(LiveCurveWindow.pollMillis(5.0)));
+        // A settings file may set any number, including one that would spin
+        // the poller. Floor it rather than trusting the file.
+        check("an absurd refresh rate is floored", "100",
+                String.valueOf(LiveCurveWindow.pollMillis(0.0)));
+        check("a negative refresh rate is floored too", "100",
+                String.valueOf(LiveCurveWindow.pollMillis(-3.0)));
+
+        // Whether a failed header parse is a verdict or impatience. The engine
+        // issues its header as several writes and flushes once at the end, so
+        // a poll can land on a partial header; calling that an unsupported
+        // engine accuses the user of something that is not true.
+        check("a header still arriving is not a refusal", "false",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        Arrays.asList("# stepss-cur 1", "# tstop 30.000"))));
+        check("nothing read yet is not a refusal either", "false",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        Collections.<String>emptyList())));
+        check("blank lines do not end the header", "false",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        Arrays.asList("# stepss-cur 1", "", "   "))));
+        // A data row proves no more header is coming, so now it is a verdict.
+        check("a data row after a bad header is a refusal", "true",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        Arrays.asList("# stepss-cur 1", " 0.0 1.0"))));
+        check("a file that starts with data refuses at once", "true",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        Arrays.asList(" 0.000000E+00  1.012404E+00 "))));
     }
 
     /**
