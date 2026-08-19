@@ -37,9 +37,61 @@ public final class CurvePanel extends JPanel {
 
     private CurveData data = new CurveData(
             new java.util.ArrayList<CurveSeries>(), null, 0);
+    /** The zoom window as {tLo, tHi, vLo, vHi}, or null for auto-scale. */
+    private double[] zoom;
+    /** Where a drag began, in device pixels, or null when not dragging. */
+    private java.awt.Point dragFrom;
+    /** The current drag rectangle, painted as feedback while dragging. */
+    private java.awt.Rectangle dragTo;
 
     public CurvePanel() {
         setPreferredSize(new Dimension(760, 460));
+        setToolTipText("");
+        addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent event) {
+                dragFrom = event.getPoint();
+                dragTo = null;
+            }
+
+            @Override
+            public void mouseReleased(java.awt.event.MouseEvent event) {
+                java.awt.Rectangle box = dragTo;
+                dragFrom = null;
+                dragTo = null;
+                // A click, not a drag. Anything smaller than this is a
+                // misclick rather than an intended window, and zooming to a
+                // few pixels leaves no way back except the reset.
+                if (box == null || box.width < 8 || box.height < 8) {
+                    repaint();
+                    return;
+                }
+                Bounds b = bounds(data, getWidth(), getHeight());
+                setZoom(b.t(box.x), b.t(box.x + box.width),
+                        b.v(box.y + box.height), b.v(box.y));
+            }
+
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent event) {
+                if (event.getClickCount() == 2) {
+                    resetZoom();
+                }
+            }
+        });
+        addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(java.awt.event.MouseEvent event) {
+                if (dragFrom == null) {
+                    return;
+                }
+                dragTo = new java.awt.Rectangle(
+                        Math.min(dragFrom.x, event.getX()),
+                        Math.min(dragFrom.y, event.getY()),
+                        Math.abs(event.getX() - dragFrom.x),
+                        Math.abs(event.getY() - dragFrom.y));
+                repaint();
+            }
+        });
     }
 
     /**
@@ -63,6 +115,46 @@ public final class CurvePanel extends JPanel {
 
     public CurveData data() {
         return data;
+    }
+
+    /**
+     * Narrows both axes to this data window. The buffers are untouched:
+     * zooming is a view concern, so it can never lose a sample.
+     */
+    public void setZoom(double tLo, double tHi, double vLo, double vHi) {
+        this.zoom = new double[] {tLo, tHi, vLo, vHi};
+        repaint();
+    }
+
+    public void resetZoom() {
+        this.zoom = null;
+        repaint();
+    }
+
+    public boolean zoomed() {
+        return zoom != null;
+    }
+
+    /**
+     * The data coordinates under a device point, or null when the point is
+     * outside the plot area, where there is nothing to report.
+     */
+    public String readoutAt(int px, int py) {
+        if (data.series.isEmpty()) {
+            return null;
+        }
+        if (px < PAD_LEFT || px > getWidth() - PAD_RIGHT
+                || py < PAD_TOP || py > getHeight() - PAD_BOTTOM) {
+            return null;
+        }
+        Bounds b = bounds(data, getWidth(), getHeight());
+        return String.format(Locale.ROOT, "t = %.4g, value = %.6g",
+                b.t(px), b.v(py));
+    }
+
+    @Override
+    public String getToolTipText(java.awt.event.MouseEvent event) {
+        return readoutAt(event.getX(), event.getY());
     }
 
     public String toSvg(int width, int height) {
@@ -107,7 +199,7 @@ public final class CurvePanel extends JPanel {
         }
     }
 
-    static void render(PlotSink sink, CurveData data, int width, int height) {
+    void render(PlotSink sink, CurveData data, int width, int height) {
         if (data.series.isEmpty()) {
             sink.text(width / 2.0, height / 2.0, "No curves extracted",
                     "middle", "label");
@@ -157,6 +249,8 @@ public final class CurvePanel extends JPanel {
         }
         sink.endGroup();
 
+        sink.clipRect(b.px(b.xLo), b.py(b.yHi),
+                b.px(b.xHi) - b.px(b.xLo), b.py(b.yLo) - b.py(b.yHi));
         sink.group("curves");
         double[] xs = new double[0];
         double[] ys = new double[0];
@@ -173,6 +267,7 @@ public final class CurvePanel extends JPanel {
             sink.polyline(xs, ys, one.t.length, PlotStyle.seriesClass(s));
         }
         sink.endGroup();
+        sink.endClip();
 
         sink.group("legend");
         double ly = PAD_TOP + LEGEND_ROW;
@@ -183,6 +278,17 @@ public final class CurvePanel extends JPanel {
             ly += LEGEND_ROW;
         }
         sink.endGroup();
+
+        if (dragTo != null) {
+            sink.group("zoom-box");
+            sink.line(dragTo.x, dragTo.y, dragTo.x + dragTo.width, dragTo.y, "axis");
+            sink.line(dragTo.x, dragTo.y + dragTo.height,
+                    dragTo.x + dragTo.width, dragTo.y + dragTo.height, "axis");
+            sink.line(dragTo.x, dragTo.y, dragTo.x, dragTo.y + dragTo.height, "axis");
+            sink.line(dragTo.x + dragTo.width, dragTo.y,
+                    dragTo.x + dragTo.width, dragTo.y + dragTo.height, "axis");
+            sink.endGroup();
+        }
     }
 
     /**
@@ -226,7 +332,7 @@ public final class CurvePanel extends JPanel {
         return new double[] {low, high};
     }
 
-    private static Bounds bounds(CurveData data, int width, int height) {
+    private Bounds bounds(CurveData data, int width, int height) {
         double tLo = Double.POSITIVE_INFINITY;
         double tHi = Double.NEGATIVE_INFINITY;
         double vLo = Double.POSITIVE_INFINITY;
@@ -245,6 +351,12 @@ public final class CurvePanel extends JPanel {
             tHi = 1.0;
             vLo = 0.0;
             vHi = 1.0;
+        }
+        if (zoom != null) {
+            tLo = zoom[0];
+            tHi = zoom[1];
+            vLo = zoom[2];
+            vHi = zoom[3];
         }
         double xStep = niceStep(tHi - tLo, X_TICKS);
         double yStep = niceStep(vHi - vLo, Y_TICKS);
@@ -298,6 +410,21 @@ public final class CurvePanel extends JPanel {
             double span = yHi - yLo;
             double frac = span == 0.0 ? 0.0 : (v - yLo) / span;
             return height - PAD_BOTTOM - frac * (height - PAD_TOP - PAD_BOTTOM);
+        }
+
+        /** The time at a device x. The inverse of {@link #px}. */
+        double t(double deviceX) {
+            double plot = width - PAD_LEFT - PAD_RIGHT;
+            double frac = plot == 0.0 ? 0.0 : (deviceX - PAD_LEFT) / plot;
+            return xLo + frac * (xHi - xLo);
+        }
+
+        /** The value at a device y. The inverse of {@link #py}. */
+        double v(double deviceY) {
+            double plot = height - PAD_TOP - PAD_BOTTOM;
+            double frac = plot == 0.0 ? 0.0
+                    : (height - PAD_BOTTOM - deviceY) / plot;
+            return yLo + frac * (yHi - yLo);
         }
     }
 }

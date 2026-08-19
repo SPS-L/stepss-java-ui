@@ -49,6 +49,9 @@ public final class CurveHarness {
         rendersOnePolylinePerSeries();
         namesTheSharedUnitAndFlagsMixedOnes();
         curvesWearTheirOwnColourInOrder();
+        zoomNarrowsTheAxesAndResets();
+        readoutIsNullOutsideThePlotArea();
+        curvesAreClippedToTheFrame();
 
         if (failures > 0) {
             System.err.println(failures + " curve check(s) FAILED");
@@ -219,6 +222,51 @@ public final class CurveHarness {
                 plain.toSvg(600, 400).contains("mixed units"));
     }
 
+    private static void zoomNarrowsTheAxesAndResets() {
+        CurvePanel panel = new CurvePanel();
+        panel.setData(CurReader.parse(SMOKE, null, SMOKE_LABELS));
+        check("starts unzoomed", false, panel.zoomed());
+        panel.setZoom(0.0, 0.25, 1.0, 1.25);
+        check("zoom is recorded", true, panel.zoomed());
+        String zoomedSvg = panel.toSvg(600, 400);
+        check("still one polyline per curve when zoomed", 4,
+                count(zoomedSvg, "<polyline"));
+        panel.resetZoom();
+        check("reset clears it", false, panel.zoomed());
+    }
+
+    private static void readoutIsNullOutsideThePlotArea() {
+        CurvePanel panel = new CurvePanel();
+        panel.setData(CurReader.parse(SMOKE, null, SMOKE_LABELS));
+        panel.setSize(600, 400);
+        check("outside left is null", null, panel.readoutAt(2, 200));
+        check("outside top is null", null, panel.readoutAt(300, 2));
+        String inside = panel.readoutAt(300, 200);
+        check("inside reads out", true, inside != null && inside.contains("t ="));
+    }
+
+    /**
+     * Without a clip, a zoomed curve paints over the axes and the legend. The
+     * clip is what makes zoom look like zoom rather than like a defect.
+     */
+    private static void curvesAreClippedToTheFrame() {
+        CurvePanel panel = new CurvePanel();
+        panel.setData(CurReader.parse(SMOKE, null, SMOKE_LABELS));
+        String svg = panel.toSvg(600, 400);
+        check("a clip path is declared", 1, count(svg, "<clipPath"));
+        check("the curves group is clipped", true,
+                svg.contains("clip-path=\"url(#clip1)\""));
+        // Both presence assertions come first on purpose. Comparing two
+        // indexOf results alone passes when the curves group is absent, since
+        // -1 is less than any real position, so the comparison would report
+        // success for a document with no curves in it at all.
+        int curvesAt = svg.indexOf("id=\"curves\"");
+        int legendAt = svg.indexOf("id=\"legend\"");
+        check("the curves group exists", true, curvesAt >= 0);
+        check("the legend group exists", true, legendAt >= 0);
+        check("the legend is outside the clip", true, legendAt > curvesAt);
+    }
+
     private static double round(double value) {
         return Math.round(value * 1e6) / 1e6;
     }
@@ -234,7 +282,10 @@ public final class CurveHarness {
     }
 
     private static void check(String what, Object expected, Object actual) {
-        if (!expected.equals(actual)) {
+        // java.util.Objects.equals rather than expected.equals(actual):
+        // readoutIsNullOutsideThePlotArea asserts against a null expected
+        // value, which the bare call NPEs on before it ever gets to compare.
+        if (!java.util.Objects.equals(expected, actual)) {
             System.err.println("FAIL " + what + ": expected " + expected
                     + ", got " + actual);
             failures++;

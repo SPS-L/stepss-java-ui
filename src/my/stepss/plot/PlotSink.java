@@ -36,4 +36,15 @@ public interface PlotSink {
 
     /** anchor is "start", "middle" or "end". */
     void text(double x, double y, String s, String anchor, String cls);
+
+    /**
+     * Confines everything drawn until {@link #endClip()} to this rectangle.
+     *
+     * <p>One level only, which is all any caller needs: a zoomed curve extends
+     * past the frame and would otherwise paint over the axes, the tick labels
+     * and the legend. Nesting is not supported and not needed.
+     */
+    void clipRect(double x, double y, double w, double h);
+
+    void endClip();
 }

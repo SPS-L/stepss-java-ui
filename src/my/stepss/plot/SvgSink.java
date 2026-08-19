@@ -18,6 +18,7 @@ public final class SvgSink implements PlotSink {
     private final int width;
     private final int height;
     private int openGroups;
+    private int clipCount;
 
     public SvgSink(int width, int height) {
         this.width = width;
@@ -82,6 +83,27 @@ public final class SvgSink implements PlotSink {
             body.append(fmt(xs[i])).append(',').append(fmt(ys[i]));
         }
         body.append("\" class=\"").append(escape(cls)).append("\"/>\n");
+    }
+
+    @Override
+    public void clipRect(double x, double y, double w, double h) {
+        clipCount++;
+        String id = "clip" + clipCount;
+        body.append("  <clipPath id=\"").append(id).append("\">\n")
+                .append("    <rect x=\"").append(fmt(x))
+                .append("\" y=\"").append(fmt(y))
+                .append("\" width=\"").append(fmt(w))
+                .append("\" height=\"").append(fmt(h))
+                .append("\"/>\n  </clipPath>\n");
+        // Counted as a group, so toSvg's auto-close covers an unbalanced clip
+        // exactly as it already covers an unbalanced group.
+        body.append("  <g clip-path=\"url(#").append(id).append(")\">\n");
+        openGroups++;
+    }
+
+    @Override
+    public void endClip() {
+        endGroup();
     }
 
     @Override

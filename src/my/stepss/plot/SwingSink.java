@@ -17,6 +17,7 @@ public final class SwingSink implements PlotSink {
 
     private final Graphics2D g;
     private final boolean dark;
+    private java.awt.Shape savedClip;
 
     /**
      * @param dark which column of {@link PlotStyle} to draw in, measured by
@@ -75,6 +76,18 @@ public final class SwingSink implements PlotSink {
             path.lineTo(xs[i], ys[i]);
         }
         g.draw(path);
+    }
+
+    @Override
+    public void clipRect(double x, double y, double w, double h) {
+        savedClip = g.getClip();
+        g.clip(new java.awt.geom.Rectangle2D.Double(x, y, w, h));
+    }
+
+    @Override
+    public void endClip() {
+        g.setClip(savedClip);
+        savedClip = null;
     }
 
     @Override
