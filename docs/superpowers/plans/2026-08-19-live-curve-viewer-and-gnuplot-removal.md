@@ -689,10 +689,14 @@ mechanics.
             // The offset must advance rather than the file being re-read: a
             // full re-read each second is quadratic over a run.
             long before = tail.offset();
+            // Nine bytes: space, 9, dot, 0, space, 9, dot, 0, newline. Count
+            // the literal rather than trusting this comment, and if it
+            // disagrees fix the expected value, never the class: an offset
+            // that advances by the wrong amount is the bug this pins.
             append(cur, " 9.0 9.0\n");
             tail.poll();
             check("the offset advances by exactly what was appended",
-                    String.valueOf(before + 10), String.valueOf(tail.offset()));
+                    String.valueOf(before + 9), String.valueOf(tail.offset()));
         } finally {
             deleteRecursively(dir);
         }
