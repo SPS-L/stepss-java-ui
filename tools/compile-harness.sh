@@ -13,8 +13,12 @@ fi
 # dist/lib, so the guard above already covers it.
 CP="build/classes:dist/lib/*"
 
-java -cp "$CP" my.stepss.compile.CompileHarness
+# TMPDIR honoured for the same reason curve-harness.sh and ssa-harness.sh do it:
+# these checks create temporary files, and a sandboxed or containerised run
+# can have /tmp read-only while TMPDIR points somewhere writable. Without it
+# the checks fail on their fixtures rather than on anything they test.
+java -Djava.io.tmpdir="${TMPDIR:-/tmp}" -cp "$CP" my.stepss.compile.CompileHarness
 
 # Headless so the Swing sink checks need no display; they construct a
 # JTextArea and drain the event queue, never a window.
-java -Djava.awt.headless=true -cp "$CP" my.stepss.ConsoleSinkCheck
+java -Djava.awt.headless=true -Djava.io.tmpdir="${TMPDIR:-/tmp}" -cp "$CP" my.stepss.ConsoleSinkCheck

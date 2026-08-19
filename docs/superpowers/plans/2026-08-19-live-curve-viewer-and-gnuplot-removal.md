@@ -2576,10 +2576,16 @@ The handler at `:4467-4472` becomes:
     }//GEN-LAST:event_clearGnuplotButtonActionPerformed
 ```
 
-Leave the field and method names as they are: renaming a NetBeans generated
-widget means editing matched `//GEN-` guarded blocks in two files, and the
-user-visible text is what this task owns. Note it in the report as a deliberate
-inconsistency rather than an oversight.
+Leave the **field** and **handler** names as they are: renaming those means
+editing matched `//GEN-` guarded blocks in two files, and the user-visible text
+is what this task owns. The `setName` value is different, because it is a
+generated property whose source of truth is the `.form`: change it in **both**,
+or the next person to open the form in NetBeans silently reverts the Java. The
+component's `name` attribute (the field) and its `name` *property* (the
+`setName` argument) are separate things in a `.form` and are allowed to differ,
+which is what lets the property move without a field rename. Nothing in this
+codebase reads a Swing component's name, so this is for debugging legibility
+rather than behaviour.
 
 In `StepssUI.form`, change both `value="Clear all gnuplot instances"`
 occurrences (`:341`, `:1804`) to `value="Close all curve windows"` and the
@@ -2608,12 +2614,20 @@ and the same two strings in `StepssUI.form`.
 
 - [ ] **Step 7: Strip the pass-through instructions from the three tooltips**
 
-At `:1788`, `:1813` and `:1819` the run-time observable name tooltips end with
-instructions for passing gnuplot commands through. Delete only that trailing
-sentence from each; keep every example. Do the same in the three `.form`
-tooltips at `:1198`, `:1239`, `:1251`. The `gnup_cmds` pass-through still
-reaches the `.plt`, so this is about not advertising a gnuplot feature in a
-window that no longer runs gnuplot.
+At `:1788`, `:1813` and `:1819` the run-time observable name tooltips end with a
+block about passing gnuplot commands through. Delete the **whole** block, from
+"Additionally you can pass extra commands to gnuplot" through "which will set the
+range of the y-axes between these values.", leaving the numbered 1) to 4)
+equipment-naming examples, which are what the field is actually for. Do the same
+in the three `.form` tooltips, where the HTML is entity-escaped
+(`&lt;br&gt;`, `&#xa;`), so a search for the plain text will not find it.
+
+Not just the opening sentence: deleting that alone leaves "These commands must
+follow the name of the equipment" with no antecedent and a `set yrange[0.9:1.1]`
+example still standing, which is worse than either keeping or removing the lot.
+The `gnup_cmds` pass-through does still reach the `.plt`, so removing this is
+about not advertising it in a window that no longer runs gnuplot; documenting
+`.plt` customisation belongs in the docs, not in a tooltip.
 
 - [ ] **Step 8: Build, and run the harnesses that cover this file**
 
