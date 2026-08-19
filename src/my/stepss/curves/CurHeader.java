@@ -94,7 +94,9 @@ public final class CurHeader {
      * @param lines the whole file, or as much of it as has been read; parsing
      *     stops at the first line that is not a comment
      * @throws Unsupported when there is no header, when its version is not
-     *     {@link #VERSION}, or when the records disagree with {@code ncol}
+     *     {@link #VERSION}, when the records disagree with {@code ncol}, when
+     *     an {@code obs} record has fewer than 5 fields, or when a numeric
+     *     field fails to parse as an integer or a double
      */
     public static CurHeader parse(List<String> lines) throws Unsupported {
         Double tstop = null;

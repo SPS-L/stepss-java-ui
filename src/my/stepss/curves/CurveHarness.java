@@ -516,7 +516,9 @@ public final class CurveHarness {
             check("an unknown version marker refuses", "Unsupported thrown", "parsed anyway");
         } catch (CurHeader.Unsupported ex) {
             check("an unknown version marker names the version it found",
-                    "true", String.valueOf(ex.getMessage().contains("2")));
+                    "true", String.valueOf(ex.getMessage().contains("version 2,")));
+            check("and the version this build supports", "true",
+                    String.valueOf(ex.getMessage().contains("reads version 1 only")));
         }
 
         // No header at all is the state of every engine older than the map.
@@ -541,9 +543,10 @@ public final class CurveHarness {
             check("ncol disagreeing with the records refuses",
                     "Unsupported thrown", "parsed anyway");
         } catch (CurHeader.Unsupported ex) {
-            check("the ncol disagreement names both numbers", "true",
-                    String.valueOf(ex.getMessage().contains("6")
-                            && ex.getMessage().contains("5")));
+            check("the ncol disagreement says which number the header stated",
+                    "true", String.valueOf(ex.getMessage().contains("ncol 6")));
+            check("and which the records actually cover", "true",
+                    String.valueOf(ex.getMessage().contains("cover 5")));
         }
     }
 
