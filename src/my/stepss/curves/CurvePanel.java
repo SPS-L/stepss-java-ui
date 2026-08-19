@@ -250,12 +250,16 @@ public final class CurvePanel extends JPanel {
         sink.endGroup();
 
         sink.group("ticks");
-        for (double x = b.xLo; x <= b.xHi + b.xStep / 2.0; x += b.xStep) {
+        // Tolerance of a tick's width, not half a step. Half a step admits a
+        // tick one whole step past the axis end, which never showed while the
+        // bounds were always rounded onto the ladder and does as soon as a fixed
+        // range is used exactly: an axis to 12.5 grew a label at 15.
+        for (double x = b.xLo; x <= b.xHi + b.xStep * 1e-9; x += b.xStep) {
             double dx = b.px(x);
             sink.line(dx, b.py(b.yLo), dx, b.py(b.yLo) + TICK_LEN, "axis");
             sink.text(dx, b.py(b.yLo) + TICK_LEN + 13.0, tick(x), "middle", "label");
         }
-        for (double y = b.yLo; y <= b.yHi + b.yStep / 2.0; y += b.yStep) {
+        for (double y = b.yLo; y <= b.yHi + b.yStep * 1e-9; y += b.yStep) {
             double dy = b.py(y);
             sink.line(b.px(b.xLo) - TICK_LEN, dy, b.px(b.xLo), dy, "axis");
             sink.text(b.px(b.xLo) - TICK_LEN - 3.0, dy + 4.0, tick(y), "end", "label");
@@ -401,8 +405,22 @@ public final class CurvePanel extends JPanel {
         }
         double xStep = NiceScale.step(tHi - tLo, X_TICKS);
         double yStep = NiceScale.step(vHi - vLo, Y_TICKS);
-        double[] x = NiceScale.bounds(tLo, tHi, xStep);
-        double[] y = NiceScale.bounds(vLo, vHi, yStep);
+        // A fixed x range is used exactly, not rounded outward. Rounding it made
+        // a run's last sample land short of the frame's right edge whenever the
+        // stop time was not already on the tick ladder: 12.5 s became an axis to
+        // 15, so a completed run drew to 83% of the width and read as one that
+        // stopped early. gnuplot's own "set xrange [0 : tstop]" did not round
+        // either, so this is the faithful reading as well as the useful one.
+        // Ticks still come off the ladder and simply stop before the end.
+        double[] x = axes.xFixed() && zoom == null
+                ? new double[] {tLo, tHi}
+                : NiceScale.bounds(tLo, tHi, xStep);
+        // y gets a small pad BEFORE rounding, which is what the design asks for.
+        // Without it a curve whose extent happens to equal its rounded bounds is
+        // drawn along the frame edges with half its stroke width clipped: a
+        // trace spanning exactly 0.9 to 1.0 came out on the borders.
+        double vPad = (vHi - vLo) * 0.05;
+        double[] y = NiceScale.bounds(vLo - vPad, vHi + vPad, yStep);
         // A titled panel needs a line for the title above the one the y unit
         // occupies. 18px because the title is drawn in the "title" class, whose
         // PlotStyle entry is 13px, and 18 clears its ascent and descent with a

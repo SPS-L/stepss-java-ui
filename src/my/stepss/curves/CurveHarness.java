@@ -744,6 +744,34 @@ public final class CurveHarness {
         // legend on a shaded panel broke it for no real reason.
         check("no plain polyline is drawn for a shaded series", "false",
                 String.valueOf(latSvg.contains("<polyline")));
+
+        // A curve whose extent lands exactly on its rounded bounds used to be
+        // drawn along the frame edges with half its stroke clipped. 0.9 to 1.0
+        // is the case: the tick step comes out at 0.02 and both ends are whole
+        // multiples of it, so the outward rounding had nothing to do. The pad is
+        // what separates the trace from the frame, and it is absorbed silently
+        // whenever the rounding already provides the gap, which is why the
+        // pinned golden above does not move.
+        CurveData flush = new CurveData(Arrays.asList(
+                new CurveSeries("V (pu)", "pu",
+                        new double[] {0.0, 1.0, 2.0},
+                        new double[] {0.9, 1.0, 0.9})),
+                null, 0);
+        CurvePanel edge = new CurvePanel();
+        edge.setData(flush);
+        String edgeSvg = edge.toSvg(800, 500);
+        check("a curve touching its rounded bounds is not drawn on the frame",
+                "false", String.valueOf(edgeSvg.contains(",450.00 ")
+                        || edgeSvg.contains(",30.00 ")));
+
+        // A fixed x range is used exactly, so a run's last sample reaches the
+        // frame's right edge even when the stop time is off the tick ladder.
+        // 12.5 rounds to 15, which drew a completed run to 83% of the width.
+        CurvePanel odd = new CurvePanel();
+        odd.setAxes(new CurveAxes("", "t (s)", "V (pu)", 0.0, 12.5, false, false));
+        odd.setData(one);
+        check("a fixed range that misses the tick ladder still fills the frame",
+                "false", String.valueOf(odd.toSvg(800, 500).contains(">15.0<")));
     }
 
     private static void checkLiveModel() throws CurHeader.Unsupported {
