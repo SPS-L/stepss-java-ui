@@ -4770,11 +4770,16 @@ public class StepssUI extends javax.swing.JFrame {
                 } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
                 } catch (java.util.concurrent.ExecutionException failed) {
-                    Throwable cause = failed.getCause();
+                    // Fall back to the wrapper rather than logging and
+                    // displaying a null cause: an ExecutionException with no
+                    // cause would otherwise log a null throwable, which
+                    // records nothing, and show the user the word "null".
+                    Throwable cause = failed.getCause() != null
+                            ? failed.getCause() : failed;
                     Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, cause);
                     JOptionPane.showMessageDialog(StepssUI.this,
                             "<html>Curves were extracted but could not be read back:<br>"
-                            + escapeHtml(String.valueOf(cause == null ? null : cause.getMessage()))
+                            + escapeHtml(String.valueOf(cause.getMessage()))
                             + "<br><br>The file is " + escapeHtml(cur.getAbsolutePath())
                             + "</html>",
                             "Show curves failed", JOptionPane.ERROR_MESSAGE);

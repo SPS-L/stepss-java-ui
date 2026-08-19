@@ -73,6 +73,26 @@ public final class CurReader {
                     ok = false;
                     break;
                 }
+                // gfortran writes NaN, Infinity, +Infinity or -Infinity into
+                // an E15.7E3 field for a non-finite value, and
+                // Double.parseDouble accepts every one of them, so this is a
+                // row that parses without being data.
+                //
+                // Keeping it is not a cosmetic problem. CurvePanel.bounds
+                // propagates the value through Math.min/Math.max, which
+                // return NaN for a NaN argument; the tLo > tHi fallback
+                // cannot rescue it because every comparison against NaN is
+                // false; and the AXES themselves then come out as y1="NaN",
+                // so the user gets a blank frame with a legend over a header
+                // stating that nothing was skipped. Dropping the row makes it
+                // one of the "N unreadable row(s) skipped" CurveWindow.header
+                // already reports, and matches gnuplot, which treats a
+                // non-finite sample as a gap and still draws the axes and the
+                // good part of the trace.
+                if (!Double.isFinite(row[i])) {
+                    ok = false;
+                    break;
+                }
             }
             if (ok) {
                 rows.add(row);

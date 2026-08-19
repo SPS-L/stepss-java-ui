@@ -85,11 +85,25 @@ public final class PlotStyle {
     /**
      * How many distinct curve colours exist before the cycle repeats.
      *
-     * <p>Okabe-Ito, which is distinguishable under the common forms of colour
-     * blindness. Its yellow and black are deliberately not here: yellow is
-     * illegible on the light ground exports always use, and black is what the
-     * axis furniture is drawn in, so a curve wearing it would read as part of
-     * the frame.
+     * <p>Slots 0 to 5 are Okabe-Ito, which is distinguishable under the common
+     * forms of colour blindness. Its yellow and black are deliberately not
+     * here: yellow is illegible on the light ground exports always use, and
+     * black is what the axis furniture is drawn in, so a curve wearing it
+     * would read as part of the frame.
+     *
+     * <p>Removing those two leaves six, so slots 6 and 7 are not Okabe-Ito at
+     * all. {@code series6} ({@code #8b4513}, saddle brown) and {@code series7}
+     * ({@code #6a3d9a}, violet) are unverified extensions: neither has been
+     * put through a colour-vision-deficiency simulator, and saddle brown
+     * against the vermillion of {@code series1} ({@code #d55e00}) is a
+     * plausible confusion pair under protanopia and deuteranopia.
+     *
+     * <p>That is recorded rather than fixed, deliberately. Beyond about six
+     * hues the distinctions genuinely run out, so a guessed replacement is no
+     * better than what is here, and choosing a real one needs a simulator
+     * rather than a judgement call. A reader comparing seven or eight traces
+     * is better served by extracting them in smaller groups, which the
+     * one-window-per-extraction design already supports.
      */
     public static final int SERIES_COLOURS = 8;
 
