@@ -828,7 +828,7 @@ public final class CurveHarness {
                 " 0.000000E+00  1.500000E+02  0 ",
                 " 1.000000E-02  1.510000E+02  1 "));
         check("the latency flag reaches the series", "[0.0, 1.0]",
-                java.util.Arrays.toString(latModel.snapshot(0).series.get(0).w));
+                Arrays.toString(latModel.snapshot(0).series.get(0).w));
         check("and the apparent power is the y value", "151.0",
                 String.valueOf(latModel.snapshot(0).series.get(0).v[1]));
     }

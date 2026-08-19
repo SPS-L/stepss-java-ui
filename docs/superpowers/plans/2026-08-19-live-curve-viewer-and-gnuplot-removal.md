@@ -1809,15 +1809,24 @@ One at a time, reverting after each:
 2. In `axesFor`, delete the `case "O-D"` arm so it falls through to the
    default. Expected red: "a phase plane labels x with delta" and "a phase
    plane does not fix x to the run length".
-3. In `accept`, bound the parse loop by `Math.min(header.ncol, fields.length)`
-   so a short row is accepted rather than counted. Expected red: "a short row
-   is counted rather than drawn".
+3. In `accept`, make **both** of these edits together, because neither works
+   alone: change `fields.length != header.ncol` to `false` so a short row is no
+   longer counted, **and** bound the parse loop by
+   `Math.min(header.ncol, fields.length)` so the short row it now admits does
+   not blow up. Expected red: "a short row is counted rather than drawn", and
+   its paired sample-count check.
 
-   **Not** by changing `fields.length != header.ncol` to `false`, which is the
-   obvious mutation and unusable: any bypass of the length guard lets a short
-   row reach an unconditional `fields[i]` up to `ncol - 1`, so the run dies of
-   `ArrayIndexOutOfBoundsException` before the assertion. Red, but demonstrating
-   nothing. Bounding the loop reaches the check safely.
+   Both halves are load-bearing, and each was written alone in an earlier draft
+   of this plan:
+
+   - Bypassing the guard on its own lets a short row reach an unconditional
+     `fields[i]` up to `ncol - 1`, so the run dies of
+     `ArrayIndexOutOfBoundsException` before the assertion. Red, demonstrating
+     nothing.
+   - Bounding the loop on its own changes nothing observable, because the length
+     guard still fires first and `continue`s before the loop is reached. The
+     harness stays **green**, which is the worse of the two failures: it reads as
+     a blind check when the check is fine and only the mutation was wrong.
 4. Change `this.weighted = "LAT".equals(type)` to `false`. Expected red: "the
    latency flag reaches the series".
 
