@@ -21,6 +21,15 @@ public interface PlotSink {
 
     void circle(double cx, double cy, double r, String cls);
 
+    /**
+     * One connected run of points as a single element, which is what keeps an
+     * exported time series a few kilobytes rather than one element per sample.
+     *
+     * @param n how many leading entries of xs and ys to use, so a caller may
+     *     pass growable arrays that have spare capacity
+     */
+    void polyline(double[] xs, double[] ys, int n, String cls);
+
     void cross(double cx, double cy, double r, String cls);
 
     void arrow(double x1, double y1, double x2, double y2, String cls);

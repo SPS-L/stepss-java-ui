@@ -70,6 +70,21 @@ public final class SvgSink implements PlotSink {
     }
 
     @Override
+    public void polyline(double[] xs, double[] ys, int n, String cls) {
+        if (n < 2) {
+            return;
+        }
+        body.append("    <polyline points=\"");
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                body.append(' ');
+            }
+            body.append(fmt(xs[i])).append(',').append(fmt(ys[i]));
+        }
+        body.append("\" class=\"").append(escape(cls)).append("\"/>\n");
+    }
+
+    @Override
     public void cross(double cx, double cy, double r, String cls) {
         emitLine(cx - r, cy - r, cx + r, cy + r, cls, null);
         emitLine(cx - r, cy + r, cx + r, cy - r, cls, null);

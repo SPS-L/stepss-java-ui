@@ -5,6 +5,7 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
+import java.awt.geom.Path2D;
 
 /**
  * A PlotSink over Graphics2D. Class names map to the same colours the SVG
@@ -60,6 +61,20 @@ public final class SwingSink implements PlotSink {
     public void circle(double cx, double cy, double r, String cls) {
         style(cls, false);
         g.draw(new Ellipse2D.Double(cx - r, cy - r, 2 * r, 2 * r));
+    }
+
+    @Override
+    public void polyline(double[] xs, double[] ys, int n, String cls) {
+        if (n < 2) {
+            return;
+        }
+        style(cls, false);
+        Path2D.Double path = new Path2D.Double();
+        path.moveTo(xs[0], ys[0]);
+        for (int i = 1; i < n; i++) {
+            path.lineTo(xs[i], ys[i]);
+        }
+        g.draw(path);
     }
 
     @Override
