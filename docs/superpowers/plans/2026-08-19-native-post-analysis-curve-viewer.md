@@ -1541,8 +1541,15 @@ and the methods before `round`:
         check("a clip path is declared", 1, count(svg, "<clipPath"));
         check("the curves group is clipped", true,
                 svg.contains("clip-path=\"url(#clip1)\""));
-        check("the legend is outside the clip", true,
-                svg.indexOf("id=\"legend\"") > svg.indexOf("id=\"curves\""));
+        // Both presence assertions come first on purpose. Comparing two
+        // indexOf results alone passes when the curves group is absent, since
+        // -1 is less than any real position, so the comparison would report
+        // success for a document with no curves in it at all.
+        int curvesAt = svg.indexOf("id=\"curves\"");
+        int legendAt = svg.indexOf("id=\"legend\"");
+        check("the curves group exists", true, curvesAt >= 0);
+        check("the legend group exists", true, legendAt >= 0);
+        check("the legend is outside the clip", true, legendAt > curvesAt);
     }
 ```
 
