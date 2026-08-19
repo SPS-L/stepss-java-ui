@@ -1024,8 +1024,13 @@ without a display.
                 String.valueOf(latSvg.contains("class=\"latent\"")));
         check("an active segment is drawn in the active class", "true",
                 String.valueOf(latSvg.contains("class=\"active\"")));
-        check("and no single-colour series class is used for it", "false",
-                String.valueOf(latSvg.contains("class=\"series0\"")));
+        // On the absence of a polyline rather than of a series class: the
+        // shaded path draws one <line> per segment where the plain path draws a
+        // single <polyline>, so this says the shaded path replaced the plain
+        // one. A series-class assertion is coupled to the legend being off,
+        // because a legend swatch carries one too.
+        check("no plain polyline is drawn for a shaded series", "false",
+                String.valueOf(latSvg.contains("<polyline")));
     }
 
     /**
@@ -1308,8 +1313,14 @@ per-series loop so that a series carrying `w` is drawn segment by segment:
                 // only one LAT observable exists per panel, so the element
                 // count is bounded by the sample count of a single curve.
                 for (int i = 1; i < one.t.length; i++) {
+                    // The segment wears its START point's flag, matching
+                    // gnuplot's own "with lines palette", which colours a
+                    // segment from the first of its two points. Using w[i]
+                    // instead colours by the end point, which cannot produce a
+                    // latent segment at all when the equipment becomes active
+                    // on the second sample and stays active.
                     sink.line(xs[i - 1], ys[i - 1], xs[i], ys[i],
-                            one.w[i] >= 0.5 ? "active" : "latent");
+                            one.w[i - 1] >= 0.5 ? "active" : "latent");
                 }
             }
         }

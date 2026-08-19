@@ -719,8 +719,15 @@ public final class CurveHarness {
                 String.valueOf(latSvg.contains("class=\"latent\"")));
         check("an active segment is drawn in the active class", "true",
                 String.valueOf(latSvg.contains("class=\"active\"")));
-        check("and no single-colour series class is used for it", "false",
-                String.valueOf(latSvg.contains("class=\"series0\"")));
+        // On the absence of a polyline rather than the absence of a series
+        // class. The shaded path draws one <line> per segment where the plain
+        // path draws a single <polyline>, so this says "the shaded path
+        // replaced the plain one" and would catch a bug that drew both. The
+        // series-class form of this check was coupled to the legend being off,
+        // because a legend swatch also carries a series class, so enabling a
+        // legend on a shaded panel broke it for no real reason.
+        check("no plain polyline is drawn for a shaded series", "false",
+                String.valueOf(latSvg.contains("<polyline")));
     }
 
     /**
