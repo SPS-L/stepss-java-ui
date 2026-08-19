@@ -118,10 +118,9 @@ public final class PayloadManifestCheck {
             for (Platform p : Platform.values()) {
                 ToolSpec.Payload payload = spec.payloadFor(p);
                 if (payload == null || !payload.resource.startsWith(PAYLOAD_PREFIX)) {
-                    // RAW payloads such as "dyngraph.exe" or "gpwin.zip" are
-                    // committed directly under src/my/stepss/, not fetched
-                    // into src/my/stepss/payload/, so they are out of scope
-                    // for this check.
+                    // A payload committed directly under src/my/stepss/ rather
+                    // than fetched into src/my/stepss/payload/ is out of scope
+                    // for this check. None exists today.
                     continue;
                 }
                 String name = payload.resource.substring(PAYLOAD_PREFIX.length());

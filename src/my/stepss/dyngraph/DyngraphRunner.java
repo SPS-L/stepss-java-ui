@@ -3,7 +3,6 @@ package my.stepss.dyngraph;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.Map;
 
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecuteResultHandler;
@@ -53,18 +52,14 @@ public final class DyngraphRunner {
 
     private final File dyngraph;
     private final File workingDir;
-    private final Map environment;
 
     /**
      * @param dyngraph the resolved executable ({@code toolchain.dyngraph()})
      * @param workingDir the temp directory both runs execute in
-     * @param environment the exec environment
-     *        ({@code PlatformLauncher.execEnvironment}'s map); null inherits
      */
-    public DyngraphRunner(File dyngraph, File workingDir, Map environment) {
+    public DyngraphRunner(File dyngraph, File workingDir) {
         this.dyngraph = dyngraph;
         this.workingDir = workingDir;
-        this.environment = environment;
     }
 
     /**
@@ -91,7 +86,7 @@ public final class DyngraphRunner {
         executor.setStreamHandler(new PumpStreamHandler(stdout, stderr));
         executor.setWorkingDirectory(workingDir);
         executor.setProcessDestroyer(new ShutdownHookProcessDestroyer());
-        int exit = executor.execute(cmd, environment);
+        int exit = executor.execute(cmd);
         return new ListResult(exit,
                 new String(stdout.toByteArray(), ReplayFile.CHARSET),
                 new String(stderr.toByteArray(), ReplayFile.CHARSET));
@@ -140,6 +135,6 @@ public final class DyngraphRunner {
                         new String(stderr.toByteArray(), ReplayFile.CHARSET));
             }
         };
-        executor.execute(cmd, environment, handler);
+        executor.execute(cmd, handler);
     }
 }

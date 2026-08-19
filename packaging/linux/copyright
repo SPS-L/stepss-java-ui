@@ -112,25 +112,3 @@ License: LGPL-2.1+
  Software Foundation, either version 2.1 of the License, or (at your option)
  any later version. On Debian systems the complete text is in
  /usr/share/common-licenses/LGPL-2.1
-
-Comment: gnuplot is bundled for Windows only. This package depends on the
- distribution's own gnuplot instead, but the jar is built once for every
- platform, so the Windows build travels inside it here too.
-Files: my/stepss/gpwin.zip
-Copyright: 1986-1993, 1998, 2004, Thomas Williams, Colin Kelley
-License: gnuplot
- Permission to use, copy, and distribute this software and its documentation
- for any purpose with or without fee is hereby granted, provided that the
- above copyright notice appear in all copies and that both that copyright
- notice and this permission notice appear in supporting documentation.
- Permission to modify the software is granted, but not the right to distribute
- the complete modified source code. Modifications are to be distributed as
- patches to the released version. Permission to distribute binaries produced
- by compiling modified sources is granted, provided you keep the source code
- available, note that the source has been modified, and provide the
- modifications to the copyright holders.
- .
- This software is provided "as is" without express or implied warranty to the
- extent permitted by applicable law.
- .
- Verbatim text: Help > About > gnuplot in the application.

@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
-import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.apache.commons.exec.CommandLine;
@@ -14,7 +13,6 @@ import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteException;
 import org.apache.commons.exec.ExecuteResultHandler;
 import org.apache.commons.exec.ShutdownHookProcessDestroyer;
-import org.apache.commons.exec.environment.EnvironmentUtils;
 
 /**
  * Launches external programs (editor, terminal, file manager, browser) and
@@ -455,31 +453,6 @@ public final class PlatformLauncher {
             // Defensive: guarantee this method genuinely cannot throw.
             System.err.println("PlatformLauncher.killByName: " + ex.getMessage());
         }
-    }
-
-    /**
-     * Windows needs gnuplot's bin directory on PATH for the exec'd children.
-     * Other platforms inherit the ambient environment, signalled by null.
-     *
-     * <p>A {@code dynsim} directory used to be prepended here as well, so a
-     * Codegen-built {@code Release_intel_w64/dynsim.exe} could find the Intel
-     * Fortran runtime DLLs that shipped beside it in {@code dynsim.zip}.
-     * Nothing is left of that arrangement: {@code dynsim.zip} is gone, the
-     * bundled engine extracts to {@code dynsim.exe} as a file rather than a
-     * directory - so the entry pointed at a path that never existed - and the
-     * custom-model build is statically linked MinGW, which needs no runtime
-     * DLLs on PATH at all.
-     */
-    public static Map execEnvironment(Platform p, File toolDir) throws IOException {
-        if (p != Platform.WINDOWS_X86_64) {
-            return null;
-        }
-        Map env = EnvironmentUtils.getProcEnvironment();
-        String path = (String) env.get("PATH");
-        String gnuplotBin = new File(new File(toolDir, "gnuplot"), "bin").getAbsolutePath();
-        EnvironmentUtils.addVariableToEnvironment(env, "PATH=" + gnuplotBin
-                + File.pathSeparator + path);
-        return env;
     }
 
     private static Platform platformOrThrow() throws IOException {

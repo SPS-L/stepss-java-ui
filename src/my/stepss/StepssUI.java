@@ -459,7 +459,7 @@ public class StepssUI extends javax.swing.JFrame {
                 .add(saveTrajToFileButton)
                 .add(loadTrajToFileButton)
                 .toTheEnd()
-                .add(clearGnuplotButton)
+                .add(closeCurveWindowsButton)
                 .build(), stretch(row++));
 
         content.add(heading(jLabel8), span(row++));
@@ -1050,7 +1050,6 @@ public class StepssUI extends javax.swing.JFrame {
         versionLabel = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
         webpageLabel = new javax.swing.JLabel();
-        showGnupCopyrightButton = new javax.swing.JButton();
         showApacheLicenseButton = new javax.swing.JButton();
         showKLULicenseButton = new javax.swing.JButton();
         versionLabel1 = new javax.swing.JLabel();
@@ -1143,7 +1142,7 @@ public class StepssUI extends javax.swing.JFrame {
         jPanel8 = new javax.swing.JPanel();
         runDyngraphButton = new javax.swing.JButton();
         saveTrajToFileButton = new javax.swing.JButton();
-        clearGnuplotButton = new javax.swing.JButton();
+        closeCurveWindowsButton = new javax.swing.JButton();
         saveCurrentCurveButton = new javax.swing.JButton();
         loadTrajToFileButton = new javax.swing.JButton();
         saveDynJac = new javax.swing.JButton();
@@ -1216,14 +1215,6 @@ public class StepssUI extends javax.swing.JFrame {
             }
         });
 
-        showGnupCopyrightButton.setText("Gnuplot");
-        showGnupCopyrightButton.setName("showGnupCopyrightButton"); // NOI18N
-        showGnupCopyrightButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                showGnupCopyrightButtonActionPerformed(evt);
-            }
-        });
-
         showApacheLicenseButton.setText("Apache");
         showApacheLicenseButton.setName("showApacheLicenseButton"); // NOI18N
         showApacheLicenseButton.addActionListener(new java.awt.event.ActionListener() {
@@ -1288,9 +1279,7 @@ public class StepssUI extends javax.swing.JFrame {
                                     .addGroup(aboutBoxLayout.createSequentialGroup()
                                         .addComponent(showKLULicenseButton)
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                        .addComponent(showApacheLicenseButton)
-                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                        .addComponent(showGnupCopyrightButton))
+                                        .addComponent(showApacheLicenseButton))
                                     .addComponent(versionLabel1)))
                             .addGroup(aboutBoxLayout.createSequentialGroup()
                                 .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -1326,7 +1315,6 @@ public class StepssUI extends javax.swing.JFrame {
                 .addComponent(versionLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(aboutBoxLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(showGnupCopyrightButton)
                     .addComponent(showApacheLicenseButton)
                     .addComponent(showKLULicenseButton))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
@@ -2239,12 +2227,12 @@ public class StepssUI extends javax.swing.JFrame {
             }
         });
 
-        clearGnuplotButton.setText("Close all curve windows");
-        clearGnuplotButton.setToolTipText("Closes every run-time and extracted-curve window this session opened.");
-        clearGnuplotButton.setName("closeCurveWindowsButton"); // NOI18N
-        clearGnuplotButton.addActionListener(new java.awt.event.ActionListener() {
+        closeCurveWindowsButton.setText("Close all curve windows");
+        closeCurveWindowsButton.setToolTipText("Closes every run-time and extracted-curve window this session opened.");
+        closeCurveWindowsButton.setName("closeCurveWindowsButton"); // NOI18N
+        closeCurveWindowsButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                clearGnuplotButtonActionPerformed(evt);
+                closeCurveWindowsButtonActionPerformed(evt);
             }
         });
 
@@ -2364,7 +2352,7 @@ public class StepssUI extends javax.swing.JFrame {
                                 .addComponent(runDyngraphButton)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(saveCurrentCurveButton))
-                            .addComponent(clearGnuplotButton)
+                            .addComponent(closeCurveWindowsButton)
                             .addGroup(jPanel8Layout.createSequentialGroup()
                                 .addComponent(saveTrajToFileButton)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -2411,7 +2399,7 @@ public class StepssUI extends javax.swing.JFrame {
                     .addComponent(saveCurrentCurveButton)
                     .addComponent(runDyngraphButton))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(clearGnuplotButton)
+                .addComponent(closeCurveWindowsButton)
                 .addGap(18, 18, 18)
                 .addComponent(jLabel8, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
@@ -3192,7 +3180,7 @@ public class StepssUI extends javax.swing.JFrame {
             rememberSession();
             if (toolDir == null) {
             } else {
-                clearGnuplotButtonActionPerformed(null);
+                closeCurveWindowsButtonActionPerformed(null);
                 stopSimulationButtonActionPerformed(null);
                 fileOps.deleteDirectory(toolDir);
             }
@@ -3950,13 +3938,10 @@ public class StepssUI extends javax.swing.JFrame {
      * constructor, and the difference is two bugs rather than a preference.
      * The splash holds the window back for up to three seconds, so a check
      * started at the end of the constructor runs against a frame nobody can
-     * see yet. {@link InlineBanner} holds one message, and {@code initRamses()}
-     * puts the "gnuplot was not found" warning on it during that same
-     * constructor, so on a machine with no gnuplot and an update available the
-     * notice replaced the warning before either had ever been on screen. And
-     * the banner's twelve second expiry runs from the call, not from first
-     * paint, so an early notice spent a quarter of its life behind a hidden
-     * window. Both go away once the check begins after the window is up.
+     * see yet. And the banner's twelve second expiry runs from the call, not
+     * from first paint, so an early notice spent a quarter of its life behind
+     * a hidden window. Both go away once the check begins after the window is
+     * up.
      */
     private void checkForUpdatesAtStartup() {
         if (!preferences().getBoolean(CHECK_UPDATES_KEY, true)) {
@@ -3992,22 +3977,6 @@ public class StepssUI extends javax.swing.JFrame {
     /** Whether to ask github.com for a newer release at startup. */
     static final String CHECK_UPDATES_KEY = "checkUpdatesAtStartup";
 
-    private void showGnupCopyrightButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showGnupCopyrightButtonActionPerformed
-        try {
-            InputStream in;
-            in = StepssUI.class.getResourceAsStream("gnuplotLicense.txt");
-            File gnupCopyrightFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "gnuplotLicense.txt");
-            OutputStream streamOut;
-            streamOut = FileUtils.openOutputStream(gnupCopyrightFile);
-            IOUtils.copy(in, streamOut);
-            in.close();
-            streamOut.close();
-            PlatformLauncher.openInEditor(gnupCopyrightFile);
-        } catch (IOException ex) {
-            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }//GEN-LAST:event_showGnupCopyrightButtonActionPerformed
-
     private void webpageLabelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_webpageLabelMouseClicked
         String url = "https://stepss.sps-lab.org";
         PlatformLauncher.openUrl(url);
@@ -4029,7 +3998,7 @@ public class StepssUI extends javax.swing.JFrame {
     }//GEN-LAST:event_showApacheLicenseButtonActionPerformed
 
     private void killAllGnupMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_killAllGnupMenuItemActionPerformed
-        clearGnuplotButtonActionPerformed(evt);
+        closeCurveWindowsButtonActionPerformed(evt);
     }//GEN-LAST:event_killAllGnupMenuItemActionPerformed
 
     private void showKLULicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showKLULicenseButtonActionPerformed
@@ -4472,13 +4441,13 @@ public class StepssUI extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_saveCurrentCurveButtonActionPerformed
 
-    private void clearGnuplotButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearGnuplotButtonActionPerformed
+    private void closeCurveWindowsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_closeCurveWindowsButtonActionPerformed
         for (java.awt.Window window : curveWindows) {
             window.dispose();
         }
         curveWindows.clear();
         liveCurves = null;
-    }//GEN-LAST:event_clearGnuplotButtonActionPerformed
+    }//GEN-LAST:event_closeCurveWindowsButtonActionPerformed
 
     private void saveTrajToFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveTrajToFileButtonActionPerformed
         try {
@@ -4545,7 +4514,7 @@ public class StepssUI extends javax.swing.JFrame {
                     "Extract Curves failed", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        final DyngraphRunner runner = new DyngraphRunner(dyngraphExec, myTempDir, WinEnvironment);
+        final DyngraphRunner runner = new DyngraphRunner(dyngraphExec, myTempDir);
 
         // get_observ_name rewinds the trajectory several times, so --list
         // scales with file size and must not run on the EDT: a SwingWorker
@@ -5057,7 +5026,7 @@ public class StepssUI extends javax.swing.JFrame {
         simulExecutor.setWorkingDirectory(myTempDir);
         simulExecutor.setProcessDestroyer(processDestroyer);
         try {
-            simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
+            simulExecutor.execute(command, simulExecutorResultHandler);
             statusBar.running("Simulating");
             runSimulation.setEnabled(false);
             runDyngraphButton.setEnabled(false);
@@ -5575,7 +5544,7 @@ public class StepssUI extends javax.swing.JFrame {
         final String diagramTemplate = fileDiagram.getText();
         final int runNumber = powerFlowRun;
         try {
-            simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
+            simulExecutor.execute(command, simulExecutorResultHandler);
             statusBar.running("Solving power flow");
         } catch (IOException ex) {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
@@ -6143,7 +6112,7 @@ public class StepssUI extends javax.swing.JFrame {
     simulExecutor.setWorkingDirectory(myTempDir);
     simulExecutor.setProcessDestroyer(processDestroyer);
     try {
-        simulExecutor.execute(command, WinEnvironment, simulExecutorResultHandler);
+        simulExecutor.execute(command, simulExecutorResultHandler);
     } catch (IOException ex) {
         Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
     }
@@ -6833,7 +6802,6 @@ public class StepssUI extends javax.swing.JFrame {
     private File ramsesExec = null;
     private File heliosExec = null;
     private File dyngraphExec = null;
-    private File gnuplotExec = null;
 
     /**
      * The output base of the most recent extraction. Was a constant while one
@@ -6900,9 +6868,6 @@ public class StepssUI extends javax.swing.JFrame {
     // running make, and against the Codegen completion handler re-enabling
     // Compile mid-build.
     private boolean compileInProgress = false;
-    // initRamses() re-runs on every working-directory change, but the
-    // "gnuplot not found" warning only needs to be told once per session.
-    private boolean gnuplotMissingWarned = false;
     private String this_version = "0.0";
     // This repository's releases: the changelog Help->Changelog opens, and the
     // versions the update check compares against, are the same pages.
@@ -6927,7 +6892,6 @@ public class StepssUI extends javax.swing.JFrame {
     private Highlighter highlighter;
     private int highlighterLen;
     private Preferences prefs;
-    private Map WinEnvironment;
     private ArrayList<JTextField> dataFileList = new ArrayList();
     private TextareaOutputStream outputstream;
     private TextareaOutputStream outputstreamCG;
@@ -6943,7 +6907,7 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.ButtonGroup buttonGroup1;
     private javax.swing.JMenuItem checkUpdateButton;
     private javax.swing.JButton clearDataFiles;
-    private javax.swing.JButton clearGnuplotButton;
+    private javax.swing.JButton closeCurveWindowsButton;
     private javax.swing.JButton clearObsFileButton;
     private javax.swing.JButton clearPFCOutput;
     private javax.swing.JButton clearSimulOutput;
@@ -7062,7 +7026,6 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton showApacheLicenseButton;
     private javax.swing.JButton showCODEGENLicenseButton;
     private javax.swing.JMenuItem showChangeLogButton;
-    private javax.swing.JButton showGnupCopyrightButton;
     private javax.swing.JButton showKLULicenseButton;
     private javax.swing.JButton showPFCLicenseButton;
     private javax.swing.JButton showRAMSESLicenseButton;
@@ -7104,17 +7067,6 @@ public class StepssUI extends javax.swing.JFrame {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
             return false;
         }
-    }
-
-    /** @return the platform-appropriate command to install gnuplot from a package manager. */
-    private String gnuplotInstallHint() {
-        if (platform == Platform.MACOS_ARM64) {
-            return "brew install gnuplot";
-        }
-        if (platform == Platform.WINDOWS_X86_64) {
-            return "reinstall STEPSS; gnuplot ships bundled on Windows";
-        }
-        return "apt install gnuplot";
     }
 
     /**
@@ -7168,7 +7120,7 @@ public class StepssUI extends javax.swing.JFrame {
             exec.setExitValues(null);
             exec.setWatchdog(new ExecuteWatchdog(10_000));
             exec.setStreamHandler(new PumpStreamHandler(out, out));
-            exec.execute(command, WinEnvironment);
+            exec.execute(command);
         } catch (Exception ex) {
             // An engine that cannot be run at all is reported as unknown, and
             // the caller disables the parameters. Whatever stopped it will
@@ -7270,20 +7222,8 @@ public class StepssUI extends javax.swing.JFrame {
             heliosExec = toolchain.helios();
             dyngraphExec = toolchain.dyngraph();
             codegenExec = toolchain.codegen();
-            gnuplotExec = toolchain.gnuplot();
-            WinEnvironment = PlatformLauncher.execEnvironment(platform, toolDir);
 
-            // After WinEnvironment, not beside ramsesExec above: this runs the
-            // engine, and on Windows it needs that environment to resolve the
-            // runtime DLLs beside it.
             applyEngineCapabilities();
-
-            if ((gnuplotExec == null || !gnuplotExec.exists()) && !gnuplotMissingWarned) {
-                gnuplotMissingWarned = true;
-                banner.warn("<html>gnuplot was not found, so real-time plotting is disabled."
-                        + "<br>Install it and restart to enable it: <b>" + gnuplotInstallHint()
-                        + "</b></html>");
-            }
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this,
                     "Could not prepare the simulation toolchain.\n\n" + ex.getMessage(),

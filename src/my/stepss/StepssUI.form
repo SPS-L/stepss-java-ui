@@ -36,8 +36,6 @@
                                           <Component id="showKLULicenseButton" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
                                           <Component id="showApacheLicenseButton" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                                          <Component id="showGnupCopyrightButton" min="-2" max="-2" attributes="0"/>
                                       </Group>
                                       <Component id="versionLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
                                   </Group>
@@ -86,7 +84,6 @@
                   <Component id="versionLabel1" min="-2" max="-2" attributes="0"/>
                   <EmptySpace type="separate" max="-2" attributes="0"/>
                   <Group type="103" groupAlignment="3" attributes="0">
-                      <Component id="showGnupCopyrightButton" alignment="3" max="-2" attributes="0"/>
                       <Component id="showApacheLicenseButton" alignment="3" max="-2" attributes="0"/>
                       <Component id="showKLULicenseButton" alignment="3" max="-2" attributes="0"/>
                   </Group>
@@ -120,15 +117,6 @@
           </Properties>
           <Events>
             <EventHandler event="mouseClicked" listener="java.awt.event.MouseListener" parameters="java.awt.event.MouseEvent" handler="webpageLabelMouseClicked"/>
-          </Events>
-        </Component>
-        <Component class="javax.swing.JButton" name="showGnupCopyrightButton">
-          <Properties>
-            <Property name="text" type="java.lang.String" value="Gnuplot"/>
-            <Property name="name" type="java.lang.String" value="showGnupCopyrightButton" noResource="true"/>
-          </Properties>
-          <Events>
-            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="showGnupCopyrightButtonActionPerformed"/>
           </Events>
         </Component>
         <Component class="javax.swing.JButton" name="showApacheLicenseButton">
@@ -1673,7 +1661,7 @@
                                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
                                           <Component id="saveCurrentCurveButton" min="-2" max="-2" attributes="0"/>
                                       </Group>
-                                      <Component id="clearGnuplotButton" alignment="0" min="-2" max="-2" attributes="0"/>
+                                      <Component id="closeCurveWindowsButton" alignment="0" min="-2" max="-2" attributes="0"/>
                                       <Group type="102" alignment="0" attributes="0">
                                           <Component id="saveTrajToFileButton" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace max="-2" attributes="0"/>
@@ -1730,7 +1718,7 @@
                               <Component id="runDyngraphButton" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                          <Component id="clearGnuplotButton" min="-2" max="-2" attributes="0"/>
+                          <Component id="closeCurveWindowsButton" min="-2" max="-2" attributes="0"/>
                           <EmptySpace type="separate" max="-2" attributes="0"/>
                           <Component id="jLabel8" min="-2" max="-2" attributes="0"/>
                           <EmptySpace type="separate" max="-2" attributes="0"/>
@@ -1785,14 +1773,14 @@
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="saveTrajToFileButtonActionPerformed"/>
                   </Events>
                 </Component>
-                <Component class="javax.swing.JButton" name="clearGnuplotButton">
+                <Component class="javax.swing.JButton" name="closeCurveWindowsButton">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Close all curve windows"/>
                     <Property name="toolTipText" type="java.lang.String" value="Closes every run-time and extracted-curve window this session opened."/>
                     <Property name="name" type="java.lang.String" value="closeCurveWindowsButton" noResource="true"/>
                   </Properties>
                   <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="clearGnuplotButtonActionPerformed"/>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="closeCurveWindowsButtonActionPerformed"/>
                   </Events>
                 </Component>
                 <Component class="javax.swing.JButton" name="saveCurrentCurveButton">

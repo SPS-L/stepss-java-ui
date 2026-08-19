@@ -448,16 +448,15 @@ public final class CompileHarness {
      * What extractAll() visits, per platform, without extracting anything.
      *
      * <p>Pinned because the splash names each tool as it goes, so this list is
-     * what a user reads during startup, and because gnuplot ships on Windows
-     * only while uramses is deliberately lazy on all three.
+     * what a user reads during startup, and because uramses is deliberately
+     * lazy on all three.
      */
     private static void checkExtractionOrder() {
         expect("linux extraction order", "[ramses, helios, dyngraph, codegen]",
                 Toolchain.extractionOrder(Platform.LINUX_X86_64).toString());
         expect("macos extraction order", "[ramses, helios, dyngraph, codegen]",
                 Toolchain.extractionOrder(Platform.MACOS_ARM64).toString());
-        expect("windows extraction order carries gnuplot",
-                "[ramses, helios, dyngraph, codegen, gnuplot]",
+        expect("windows extraction order", "[ramses, helios, dyngraph, codegen]",
                 Toolchain.extractionOrder(Platform.WINDOWS_X86_64).toString());
         expect("uramses stays lazy on every platform", "false",
                 String.valueOf(Toolchain.extractionOrder(Platform.LINUX_X86_64)
