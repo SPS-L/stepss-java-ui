@@ -52,6 +52,7 @@ public final class CurveHarness {
         zoomNarrowsTheAxesAndResets();
         readoutIsNullOutsideThePlotArea();
         curvesAreClippedToTheFrame();
+        csvCarriesEveryColumnAndQuotesLabels();
 
         if (failures > 0) {
             System.err.println(failures + " curve check(s) FAILED");
@@ -270,6 +271,24 @@ public final class CurveHarness {
         check("the curves group exists", true, curvesAt >= 0);
         check("the legend group exists", true, legendAt >= 0);
         check("the legend is outside the clip", true, legendAt > curvesAt);
+    }
+
+    private static void csvCarriesEveryColumnAndQuotesLabels() {
+        String csv = CurveWindow.toCsv(CurReader.parse(SMOKE, null, SMOKE_LABELS));
+        String[] lines = csv.split("\n");
+        check("header plus three rows", 4, lines.length);
+        check("time column is named", true, lines[0].startsWith("t (s),"));
+        check("labels are quoted", true,
+                lines[0].contains("\"bus BUS1: voltage magnitude (pu)\""));
+        check("first data row", true, lines[1].startsWith("0.0,"));
+        check("last row carries the last column", true, lines[3].endsWith(",8.5"));
+
+        // A label containing a comma must not become two columns.
+        String odd = CurveWindow.toCsv(CurReader.parse(
+                Arrays.asList(" 0.0E+000  0.1E+001  ;"), null,
+                Arrays.asList("bus A,B: voltage magnitude (pu)")));
+        check("comma in a label stays inside its quotes", true,
+                odd.split("\n")[0].contains("\"bus A,B: voltage magnitude (pu)\""));
     }
 
     private static double round(double value) {
