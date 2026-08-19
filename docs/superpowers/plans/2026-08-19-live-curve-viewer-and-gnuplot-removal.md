@@ -256,7 +256,7 @@ existing helper: `check(String what, String expected, String actual)`.
     private static void checkHeader() {
         // The real capture from a locally built engine, reproduced byte for
         // byte apart from the leading indentation of the data row.
-        List<String> real = java.util.Arrays.asList(
+        List<String> real = Arrays.asList(
                 "# stepss-cur 1",
                 "# tstop      240.000",
                 "# refresh        1.000",
@@ -287,7 +287,7 @@ existing helper: `check(String what, String expected, String actual)`.
                 h.observables.get(1).name2);
 
         // ON and TO legitimately carry two names, space delimited, unquoted.
-        List<String> twoNames = java.util.Arrays.asList(
+        List<String> twoNames = Arrays.asList(
                 "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 2",
                 "# obs 1 2 1 ON myinj myobs");
         try {
@@ -298,7 +298,7 @@ existing helper: `check(String what, String expected, String actual)`.
         }
 
         // A version this build does not know is a loud refusal, never a guess.
-        List<String> future = java.util.Arrays.asList(
+        List<String> future = Arrays.asList(
                 "# stepss-cur 2", "# tstop 30.000", "# refresh 1.000", "# ncol 2",
                 "# obs 1 2 1 BV 4044");
         try {
@@ -311,7 +311,7 @@ existing helper: `check(String what, String expected, String actual)`.
 
         // No header at all is the state of every engine older than the map.
         try {
-            CurHeader.parse(java.util.Arrays.asList(
+            CurHeader.parse(Arrays.asList(
                     " 0.000000E+00  1.012404E+00 "));
             check("a headerless file refuses", "Unsupported thrown", "parsed anyway");
         } catch (CurHeader.Unsupported ex) {
@@ -323,7 +323,7 @@ existing helper: `check(String what, String expected, String actual)`.
         // The columns the records claim must add up to what ncol states, or
         // the reader is about to draw one observable's data under another's
         // name. ncol 5 with records covering 2..5 is consistent; ncol 6 is not.
-        List<String> inconsistent = java.util.Arrays.asList(
+        List<String> inconsistent = Arrays.asList(
                 "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 6",
                 "# obs 1 2 1 BV 4044", "# obs 2 3 2 o-d g6", "# obs 3 5 1 MS g6");
         try {
@@ -347,7 +347,7 @@ existing `CurReader` checks:
         // CurveWindow's header report damage over undamaged data. Six of them
         // here, one per header record, because this fixture carries two
         // observables; the real capture has seven because it carries three.
-        CurveData headed = CurReader.parse(java.util.Arrays.asList(
+        CurveData headed = CurReader.parse(Arrays.asList(
                 "# stepss-cur 1",
                 "# tstop      240.000",
                 "# refresh        1.000",
@@ -356,7 +356,7 @@ existing `CurReader` checks:
                 "# obs 2 3 1 MS g6",
                 " 0.000000E+00  1.012404E+00  1.000000E+00 ",
                 " 1.000000E-02  1.012000E+00  1.000100E+00 "),
-                null, java.util.Arrays.asList("bus voltage (pu)", "speed (pu)"));
+                null, Arrays.asList("bus voltage (pu)", "speed (pu)"));
         check("a clean headed file reports no damage", "0",
                 String.valueOf(headed.skippedRows));
         check("and every data row survives", "2",
@@ -952,7 +952,7 @@ without a display.
 
 ```java
     private static void checkAxes() {
-        CurveData one = new CurveData(java.util.Arrays.asList(
+        CurveData one = new CurveData(Arrays.asList(
                 new CurveSeries("V (pu)", "pu",
                         new double[] {0.0, 1.0, 2.0}, new double[] {1.0, 1.1, 0.9})),
                 null, 0);
@@ -1009,7 +1009,7 @@ without a display.
 
         // LAT's second column is a 0/1 activity flag, so a segment is drawn
         // in one of exactly two classes.
-        CurveData latency = new CurveData(java.util.Arrays.asList(
+        CurveData latency = new CurveData(Arrays.asList(
                 new CurveSeries("S (MVA)", "MVA",
                         new double[] {0.0, 1.0, 2.0},
                         new double[] {10.0, 11.0, 12.0},
@@ -1447,17 +1447,24 @@ Add `checkLiveModel()` to `CurveHarness`, called from `main`.
 
 ```java
     private static void checkLiveModel() throws CurHeader.Unsupported {
-        CurHeader h = CurHeader.parse(java.util.Arrays.asList(
-                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 6",
+        // ncol 5, and it must stay 5: the three records cover 1 + 1 + 2 + 1 = 5
+        // columns, and CurHeader refuses a header whose records disagree with
+        // ncol. The first draft of this task said 6, copied from the
+        // deliberately inconsistent fixture in checkHeader() that exists to
+        // test that very refusal, so this whole method threw before its first
+        // check ran.
+        CurHeader h = CurHeader.parse(Arrays.asList(
+                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 5",
                 "# obs 1 2 1 BV 4044",
                 "# obs 2 3 2 o-d g6",
                 "# obs 3 5 1 MS g6"));
         LiveModel model = new LiveModel(h);
         check("one panel per observable", "3", String.valueOf(model.panelCount()));
 
-        model.accept(java.util.Arrays.asList(
-                " 0.000000E+00  1.010000E+00  1.000000E+00  0.100000E+00  1.000000E+00  0.0 ",
-                " 1.000000E-02  1.020000E+00  1.001000E+00  0.200000E+00  1.002000E+00  0.0 "));
+        // Five fields per row, matching ncol: t, BV, o-d omega, o-d delta, MS.
+        model.accept(Arrays.asList(
+                " 0.000000E+00  1.010000E+00  1.000000E+00  0.100000E+00  1.000000E+00 ",
+                " 1.000000E-02  1.020000E+00  1.001000E+00  0.200000E+00  1.002000E+00 "));
         check("no row is skipped when the count matches ncol", "0",
                 String.valueOf(model.skippedRows()));
         check("both samples land", "2", String.valueOf(model.samples()));
@@ -1486,7 +1493,7 @@ Add `checkLiveModel()` to `CurveHarness`, called from `main`.
 
         // A short row is the torn last line the writer leaves mid-flush. It is
         // counted, not drawn, and never grows a buffer.
-        model.accept(java.util.Arrays.asList(" 2.000000E-02  1.03"));
+        model.accept(Arrays.asList(" 2.000000E-02  1.03"));
         check("a short row is counted rather than drawn", "1",
                 String.valueOf(model.skippedRows()));
         check("and does not extend the curves", "2",
@@ -1522,11 +1529,11 @@ Add `checkLiveModel()` to `CurveHarness`, called from `main`.
 
         // LAT carries the activity flag through to the series, which is the
         // only reason CurveSeries has a weight array at all.
-        CurHeader lat = CurHeader.parse(java.util.Arrays.asList(
+        CurHeader lat = CurHeader.parse(Arrays.asList(
                 "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 3",
                 "# obs 1 2 2 LAT 4041"));
         LiveModel latModel = new LiveModel(lat);
-        latModel.accept(java.util.Arrays.asList(
+        latModel.accept(Arrays.asList(
                 " 0.000000E+00  1.500000E+02  0 ",
                 " 1.000000E-02  1.510000E+02  1 "));
         check("the latency flag reaches the series", "[0.0, 1.0]",
@@ -1802,9 +1809,15 @@ One at a time, reverting after each:
 2. In `axesFor`, delete the `case "O-D"` arm so it falls through to the
    default. Expected red: "a phase plane labels x with delta" and "a phase
    plane does not fix x to the run length".
-3. In `accept`, change `fields.length != header.ncol` to `false`. Expected
-   red: "a short row is counted rather than drawn". Note what else goes red,
-   which tells you whether the check is narrow enough.
+3. In `accept`, bound the parse loop by `Math.min(header.ncol, fields.length)`
+   so a short row is accepted rather than counted. Expected red: "a short row
+   is counted rather than drawn".
+
+   **Not** by changing `fields.length != header.ncol` to `false`, which is the
+   obvious mutation and unusable: any bypass of the length guard lets a short
+   row reach an unconditional `fields[i]` up to `ncol - 1`, so the run dies of
+   `ArrayIndexOutOfBoundsException` before the assertion. Red, but demonstrating
+   nothing. Bounding the loop reaches the check safely.
 4. Change `this.weighted = "LAT".equals(type)` to `false`. Expected red: "the
    latency flag reaches the series".
 
@@ -1853,20 +1866,20 @@ interval derivation, which is the one piece of arithmetic in the class.
         // engine accuses the user of something that is not true.
         check("a header still arriving is not a refusal", "false",
                 String.valueOf(LiveCurveWindow.headerFailureIsFinal(
-                        java.util.Arrays.asList("# stepss-cur 1", "# tstop 30.000"))));
+                        Arrays.asList("# stepss-cur 1", "# tstop 30.000"))));
         check("nothing read yet is not a refusal either", "false",
                 String.valueOf(LiveCurveWindow.headerFailureIsFinal(
                         java.util.Collections.<String>emptyList())));
         check("blank lines do not end the header", "false",
                 String.valueOf(LiveCurveWindow.headerFailureIsFinal(
-                        java.util.Arrays.asList("# stepss-cur 1", "", "   "))));
+                        Arrays.asList("# stepss-cur 1", "", "   "))));
         // A data row proves no more header is coming, so now it is a verdict.
         check("a data row after a bad header is a refusal", "true",
                 String.valueOf(LiveCurveWindow.headerFailureIsFinal(
-                        java.util.Arrays.asList("# stepss-cur 1", " 0.0 1.0"))));
+                        Arrays.asList("# stepss-cur 1", " 0.0 1.0"))));
         check("a file that starts with data refuses at once", "true",
                 String.valueOf(LiveCurveWindow.headerFailureIsFinal(
-                        java.util.Arrays.asList(" 0.000000E+00  1.012404E+00 "))));
+                        Arrays.asList(" 0.000000E+00  1.012404E+00 "))));
     }
 ```
 

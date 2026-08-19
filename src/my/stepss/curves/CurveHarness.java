@@ -745,7 +745,7 @@ public final class CurveHarness {
     }
 
     private static void checkLiveModel() throws CurHeader.Unsupported {
-        CurHeader h = CurHeader.parse(java.util.Arrays.asList(
+        CurHeader h = CurHeader.parse(Arrays.asList(
                 "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 5",
                 "# obs 1 2 1 BV 4044",
                 "# obs 2 3 2 o-d g6",
@@ -753,7 +753,7 @@ public final class CurveHarness {
         LiveModel model = new LiveModel(h);
         check("one panel per observable", "3", String.valueOf(model.panelCount()));
 
-        model.accept(java.util.Arrays.asList(
+        model.accept(Arrays.asList(
                 " 0.000000E+00  1.010000E+00  1.000000E+00  0.100000E+00  1.000000E+00 ",
                 " 1.000000E-02  1.020000E+00  1.001000E+00  0.200000E+00  1.002000E+00 "));
         check("no row is skipped when the count matches ncol", "0",
@@ -784,7 +784,7 @@ public final class CurveHarness {
 
         // A short row is the torn last line the writer leaves mid-flush. It is
         // counted, not drawn, and never grows a buffer.
-        model.accept(java.util.Arrays.asList(" 2.000000E-02  1.03"));
+        model.accept(Arrays.asList(" 2.000000E-02  1.03"));
         check("a short row is counted rather than drawn", "1",
                 String.valueOf(model.skippedRows()));
         check("and does not extend the curves", "2",
@@ -820,11 +820,11 @@ public final class CurveHarness {
 
         // LAT carries the activity flag through to the series, which is the
         // only reason CurveSeries has a weight array at all.
-        CurHeader lat = CurHeader.parse(java.util.Arrays.asList(
+        CurHeader lat = CurHeader.parse(Arrays.asList(
                 "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 3",
                 "# obs 1 2 2 LAT 4041"));
         LiveModel latModel = new LiveModel(lat);
-        latModel.accept(java.util.Arrays.asList(
+        latModel.accept(Arrays.asList(
                 " 0.000000E+00  1.500000E+02  0 ",
                 " 1.000000E-02  1.510000E+02  1 "));
         check("the latency flag reaches the series", "[0.0, 1.0]",
