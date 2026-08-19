@@ -1285,7 +1285,51 @@ per-series loop so that a series carrying `w` is drawn segment by segment:
         sink.endGroup();
 ```
 
-5. Gate the legend on the spec:
+5. Fix the pointer hit test, which the taller margin otherwise breaks.
+`readoutAt` (`CurvePanel.java:143-154`) rejects a point outside the frame by
+comparing against the **constant** `PAD_TOP`, so on a titled panel the band
+between `PAD_TOP` and the real frame top is accepted while sitting above the y
+axis maximum: hovering the title returns a confident, wrong readout instead of
+null. Compute the bounds first and hit-test against them:
+
+```java
+    public String readoutAt(int px, int py) {
+        if (data.series.isEmpty()) {
+            return null;
+        }
+        Bounds b = bounds(data, getWidth(), getHeight());
+        // Against the frame's real top rather than the constant: a titled
+        // panel's frame starts lower, and the band above it is not plot area.
+        if (px < PAD_LEFT || px > getWidth() - PAD_RIGHT
+                || py < b.padTop() || py > getHeight() - PAD_BOTTOM) {
+            return null;
+        }
+        return String.format(Locale.ROOT, "t = %.4g, value = %.6g",
+                b.t(px), b.v(py));
+    }
+```
+
+This is invisible on the post-analysis panel, where the title is empty and the
+two values are equal, which is why no existing check covers it: step 2's pinned
+SVG guards rendering and this is hit-testing. Add a check for it beside the
+others in `checkAxes()`, sizing the panel because `readoutAt` reads
+`getWidth()`:
+
+```java
+        // A titled panel's frame starts below PAD_TOP, so the band between
+        // them is not plot area and must report nothing.
+        CurvePanel hit = new CurvePanel();
+        hit.setAxes(new CurveAxes("BUS 4044", "t (s)", "V (pu)",
+                0.0, 30.0, false, false));
+        hit.setData(one);
+        hit.setSize(800, 500);
+        check("a point in the title band reads out nothing", "null",
+                String.valueOf(hit.readoutAt(400, 36)));
+        check("a point inside the frame still reads out", "true",
+                String.valueOf(hit.readoutAt(400, 250) != null));
+```
+
+6. Gate the legend on the spec:
 
 ```java
         if (axes.legend) {
@@ -1755,8 +1799,34 @@ interval derivation, which is the one piece of arithmetic in the class.
                 String.valueOf(LiveCurveWindow.pollMillis(0.0)));
         check("a negative refresh rate is floored too", "100",
                 String.valueOf(LiveCurveWindow.pollMillis(-3.0)));
+
+        // Whether a failed header parse is a verdict or impatience. The engine
+        // issues its header as several writes and flushes once at the end, so
+        // a poll can land on a partial header; calling that an unsupported
+        // engine accuses the user of something that is not true.
+        check("a header still arriving is not a refusal", "false",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        java.util.Arrays.asList("# stepss-cur 1", "# tstop 30.000"))));
+        check("nothing read yet is not a refusal either", "false",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        java.util.Collections.<String>emptyList())));
+        check("blank lines do not end the header", "false",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        java.util.Arrays.asList("# stepss-cur 1", "", "   "))));
+        // A data row proves no more header is coming, so now it is a verdict.
+        check("a data row after a bad header is a refusal", "true",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        java.util.Arrays.asList("# stepss-cur 1", " 0.0 1.0"))));
+        check("a file that starts with data refuses at once", "true",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        java.util.Arrays.asList(" 0.000000E+00  1.012404E+00 "))));
     }
 ```
+
+That last case is the one that matters for the currently pinned engine: it
+writes no header at all, so its first line is data, `headerFailureIsFinal`
+returns true immediately, and the user gets the real explanation on the first
+poll rather than after a timeout.
 
 - [ ] **Step 2: Write `LiveCurveWindow`**
 
@@ -1813,6 +1883,17 @@ public final class LiveCurveWindow extends JFrame {
     private int emptyPolls;
     private boolean built;
     private boolean stopped;
+    /**
+     * Lines read before the header could be parsed.
+     *
+     * <p>The engine issues the header as several separate Fortran writes and
+     * flushes once at the end, so a poll can land on a file holding only part
+     * of it. Deciding from one batch would let a startup race present as
+     * "this engine wrote no run-time header", which accuses the user of
+     * running an old engine. Lines accumulate here until something proves the
+     * header complete, and the data rows among them are replayed once it is.
+     */
+    private final List<String> pending = new ArrayList<String>();
 
     /**
      * @param cur the run's temp_display.cur, which need not exist yet
@@ -1849,6 +1930,29 @@ public final class LiveCurveWindow extends JFrame {
     static long pollMillis(double refreshSeconds) {
         long ms = Math.round(refreshSeconds * 1000.0);
         return Math.max(MIN_POLL_MS, ms);
+    }
+
+    /**
+     * Whether a failed header parse over {@code seen} is a verdict or just
+     * impatience.
+     *
+     * <p>The header is contiguous and comes first, so any line that is neither
+     * blank nor a comment proves no more header is coming and a failure is
+     * real. Until one arrives, a failure means the poll landed between the
+     * engine's header writes and its single flush, which is a race rather than
+     * a fault and must not be reported as an unsupported engine.
+     *
+     * <p>Package-private and static so it can be checked without a file, a
+     * poller or a display.
+     */
+    static boolean headerFailureIsFinal(List<String> seen) {
+        for (String line : seen) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void start() {
@@ -1890,11 +1994,17 @@ public final class LiveCurveWindow extends JFrame {
         }
         try {
             List<String> lines = tail.poll();
-            if (tail.truncatedSinceLastPoll() && model != null) {
+            if (tail.truncatedSinceLastPoll()) {
                 // status='replace' from a re-run in the same directory. The
                 // header is about to arrive again, so throw the old run away
-                // rather than drawing the two on one axis.
-                model.reset();
+                // rather than drawing the two on one axis. The panels stay:
+                // a re-run in the same window cannot have a different
+                // observable set, because Task 7 gives every run its own
+                // window and stops this one's poller before that.
+                pending.clear();
+                if (model != null) {
+                    model.reset();
+                }
             }
             if (lines.isEmpty()) {
                 if (model == null && ++emptyPolls == 5) {
@@ -1903,13 +2013,27 @@ public final class LiveCurveWindow extends JFrame {
                 return;
             }
             if (model == null) {
+                pending.addAll(lines);
                 try {
-                    model = new LiveModel(CurHeader.parse(lines));
+                    model = new LiveModel(CurHeader.parse(pending));
                 } catch (CurHeader.Unsupported unsupported) {
-                    refuse(unsupported.getMessage());
+                    // Before the first data row this means "the header is not
+                    // all here yet", which is a startup race rather than a
+                    // fault: the engine issues the header as several writes and
+                    // flushes once at the end. Refusing here would tell the
+                    // user their engine is too old on the strength of a poll
+                    // that landed mid-write. After a data row there is no more
+                    // header coming, so the same failure is real.
+                    if (headerFailureIsFinal(pending)) {
+                        refuse(unsupported.getMessage());
+                    }
                     return;
                 }
                 SwingUtilities.invokeLater(this::buildPanels);
+                // The data rows that arrived while the header was still
+                // incomplete, replayed in order so nothing is lost.
+                lines = new ArrayList<String>(pending);
+                pending.clear();
             }
             model.accept(lines);
             final List<CurveData> snapshots = new ArrayList<CurveData>();
@@ -1988,10 +2112,20 @@ ant clean && ant compile
 tools/curve-harness.sh
 ```
 
-- [ ] **Step 4: Prove the poll-interval check can fail**
+- [ ] **Step 4: Prove three checks can fail**
 
-Change `Math.max(MIN_POLL_MS, ms)` to `ms`. Expected red: "an absurd refresh
-rate is floored". Revert, and record it.
+One at a time, reverting after each:
+
+1. Change `Math.max(MIN_POLL_MS, ms)` to `ms`. Expected red: "an absurd refresh
+   rate is floored".
+2. In `headerFailureIsFinal`, change the loop body to `return true;`
+   unconditionally. Expected red: "a header still arriving is not a refusal"
+   and "blank lines do not end the header".
+3. In `headerFailureIsFinal`, drop the `!trimmed.isEmpty()` term. Expected red:
+   "blank lines do not end the header" alone, which is what tells you that
+   check is narrower than the one above it.
+
+Record all three in the report.
 
 - [ ] **Step 5: Commit**
 
