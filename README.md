@@ -11,7 +11,7 @@
 
 Neither edition wraps the other, and a case built in one runs unchanged in the other.
 
-This one is a Java (Swing) desktop application. It bundles the complete simulation toolchain (RAMSES, Helios, CODEGEN, DYNGRAPH, and on Windows gnuplot) into a single jar, so a network can be loaded, simulated statically and dynamically, and analysed without touching the command line. **CODEGEN makes this the edition for building your own models**: it is the one component the Python edition does not carry.
+This one is a Java (Swing) desktop application. It bundles the complete simulation toolchain (RAMSES, Helios, CODEGEN, DYNGRAPH) into a single jar, so a network can be loaded, simulated statically and dynamically, and analysed without touching the command line. **CODEGEN makes this the edition for building your own models**: it is the one component the Python edition does not carry.
 
 ## Features
 
@@ -19,8 +19,8 @@ This one is a Java (Swing) desktop application. It bundles the complete simulati
 - **Bundled examples**: *File → Open Examples* extracts a ready-to-run test system (Kundur two-area, IEEE Nordic, or the 5-bus tutorial) into your examples directory and fills in the case, so there is something to run on a fresh install
 - **Dynamic simulation**: runs the bundled RAMSES engine on the loaded data and disturbance files
 - **Power flow**: drives the bundled Helios power-flow engine
-- **Real-time plotting**: live curves during simulation via gnuplot (bus voltages, machine speeds, branch flows, wall time, and more)
-- **Result extraction**: *Extract Curves* drives the bundled DYNGRAPH over a saved trajectory and draws the result in a curve window of its own, one per extraction, so two extractions can be put side by side and compared. Zoom by dragging a box, reset with a double-click, and save the figure as PNG, SVG or CSV
+- **Real-time plotting**: a curve window opens with each run and follows the engine as it writes, one stacked panel per observable (bus voltages, machine speeds, branch flows, latency, phase-plane trajectories, wall time against simulation time, and more). It stops when the run does and stays open as a static chart, so two runs can be compared side by side. Drawn by STEPSS itself: no external plotting program is needed or bundled
+- **Result extraction**: *Extract Curves* drives the bundled DYNGRAPH over a saved trajectory and draws the result in a curve window of its own, one per extraction, so two extractions can be put side by side and compared. Zoom by dragging a box, reset with a double-click, and save the figure as PNG, SVG or CSV. *Save gnuplot files* keeps the extraction's `.cur` and `.plt` pair, which STEPSS writes but never reads, for anyone who would rather plot it in gnuplot themselves
 - **Analysis tools**: Jacobian matrix extraction, and small-signal stability analysis computed by the engine itself (see `examples/kundur-ssa/`)
 - **User models**: the Codegen tab generates user-written model source with CODEGEN and compiles it into a custom simulator with gfortran
 - **Observable wizard**: dialog for selecting buses, machines, shunts, branches, and injectors to record
@@ -77,7 +77,7 @@ It needs `jpackage`, which ships with JDK 14 and later, and it only ever builds 
 
 The bundles are a second CI job, and nothing is published until all three of them finish. The release job creates the release as a **draft**, which creates no tag and is invisible to users; each runner attaches its installer to that draft; a final job publishes it and tells the two package managers. One runner failing means the draft is discarded and the run goes red, so there is no tag, no release and no partial set of installers, and re-running reuses the same version number. It used to publish first and attach afterwards, on the reasoning that a release carrying `stepss.jar` alone still beat no release; v3.74.17 is why it no longer does, having gone out with the Windows artifacts and neither the `.deb` nor the `.dmg` while apt went on serving the previous version.
 
-The Linux `.deb` is the one bundle an archive serves rather than a person downloads, so `packaging/linux` overrides six of jpackage's own templates. What that buys, beyond the desktop menu entry: the RAMSES runtime libraries and gnuplot are declared as dependencies, the Fortran toolchain is a `Recommends:`, `/usr/bin/stepss` is a command you can type, and `/usr/share/doc/stepss/copyright` names each bundled component and the licence it travels under. jpackage can derive none of that, because it reads dependencies off the app image and the whole simulation toolchain is inside the jar as resources it extracts at run time.
+The Linux `.deb` is the one bundle an archive serves rather than a person downloads, so `packaging/linux` overrides six of jpackage's own templates. What that buys, beyond the desktop menu entry: the RAMSES runtime libraries are declared as dependencies, the Fortran toolchain is a `Recommends:`, `/usr/bin/stepss` is a command you can type, and `/usr/share/doc/stepss/copyright` names each bundled component and the licence it travels under. jpackage can derive none of that, because it reads dependencies off the app image and the whole simulation toolchain is inside the jar as resources it extracts at run time.
 
 ```bash
 tools/deb-harness.sh          # install the built .deb in a clean container
@@ -116,11 +116,17 @@ Then, in the GUI:
 3. Optionally, name a **one-line diagram** template (`.svg`) in the same *System Data* tab: it carries placeholder codes, and every **Run Power Flow** fills them in with the solved values and opens the result in a window of its own (placeholder table in the [user guide](https://stepss.sps-lab.org/user-guide/power-flow/))
 4. Select observables to record (*Observables* tab or the Observable dialog)
 5. Run the simulation from the *Dynamic Simulation* tab
-6. Plot results with **Extract Curves**, which opens a curve window of its own, or watch the real-time gnuplot curves during the run
+6. Plot results with **Extract Curves**, which opens a curve window of its own, or watch the run-time curves in the window that opens with the run
+
+Run-time curves need a RAMSES release that publishes its column map, which the
+engine writes into a short header at the top of the file the curves are read
+from. Against an older engine the window says so plainly rather than guessing
+which column belongs to which observable. Extract Curves is unaffected: it reads
+DYNGRAPH's output, which needs no header.
 
 ## Bundled tools
 
-The jar embeds the toolchain executables for the platform it runs on and extracts them at runtime. RAMSES, Helios, DYNGRAPH, and CODEGEN are fetched from their pinned SPS-L releases at build time (see [Installation](#installation)) on all three platforms; gnuplot on Windows is the only binary committed directly.
+The jar embeds the toolchain executables for the platform it runs on and extracts them at runtime. RAMSES, Helios, DYNGRAPH, and CODEGEN are fetched from their pinned SPS-L releases at build time (see [Installation](#installation)) on all three platforms. Every payload now arrives that way: no binary is committed to this repository.
 
 | Tool | Role | Windows | Linux | macOS (Apple Silicon) |
 |---|---|---|---|---|
@@ -129,7 +135,6 @@ The jar embeds the toolchain executables for the platform it runs on and extract
 | DYNGRAPH | Curve viewer | yes | yes | yes |
 | CODEGEN | Model generation | yes | yes | yes |
 | Model compilation | Custom models | yes (MSYS2/MinGW) | yes (gfortran) | yes (Homebrew gcc) |
-| gnuplot | Real-time plotting | bundled | resolved from `PATH` | resolved from `PATH` |
 | Data file editing | OS default editor | yes | yes | yes |
 
 DYNGRAPH is the same console program on all three platforms, but Extract Curves no longer opens it in a terminal window: STEPSS reads the trajectory's observables with `dyngraph --list`, presents them in a selection dialog, drives the extraction through a generated command file (`-t`), and then draws the extracted curves itself. Running DYNGRAPH by hand, outside STEPSS, still gives the console prompts.
@@ -163,7 +168,7 @@ STEPSS taken as a whole is not, and should never be described that way: it is an
 | This Java interface, and DYNGRAPH | Apache License 2.0 |
 | **RAMSES** | Property of the University of Liège. Proprietary, free for non-commercial use only, and the free version is capped at 1000 buses and 2 cores |
 | **Helios**, **CODEGEN** | Academic Public Licence: free for academic, research and educational use, commercial use by separate agreement |
-| Bundled third-party tools and libraries | Their own terms: gnuplot, KLU, Batik, Apache Commons Exec/IO, FlatLaf |
+| Bundled third-party libraries | Their own terms: KLU, Batik, Apache Commons Exec/IO, FlatLaf |
 
 The authoritative statement of what governs what is the [licence page](https://stepss.sps-lab.org/getting-started/license/). The table above is a summary of it and must not grow into a second copy. The licence text of each bundled component is embedded in the application and viewable from the About dialog.
 
