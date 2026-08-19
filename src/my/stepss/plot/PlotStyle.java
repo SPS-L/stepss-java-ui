@@ -58,6 +58,14 @@ public final class PlotStyle {
      * 1.6:1 and 2.9:1. Raising them to the 3:1 that data-bearing ink wants
      * would make the guides louder in dark than in light, which is the same
      * kind of untruth as leaving them invisible.
+     *
+     * <p>The last two entries are not a palette slot. gnuplot.f90:95-96 shades a
+     * LAT trace through a two-stop blue-to-red palette over cbrange [0:1], and
+     * the engine writes that input as a literal 0 or 1 through an i2
+     * descriptor, so the "ramp" only ever takes its two end values. Two
+     * classes rather than a graded set of them: a ramp would be unreachable
+     * code, and every drawn hex has to be in this table for an exported figure
+     * to stay restylable.
      */
     public static final Entry[] ENTRIES = {
         new Entry("axis", "#333333", "#d0d4d6", 1.0f, null),
@@ -77,6 +85,8 @@ public final class PlotStyle {
         new Entry("series5", "#56b4e9", "#9ad4f2", 1.5f, null),
         new Entry("series6", "#8b4513", "#c58a5e", 1.5f, null),
         new Entry("series7", "#6a3d9a", "#b18ad6", 1.5f, null),
+        new Entry("latent", "#0072b2", "#6cb8e6", 1.5f, null),
+        new Entry("active", "#dc143c", "#ff6b83", 1.5f, null),
     };
 
     /** The ground a saved figure is drawn on, whatever the application wears. */

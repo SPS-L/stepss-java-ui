@@ -58,6 +58,7 @@ public final class CurveHarness {
         toleratesRamsesCommentsAboveTheHeader();
         checkHeader();
         checkTail();
+        checkAxes();
 
         if (failures > 0) {
             System.err.println(failures + " curve check(s) FAILED");
@@ -631,6 +632,109 @@ public final class CurveHarness {
         } finally {
             deleteRecursively(dir);
         }
+    }
+
+    private static void checkAxes() {
+        CurveData one = new CurveData(java.util.Arrays.asList(
+                new CurveSeries("V (pu)", "pu",
+                        new double[] {0.0, 1.0, 2.0}, new double[] {1.0, 1.1, 0.9})),
+                null, 0);
+
+        CurvePanel post = new CurvePanel();
+        post.setData(one);
+        String postSvg = post.toSvg(800, 500);
+        check("the post-analysis panel still draws a legend entry", "true",
+                String.valueOf(postSvg.contains("V (pu)")));
+        check("and still titles its x axis with time", "true",
+                String.valueOf(postSvg.contains(">t (s)<")));
+
+        // A fixed x range is what makes a live panel's curve grow across a
+        // frame whose extent was known before the first sample arrived. With
+        // x autoscaled to the data, a two-second-old run would fill the frame
+        // and then appear to stop moving.
+        CurvePanel live = new CurvePanel();
+        live.setAxes(new CurveAxes("BUS 4044", "t (s)", "V (pu)",
+                0.0, 30.0, false, false));
+        live.setData(one);
+        String liveSvg = live.toSvg(800, 500);
+        check("a fixed x range reaches the far tick", "true",
+                String.valueOf(liveSvg.contains(">30.0<")));
+        check("a data-fitting tick is absent, so the range is not autoscaled",
+                "false", String.valueOf(liveSvg.contains(">2.000<")));
+        check("the panel title is drawn", "true",
+                String.valueOf(liveSvg.contains("BUS 4044")));
+        check("and the legend is suppressed", "false",
+                String.valueOf(liveSvg.contains("legend")));
+        // The title gets a line of its own above the y unit. Both were drawn
+        // at PAD_TOP - 12 in the first draft of this task, one centred and one
+        // left-anchored: that does not collide at 800px wide and does on a
+        // stacked panel a third that wide.
+        check("the title sits above the y unit rather than on it", "true",
+                String.valueOf(textY(liveSvg, "BUS 4044")
+                        < textY(liveSvg, "V (pu)")));
+
+        // A titled panel's frame starts below PAD_TOP, so the band between
+        // them is not plot area and must report nothing.
+        CurvePanel hit = new CurvePanel();
+        hit.setAxes(new CurveAxes("BUS 4044", "t (s)", "V (pu)",
+                0.0, 30.0, false, false));
+        hit.setData(one);
+        hit.setSize(800, 500);
+        check("a point in the title band reads out nothing", "null",
+                String.valueOf(hit.readoutAt(400, 36)));
+        check("a point inside the frame still reads out", "true",
+                String.valueOf(hit.readoutAt(400, 250) != null));
+
+        // RT overlays y = x so a user sees at a glance whether the simulation
+        // is keeping up with the wall clock, matching gnuplot.f90:143 which
+        // plots column 1 against itself alongside the trace.
+        CurvePanel rt = new CurvePanel();
+        rt.setAxes(new CurveAxes("Simulated VS Real time", "simulation time (s)",
+                "elapsed time (s)", 0.0, 10.0, false, true));
+        rt.setData(one);
+        String rtSvg = rt.toSvg(800, 500);
+        // On the dash pattern, not on the group id: a group is emitted whether
+        // or not anything lands inside it, so asserting on the id alone cannot
+        // tell "drawn" from "opened and closed empty". Nothing else in this
+        // panel calls dashedLine.
+        check("the identity line is actually drawn", "true",
+                String.valueOf(rtSvg.contains("stroke-dasharray")));
+        check("and a panel that did not ask for one has none", "false",
+                String.valueOf(postSvg.contains("stroke-dasharray")));
+
+        // LAT's second column is a 0/1 activity flag, so a segment is drawn
+        // in one of exactly two classes.
+        CurveData latency = new CurveData(java.util.Arrays.asList(
+                new CurveSeries("S (MVA)", "MVA",
+                        new double[] {0.0, 1.0, 2.0},
+                        new double[] {10.0, 11.0, 12.0},
+                        new double[] {0.0, 1.0, 1.0})),
+                null, 0);
+        CurvePanel lat = new CurvePanel();
+        lat.setAxes(new CurveAxes("Equipment: 4041", "t (s)", "S (MVA)",
+                0.0, 30.0, false, false));
+        lat.setData(latency);
+        String latSvg = lat.toSvg(800, 500);
+        check("an idle segment is drawn in the latent class", "true",
+                String.valueOf(latSvg.contains("class=\"latent\"")));
+        check("an active segment is drawn in the active class", "true",
+                String.valueOf(latSvg.contains("class=\"active\"")));
+        check("and no single-colour series class is used for it", "false",
+                String.valueOf(latSvg.contains("class=\"series0\"")));
+    }
+
+    /**
+     * The y coordinate of the SVG text element carrying {@code content}, or
+     * NaN when there is none.
+     *
+     * <p>Reads the attribute rather than matching a formatted number, so a
+     * check about relative position does not also pin the coordinate format.
+     */
+    private static double textY(String svg, String content) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "<text x=\"[^\"]*\" y=\"([^\"]*)\"[^>]*>"
+                        + java.util.regex.Pattern.quote(content) + "</text>").matcher(svg);
+        return m.find() ? Double.parseDouble(m.group(1)) : Double.NaN;
     }
 
     private static void append(File f, String s) throws IOException {
