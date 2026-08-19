@@ -48,6 +48,7 @@ public final class CurveHarness {
         niceBoundsRoundOutward();
         rendersOnePolylinePerSeries();
         namesTheSharedUnitAndFlagsMixedOnes();
+        curvesWearTheirOwnColourInOrder();
 
         if (failures > 0) {
             System.err.println(failures + " curve check(s) FAILED");
@@ -174,6 +175,27 @@ public final class CurveHarness {
         }
         check("legend names a curve", true, svg.contains("rotor speed"));
         check("x axis is labelled", true, svg.contains("t (s)"));
+    }
+
+    /**
+     * Curve i must wear seriesClass(i). Asserting only that all four classes
+     * appear somewhere in the document passes with the colours swapped, and a
+     * swap is not cosmetic: the legend swatch comes from the same seriesClass
+     * call, so the legend would name the wrong curve.
+     */
+    private static void curvesWearTheirOwnColourInOrder() {
+        CurvePanel panel = new CurvePanel();
+        panel.setData(CurReader.parse(SMOKE, null, SMOKE_LABELS));
+        String svg = panel.toSvg(600, 400);
+        int at = 0;
+        for (int i = 0; i < SMOKE_LABELS.size(); i++) {
+            int start = svg.indexOf("<polyline", at);
+            check("polyline " + i + " is present", true, start >= 0);
+            int end = svg.indexOf("/>", start);
+            check("polyline " + i + " wears series" + i, true,
+                    svg.substring(start, end).contains("class=\"series" + i + "\""));
+            at = end;
+        }
     }
 
     private static void namesTheSharedUnitAndFlagsMixedOnes() {
