@@ -30,10 +30,11 @@ public final class CurveWindow extends JFrame {
     private final CurvePanel panel = new CurvePanel();
 
     /** Opens one extraction in a window of its own. Every call makes a new one. */
-    public static void open(Component parent, CurveData data, String title) {
+    public static CurveWindow open(Component parent, CurveData data, String title) {
         CurveWindow window = new CurveWindow(data, title);
         my.stepss.WindowCascade.track(window, parent);
         window.setVisible(true);
+        return window;
     }
 
     public CurveWindow(CurveData data, String title) {

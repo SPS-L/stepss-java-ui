@@ -454,7 +454,6 @@ public class StepssUI extends javax.swing.JFrame {
         content.add(heading(jLabel4), span(row++));
         content.add(ActionBar.create()
                 .add(runDyngraphButton)
-                .add(viewCurvesButton)
                 .add(saveCurrentCurveButton)
                 .separate()
                 .add(saveTrajToFileButton)
@@ -1143,7 +1142,6 @@ public class StepssUI extends javax.swing.JFrame {
         searchTextField = new javax.swing.JTextField();
         jPanel8 = new javax.swing.JPanel();
         runDyngraphButton = new javax.swing.JButton();
-        viewCurvesButton = new javax.swing.JButton();
         saveTrajToFileButton = new javax.swing.JButton();
         clearGnuplotButton = new javax.swing.JButton();
         saveCurrentCurveButton = new javax.swing.JButton();
@@ -1785,7 +1783,7 @@ public class StepssUI extends javax.swing.JFrame {
         runtimeObsType.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType.setName("runtimeObsType"); // NOI18N
 
-        runtimeObsName.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
+        runtimeObsName.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nThese commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName.setName("runtimeObsName"); // NOI18N
 
         jLabel30.setText("<html><b>Runtime observables</b></html>");
@@ -1810,13 +1808,13 @@ public class StepssUI extends javax.swing.JFrame {
         runtimeObsType1.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType1.setName("runtimeObsType1"); // NOI18N
 
-        runtimeObsName1.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
+        runtimeObsName1.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nThese commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName1.setName("runtimeObsName1"); // NOI18N
 
         runtimeObsType2.setToolTipText("<html>Click to choose the kind of observable you want to see in run-time during the simulation</html>");
         runtimeObsType2.setName("runtimeObsType2"); // NOI18N
 
-        runtimeObsName2.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nAdditionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
+        runtimeObsName2.setToolTipText("<html>Here you clarify the name of the equipment you want to observe. For example:<br>\n1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.<br>\n2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.<br>\n3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.<br>\n4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.<br><br>\nThese commands must follow the name of the equipment and should be separated with / <br>\nSuch commands might be:<br><br>\nset yrange[0.9:1.1]<br><br>\nwhich will set the range of the y-axes between these values.</html>");
         runtimeObsName2.setName("runtimeObsName2"); // NOI18N
 
         javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
@@ -2231,16 +2229,6 @@ public class StepssUI extends javax.swing.JFrame {
             }
         });
 
-        viewCurvesButton.setText("Preview curve");
-        viewCurvesButton.setToolTipText("Click to preview the last extracted curve.");
-        viewCurvesButton.setEnabled(false);
-        viewCurvesButton.setName("viewCurvesButton"); // NOI18N
-        viewCurvesButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                viewCurvesButtonActionPerformed(evt);
-            }
-        });
-
         saveTrajToFileButton.setText("Save current trajectory");
         saveTrajToFileButton.setToolTipText("Click to save the trajectory file of the last simulation.");
         saveTrajToFileButton.setEnabled(false);
@@ -2251,17 +2239,17 @@ public class StepssUI extends javax.swing.JFrame {
             }
         });
 
-        clearGnuplotButton.setText("Clear all gnuplot instances");
-        clearGnuplotButton.setToolTipText("Kills all instances of Gnuplot.");
-        clearGnuplotButton.setName("clearGnuplotButton"); // NOI18N
+        clearGnuplotButton.setText("Close all curve windows");
+        clearGnuplotButton.setToolTipText("Closes every run-time and extracted-curve window this session opened.");
+        clearGnuplotButton.setName("closeCurveWindowsButton"); // NOI18N
         clearGnuplotButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 clearGnuplotButtonActionPerformed(evt);
             }
         });
 
-        saveCurrentCurveButton.setText("Save extracted curve");
-        saveCurrentCurveButton.setToolTipText("Save the extracted plots.");
+        saveCurrentCurveButton.setText("Save gnuplot files");
+        saveCurrentCurveButton.setToolTipText("Saves the extracted .cur and .plt, for opening in gnuplot yourself.");
         saveCurrentCurveButton.setEnabled(false);
         saveCurrentCurveButton.setName("saveCurrentCurveButton"); // NOI18N
         saveCurrentCurveButton.addActionListener(new java.awt.event.ActionListener() {
@@ -2375,8 +2363,6 @@ public class StepssUI extends javax.swing.JFrame {
                             .addGroup(jPanel8Layout.createSequentialGroup()
                                 .addComponent(runDyngraphButton)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(viewCurvesButton)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(saveCurrentCurveButton))
                             .addComponent(clearGnuplotButton)
                             .addGroup(jPanel8Layout.createSequentialGroup()
@@ -2423,7 +2409,6 @@ public class StepssUI extends javax.swing.JFrame {
                 .addGap(12, 12, 12)
                 .addGroup(jPanel8Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(saveCurrentCurveButton)
-                    .addComponent(viewCurvesButton)
                     .addComponent(runDyngraphButton))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(clearGnuplotButton)
@@ -2688,7 +2673,7 @@ public class StepssUI extends javax.swing.JFrame {
         toolsMenu.add(openTermButton);
 
         killAllGnupMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        killAllGnupMenuItem.setText("Clear all gnuplot instances");
+        killAllGnupMenuItem.setText("Close all curve windows");
         killAllGnupMenuItem.setName("killAllGnupMenuItem"); // NOI18N
         killAllGnupMenuItem.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2969,6 +2954,29 @@ public class StepssUI extends javax.swing.JFrame {
                 : keyword + " " + name.getText());
         out.newLine();
         return null;
+    }
+
+    /**
+     * Whether any run-time observable row is filled in.
+     *
+     * <p>The same three rows and the same "blank means unused" rule
+     * {@link #writeObservable} applies, including its exception: Wall Time and
+     * Solutions name no equipment, so a selected row of either counts as
+     * configured with an empty name field.
+     */
+    private boolean anyRuntimeObservable() {
+        JComboBox[] types = {runtimeObsType, runtimeObsType1, runtimeObsType2};
+        JTextField[] names = {runtimeObsName, runtimeObsName1, runtimeObsName2};
+        for (int i = 0; i < types.length; i++) {
+            String label = String.valueOf(types[i].getSelectedItem());
+            if (WALL_TIME.equals(label) || SOLUTIONS.equals(label)) {
+                return true;
+            }
+            if (!names[i].getText().isEmpty() && OBSERVABLE_TYPES.containsKey(label)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -4465,10 +4473,11 @@ public class StepssUI extends javax.swing.JFrame {
     }//GEN-LAST:event_saveCurrentCurveButtonActionPerformed
 
     private void clearGnuplotButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearGnuplotButtonActionPerformed
-        PlatformLauncher.killByName(platform, "wgnuplot");
-        PlatformLauncher.killByName(platform, "wgnuplotR");
-        PlatformLauncher.killByName(platform, "pgnuplot");
-        PlatformLauncher.killByName(platform, "gnuplot");
+        for (java.awt.Window window : curveWindows) {
+            window.dispose();
+        }
+        curveWindows.clear();
+        liveCurves = null;
     }//GEN-LAST:event_clearGnuplotButtonActionPerformed
 
     private void saveTrajToFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveTrajToFileButtonActionPerformed
@@ -4510,29 +4519,6 @@ public class StepssUI extends javax.swing.JFrame {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
         }
     }//GEN-LAST:event_saveTrajToFileButtonActionPerformed
-
-    private void viewCurvesButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_viewCurvesButtonActionPerformed
-        try {
-            if (gnuplotExec != null && gnuplotExec.exists()) {
-                CommandLine command = new CommandLine(gnuplotExec.getAbsolutePath());
-                command.addArgument("-persist");
-                command.addArgument(lastExtractionBase.getAbsolutePath() + ".plt");
-                DefaultExecuteResultHandler resultHandler = new DefaultExecuteResultHandler();
-                DefaultExecutor exec = new DefaultExecutor();
-                ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-                PumpStreamHandler streamHandler = new PumpStreamHandler();
-                exec.setStreamHandler(streamHandler);
-                exec.setProcessDestroyer(processDestroyer);
-                exec.setWorkingDirectory(myTempDir);
-                exec.execute(command, WinEnvironment, resultHandler);
-            } else {
-                JOptionPane.showMessageDialog(this, "<html>The file <B>gnuplot</B> does not exist.</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
-            }
-
-        } catch (IOException ex) {
-            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }//GEN-LAST:event_viewCurvesButtonActionPerformed
 
     private void runDyngraphButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runDyngraphButtonActionPerformed
         if (dyngraphExec == null || !dyngraphExec.exists()) {
@@ -4649,10 +4635,9 @@ public class StepssUI extends javax.swing.JFrame {
      * <p>The output base is per-extraction rather than the fixed
      * {@code tempGnupOut} it used to be, because several extractions can now
      * stay open in their own windows at once and each needs files the next
-     * extraction will not overwrite. viewCurvesButton and
-     * saveCurrentCurveButton no longer open that name by hand; both read
-     * {@link #lastExtractionBase}, which this method sets to the base it
-     * just built.
+     * extraction will not overwrite. saveCurrentCurveButton no longer opens
+     * that name by hand; it reads {@link #lastExtractionBase}, which this
+     * method sets to the base it just built.
      *
      * <p>Line 1 of the replay file is the trajectory's bare name
      * ({@code trajectory.getName()}, always {@code "output.trj"}), not its
@@ -4693,10 +4678,9 @@ public class StepssUI extends javax.swing.JFrame {
             return;
         }
         // Disabled before the run starts, not merely left alone: after a
-        // previous successful extraction they are enabled, and a failed
-        // re-run must not leave them pointing at a stale .plt and .cur pair
+        // previous successful extraction it is enabled, and a failed
+        // re-run must not leave it pointing at a stale .plt and .cur pair
         // that DYNGRAPH may have truncated or half-written.
-        viewCurvesButton.setEnabled(false);
         saveCurrentCurveButton.setEnabled(false);
         runDyngraphButton.setEnabled(false);
         try {
@@ -4707,8 +4691,7 @@ public class StepssUI extends javax.swing.JFrame {
                             runDyngraphButton.setEnabled(true);
                             if (exitCode == 0) {
                                 // Success is silent, exactly as today: the
-                                // result buttons light up and that is all.
-                                viewCurvesButton.setEnabled(true);
+                                // result button lights up and that is all.
                                 saveCurrentCurveButton.setEnabled(true);
                                 openCurveWindow(outputBase, selections);
                             } else {
@@ -4764,9 +4747,9 @@ public class StepssUI extends javax.swing.JFrame {
             @Override
             protected void done() {
                 try {
-                    my.stepss.curves.CurveWindow.open(StepssUI.this, get(),
+                    curveWindows.add(my.stepss.curves.CurveWindow.open(StepssUI.this, get(),
                             "Curves - " + outputBase.getName() + " - " + labels.size()
-                            + " observable(s)");
+                            + " observable(s)"));
                 } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
                 } catch (java.util.concurrent.ExecutionException failed) {
@@ -4864,6 +4847,14 @@ public class StepssUI extends javax.swing.JFrame {
                     fileTemp.delete();
                 }
                 runSimulation.setEnabled(true);
+                // The watcher thread will not get here for up to two seconds and
+                // Run is enabled now, so freeze this run's window before another
+                // run can open its own. finish() is idempotent enough for the
+                // watcher to call it again on the same window.
+                if (liveCurves != null) {
+                    liveCurves.finish();
+                    liveCurves = null;
+                }
             } else {
                 fileTemp.createNewFile();
             }
@@ -5025,6 +5016,15 @@ public class StepssUI extends javax.swing.JFrame {
     }//GEN-LAST:event_saveSimulOutputActionPerformed
 
     private void runSimulationActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runSimulationActionPerformed
+        // Captured here, not at the point of use. Small-signal analysis reaches
+        // this method with the ssa flag set (see the EIG button, which sets it
+        // and then calls this), createCommandFile writes no observable rows
+        // when it is set, and the flag is cleared further down this method
+        // before the process is launched. Testing it later therefore reads
+        // false on an SSA run and would open a live window for a run whose
+        // engine was told to write no observables, leaving it waiting for data
+        // that never arrives.
+        final boolean runtimeCurves = !ssa && anyRuntimeObservable();
         String problem = createCommandFile();
         if (problem != null) {
             banner.warn(problem);
@@ -5074,6 +5074,41 @@ public class StepssUI extends javax.swing.JFrame {
         } else {
             loadDumpTraceButton.setEnabled(false);
         }
+        my.stepss.curves.LiveCurveWindow opened = null;
+        // One window per run. Opened whenever the engine was asked for
+        // observables, even if it then writes nothing: a window that says the
+        // engine has produced no data yet is more useful than a run that
+        // silently plots nothing.
+        if (runtimeCurves) {
+            File runtimeCur = new File(myTempDir, "temp_display.cur");
+            // Delete the previous run's file before watching for this one's.
+            // The poller's first tick fires immediately while the engine is
+            // still starting up, so a stale file left in the working directory
+            // is read as though it were this run: the window would show the
+            // previous run's curves until the engine truncated the file and the
+            // reader noticed. The engine recreates it with status='replace'
+            // anyway, so removing it here costs nothing and is the difference
+            // between a clean empty window and a misleading full one.
+            if (runtimeCur.exists() && !runtimeCur.delete()) {
+                // Not fatal: the engine is about to replace it regardless. Worth
+                // one line on stderr because on Windows it means something still
+                // holds a handle to it.
+                System.err.println("Could not delete the previous run's "
+                        + runtimeCur.getName() + "; the run-time window may"
+                        + " briefly show the previous run.");
+            }
+            opened = my.stepss.curves.LiveCurveWindow.open(this, runtimeCur,
+                    "Run-time curves");
+            curveWindows.add(opened);
+        }
+        liveCurves = opened;
+        // The watcher thread below must finish THIS run's window, so it captures
+        // it here rather than reading the field later. Pressing Stop twice
+        // re-enables Run directly on the EDT without waiting for the watcher, so
+        // a second run can start and overwrite the field while the first
+        // watcher is still sleeping: reading the field then would finish the new
+        // run's window and leave the old one polling forever.
+        final my.stepss.curves.LiveCurveWindow myCurves = opened;
         (new Thread() {
             @Override
             public void run() {
@@ -5085,6 +5120,18 @@ public class StepssUI extends javax.swing.JFrame {
                     }
                 } catch (InterruptedException ex) {
                     Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                // After the lock has gone, so the engine's final flush has
+                // landed. LiveCurveWindow.finish does one last read on its own
+                // thread rather than here, and never throws, which matters
+                // because the invokeLater below is what re-enables the Run
+                // button: see the contract on finish().
+                //
+                // myCurves, not the liveCurves field. This thread belongs to one
+                // run and must finish that run's window even if another run has
+                // since replaced the field.
+                if (myCurves != null) {
+                    myCurves.finish();
                 }
                 // Marshalled rather than called straight from this thread.
                 // Swing is not thread safe and these are Swing calls; they
@@ -6786,15 +6833,29 @@ public class StepssUI extends javax.swing.JFrame {
 
     /**
      * The output base of the most recent extraction. Was a constant while one
-     * extraction at a time existed and both View curves and Save extracted
-     * curve opened tempGnupOut by name; now that each extraction keeps its own
-     * files so several windows can stay open, those two buttons act on the
-     * newest, which is what they always did.
+     * extraction at a time existed and saveCurrentCurveButton opened
+     * tempGnupOut by name; now that each extraction keeps its own files so
+     * several windows can stay open, that button acts on the newest, which is
+     * what it always did.
      */
     private File lastExtractionBase;
 
     /** How many extractions this session has run, which names their files. */
     private int extractionCount;
+
+    /**
+     * Every curve window this session has opened, live and post-analysis, so
+     * "Close all curve windows" can close them.
+     *
+     * <p>A list rather than a single reference because a new run leaves the
+     * previous run's window open as a frozen chart, which is what makes two
+     * runs comparable.
+     */
+    private final java.util.List<java.awt.Window> curveWindows =
+            new java.util.ArrayList<java.awt.Window>();
+
+    /** The window tailing the run in progress, or null between runs. */
+    private my.stepss.curves.LiveCurveWindow liveCurves;
 
     private File codegenExec = null;
     private ModelCompiler modelCompiler = null;
@@ -6990,7 +7051,6 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JLabel versionLabel;
     private javax.swing.JLabel versionLabel1;
     private javax.swing.JLabel versionLabel2;
-    private javax.swing.JButton viewCurvesButton;
     private javax.swing.JLabel webpageLabel;
     // End of variables declaration//GEN-END:variables
 
