@@ -11,7 +11,7 @@ public final class CurveSeries {
 
     /** The desc_obs-format label, as {@code Selection.label()} composes it. */
     public final String label;
-    /** The unit from the label's last parenthesised group, or "" if it has none. */
+    /** The unit from the label's first parenthesised group, or "" if it has none. */
     public final String unit;
     public final double[] t;
     public final double[] v;
@@ -39,6 +39,12 @@ public final class CurveSeries {
      * <p>The FIRST parenthesised group, not the last: "P (MW) entering at FROM
      * end" puts the unit in the middle, and no label in obstypes.f90 has a
      * second group. A label with no group, or an empty one, has no unit.
+     *
+     * <p>That first-vs-last choice is unexercised by the current label corpus:
+     * no real obstypes.f90 label carries two groups, so a label with only one
+     * cannot tell the two implementations apart. CurveHarness pins the choice
+     * with a synthetic two-group label, so a future change of mind here is a
+     * visible decision rather than a silent one.
      */
     public static String unitOf(String label) {
         int open = label.indexOf('(');

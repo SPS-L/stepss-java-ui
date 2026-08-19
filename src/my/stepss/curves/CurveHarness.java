@@ -92,6 +92,12 @@ public final class CurveHarness {
                 CurveSeries.unitOf("DCTL relay1: state"));
         check("empty parentheses mean no unit", "",
                 CurveSeries.unitOf("odd ()"));
+        // Two groups, so indexOf and lastIndexOf disagree, which makes this the
+        // case that actually pins the choice. Synthetic on purpose: no real
+        // obstypes.f90 label carries two groups, so nothing in the corpus
+        // exercises the distinction.
+        check("takes the first group when a label has two", "MW",
+                CurveSeries.unitOf("branch X: P (MW) measured at bus (HV)"));
     }
 
     /** A torn or truncated row is dropped and counted, never half-read. */
