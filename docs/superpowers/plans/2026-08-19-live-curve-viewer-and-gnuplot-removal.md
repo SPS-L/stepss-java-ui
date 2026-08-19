@@ -2202,16 +2202,51 @@ Beside `lastExtractionBase` (`:6794`):
 
 - [ ] **Step 2: Open the window at run start**
 
-In `runSimulationActionPerformed`, immediately after the `try` block that calls
-`simulExecutor.execute(...)` succeeds, that is after
-`stopSimulationButton.setEnabled(true);` and before the watcher thread:
+Two edits, and the order matters.
+
+First, at the very **top** of `runSimulationActionPerformed`, before the
+`createCommandFile()` call, capture whether this run will produce run-time
+curves:
 
 ```java
-        // One window per run, opened whether or not an observable is
-        // configured: with none, the engine writes no .cur and the window says
-        // so, which is more useful than a run that silently plots nothing.
-        if (anyRuntimeObservable()) {
+        // Captured here, not at the point of use. Small-signal analysis reaches
+        // this method with the ssa flag set (see the EIG button, which sets it
+        // and then calls this), createCommandFile writes no observable rows
+        // when it is set, and the flag is cleared further down this method
+        // before the process is launched. Testing it later therefore reads
+        // false on an SSA run and would open a live window for a run whose
+        // engine was told to write no observables, leaving it waiting for data
+        // that never arrives.
+        final boolean runtimeCurves = !ssa && anyRuntimeObservable();
+```
+
+Then, after the `try` block that calls `simulExecutor.execute(...)` succeeds,
+that is after `stopSimulationButton.setEnabled(true);` and before the watcher
+thread:
+
+```java
+        // One window per run. Opened whenever the engine was asked for
+        // observables, even if it then writes nothing: a window that says the
+        // engine has produced no data yet is more useful than a run that
+        // silently plots nothing.
+        if (runtimeCurves) {
             File runtimeCur = new File(myTempDir, "temp_display.cur");
+            // Delete the previous run's file before watching for this one's.
+            // The poller's first tick fires immediately while the engine is
+            // still starting up, so a stale file left in the working directory
+            // is read as though it were this run: the window would show the
+            // previous run's curves until the engine truncated the file and the
+            // reader noticed. The engine recreates it with status='replace'
+            // anyway, so removing it here costs nothing and is the difference
+            // between a clean empty window and a misleading full one.
+            if (runtimeCur.exists() && !runtimeCur.delete()) {
+                // Not fatal: the engine is about to replace it regardless. Worth
+                // one line on stderr because on Windows it means something still
+                // holds a handle to it.
+                System.err.println("Could not delete the previous run's "
+                        + runtimeCur.getName() + "; the run-time window may"
+                        + " briefly show the previous run.");
+            }
             liveCurves = my.stepss.curves.LiveCurveWindow.open(this, runtimeCur,
                     "Run-time curves");
             curveWindows.add(liveCurves);
