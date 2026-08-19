@@ -4748,21 +4748,39 @@ public class StepssUI extends javax.swing.JFrame {
             labels.add(selection.label());
         }
         File cur = new File(outputBase.getAbsolutePath() + ".cur");
-        try {
-            my.stepss.curves.CurveData data =
-                    my.stepss.curves.CurReader.read(cur, labels);
-            my.stepss.curves.CurveWindow.open(this, data,
-                    "Curves - " + outputBase.getName() + " - " + labels.size()
-                    + " observable(s)");
-        } catch (IOException ex) {
-            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
-            JOptionPane.showMessageDialog(this,
-                    "<html>Curves were extracted but could not be read back:<br>"
-                    + escapeHtml(String.valueOf(ex.getMessage()))
-                    + "<br><br>The file is " + escapeHtml(cur.getAbsolutePath())
-                    + "</html>",
-                    "Show curves failed", JOptionPane.ERROR_MESSAGE);
-        }
+        // Reading and parsing every row of a .cur scales with the run's
+        // length and its observable count, so it must not run on the EDT -
+        // the same rule the spec states for the live viewer's poll loop.
+        // This callback is Swing's own guarantee of running on the EDT
+        // (it is posted from DyngraphRunner.PlotListener via
+        // invokeLater), so the read runs in a SwingWorker and only the
+        // finished CurveData comes back to the EDT, in done().
+        new javax.swing.SwingWorker<my.stepss.curves.CurveData, Void>() {
+            @Override
+            protected my.stepss.curves.CurveData doInBackground() throws IOException {
+                return my.stepss.curves.CurReader.read(cur, labels);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    my.stepss.curves.CurveWindow.open(StepssUI.this, get(),
+                            "Curves - " + outputBase.getName() + " - " + labels.size()
+                            + " observable(s)");
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                } catch (java.util.concurrent.ExecutionException failed) {
+                    Throwable cause = failed.getCause();
+                    Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, cause);
+                    JOptionPane.showMessageDialog(StepssUI.this,
+                            "<html>Curves were extracted but could not be read back:<br>"
+                            + escapeHtml(String.valueOf(cause == null ? null : cause.getMessage()))
+                            + "<br><br>The file is " + escapeHtml(cur.getAbsolutePath())
+                            + "</html>",
+                            "Show curves failed", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 
     private void searchTextFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_searchTextFieldActionPerformed
