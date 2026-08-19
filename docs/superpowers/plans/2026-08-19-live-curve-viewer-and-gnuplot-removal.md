@@ -1628,10 +1628,18 @@ public final class LiveModel {
      * <p>Titles, axis captions and the identity overlay are transcribed from
      * the gnuplot script the engine used to write, stepss-ramses
      * src/io/gnuplot.f90:84-133, so a user's figures do not change meaning
-     * along with their renderer. Two things are deliberately not carried
-     * across: the {@code LAT} title's observation window, which lives in the
-     * settings file rather than the header, and the {@code TO} x caption's run
-     * of padding spaces, which was a hand-made centring hack.
+     * along with their renderer. Three deliberate departures:
+     *
+     * <ul>
+     * <li>The {@code LAT} title drops its observation window, which lives in
+     * the settings file rather than in the header.</li>
+     * <li>The {@code TO} x caption drops its run of padding spaces, which was
+     * a hand-made centring hack for a layout this does not have.</li>
+     * <li>{@code o-d} and {@code P-d} gain a title. gnuplot.f90 sets none for
+     * either, and because it never unsets one either, a phase-plane panel
+     * inherited whatever title the panel above it had set. That is a bug in
+     * the script rather than an intended blank, so it is not reproduced.</li>
+     * </ul>
      */
     public static CurveAxes axesFor(CurHeader.Obs obs, double tstop) {
         String type = obs.type.toUpperCase(Locale.ROOT);
