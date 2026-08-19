@@ -176,9 +176,15 @@ public final class CurveHarness {
     }
 
     /**
-     * Fed a headed RAMSES file, the DYNGRAPH reader must treat the seven
-     * comment lines as comments. Counting them as unreadable rows made
-     * CurveWindow's header report damage over undamaged data.
+     * Fed a headed RAMSES file, the DYNGRAPH reader must treat the comment
+     * lines as comments. Counting them as unreadable rows made CurveWindow's
+     * header report damage over undamaged data.
+     *
+     * <p>Six of them here, one per header record, because this fixture carries
+     * two observables. A real capture carries one per observable and so has
+     * seven at three observables, which is where the "seven" in the plan that
+     * specified this check came from: it described the capture rather than the
+     * fixture beneath it.
      */
     private static void toleratesRamsesCommentsAboveTheHeader() {
         CurveData headed = CurReader.parse(Arrays.asList(

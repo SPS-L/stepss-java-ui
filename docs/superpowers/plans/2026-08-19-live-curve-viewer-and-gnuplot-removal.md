@@ -342,9 +342,11 @@ And one check that the comment tolerance is real, which belongs beside the
 existing `CurReader` checks:
 
 ```java
-        // Fed a headed RAMSES file, the DYNGRAPH reader must treat the seven
+        // Fed a headed RAMSES file, the DYNGRAPH reader must treat the
         // comment lines as comments. Counting them as unreadable rows made
-        // CurveWindow's header report damage over undamaged data.
+        // CurveWindow's header report damage over undamaged data. Six of them
+        // here, one per header record, because this fixture carries two
+        // observables; the real capture has seven because it carries three.
         CurveData headed = CurReader.parse(java.util.Arrays.asList(
                 "# stepss-cur 1",
                 "# tstop      240.000",
@@ -619,7 +621,8 @@ Each mutation, one at a time, revert after each:
 2. Delete the `if (covered != ncol)` block. Expected red: "ncol disagreeing
    with the records refuses".
 3. In `CurReader.parse`, delete the `line.startsWith("#")` guard. Expected
-   red: "a clean headed file reports no damage" (7, not 0).
+   red: "a clean headed file reports no damage" (6, not 0: the fixture above
+   has six comment lines, not the real capture's seven).
 
 Record all three in the task report. If any mutation leaves the harness green,
 the check is blind and must be rewritten before the task is done.
