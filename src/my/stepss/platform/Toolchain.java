@@ -33,13 +33,13 @@ public final class Toolchain {
 
         s.add(new ToolSpec(RAMSES)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "payload/ramses-windows-x86_64-v3.76.zip", ToolSpec.Kind.ZIP,
+                "payload/ramses-windows-x86_64-v3.77.zip", ToolSpec.Kind.ZIP,
                 "ramses.exe", "dynsim.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "payload/ramses-linux-x86_64-v3.76.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/ramses-linux-x86_64-v3.77.tar.gz", ToolSpec.Kind.TGZ,
                 "ramses", "dynsim", true))
             .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
-                "payload/ramses-macos-arm64-v3.76.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/ramses-macos-arm64-v3.77.tar.gz", ToolSpec.Kind.TGZ,
                 "ramses", "dynsim", true)));
 
         s.add(new ToolSpec(HELIOS)
@@ -77,15 +77,15 @@ public final class Toolchain {
 
         s.add(new ToolSpec(URAMSES)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "payload/uramses-kit-v3.76.zip", URAMSES_DIR,
+                "payload/uramses-kit-v3.77.zip", URAMSES_DIR,
                 java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
                                         "README.md", "LICENSE.rst", "modules_wg/")))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "payload/uramses-kit-v3.76.zip", URAMSES_DIR,
+                "payload/uramses-kit-v3.77.zip", URAMSES_DIR,
                 java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
                                         "README.md", "LICENSE.rst", "modules_l/")))
             .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
-                "payload/uramses-kit-v3.76.zip", URAMSES_DIR,
+                "payload/uramses-kit-v3.77.zip", URAMSES_DIR,
                 java.util.Arrays.asList("build/", "src/", "custom_models/", "tools/",
                                         "README.md", "LICENSE.rst", "modules_m/"))));
 
