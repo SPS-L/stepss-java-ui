@@ -44,6 +44,10 @@ public final class CurveHarness {
         skipsNonNumericRows();
         skipsBlankLines();
         toleratesTheDegenerateTimeOnlyFile();
+        niceStepPicksTheOneTwoFiveLadder();
+        niceBoundsRoundOutward();
+        rendersOnePolylinePerSeries();
+        namesTheSharedUnitAndFlagsMixedOnes();
 
         if (failures > 0) {
             System.err.println(failures + " curve check(s) FAILED");
@@ -137,6 +141,74 @@ public final class CurveHarness {
                 new ArrayList<String>());
         check("no series", 0, data.series.size());
         check("no rows skipped", 0, data.skippedRows);
+    }
+
+    /** Ticks land on 1, 2 or 5 times a power of ten, never on 3.7. */
+    private static void niceStepPicksTheOneTwoFiveLadder() {
+        check("span 1 into 5", 0.2, CurvePanel.niceStep(1.0, 5));
+        // 30/5 is 6, which is above 5 on the ladder, so it rounds up to 10.
+        check("span 30 into 5", 10.0, CurvePanel.niceStep(30.0, 5));
+        check("span 0.004 into 4", 0.001, CurvePanel.niceStep(0.004, 4));
+        check("span 7000 into 5", 2000.0, CurvePanel.niceStep(7000.0, 5));
+        // A flat curve has zero span and must still yield a usable step
+        // rather than 0, which would divide by zero when placing ticks.
+        check("zero span", 1.0, CurvePanel.niceStep(0.0, 5));
+    }
+
+    private static void niceBoundsRoundOutward() {
+        double[] b = CurvePanel.niceBounds(0.83, 1.04, 0.05);
+        check("low rounds down", 0.80, round(b[0]));
+        check("high rounds up", 1.05, round(b[1]));
+        double[] flat = CurvePanel.niceBounds(1.0, 1.0, 1.0);
+        check("flat data still spans", true, flat[1] > flat[0]);
+    }
+
+    private static void rendersOnePolylinePerSeries() {
+        CurvePanel panel = new CurvePanel();
+        panel.setData(CurReader.parse(SMOKE, null, SMOKE_LABELS));
+        String svg = panel.toSvg(600, 400);
+        check("one polyline per curve", 4, count(svg, "<polyline"));
+        for (int i = 0; i < 4; i++) {
+            check("curve " + i + " wears its cycle colour", true,
+                    svg.contains("class=\"series" + i + "\""));
+        }
+        check("legend names a curve", true, svg.contains("rotor speed"));
+        check("x axis is labelled", true, svg.contains("t (s)"));
+    }
+
+    private static void namesTheSharedUnitAndFlagsMixedOnes() {
+        CurveData mixed = CurReader.parse(SMOKE, null, SMOKE_LABELS);
+        check("smoke fixture mixes pu and MW", 2, mixed.distinctUnits());
+        check("no common unit", "", mixed.commonUnit());
+        CurvePanel panel = new CurvePanel();
+        panel.setData(mixed);
+        check("mixed units are called out", true,
+                panel.toSvg(600, 400).contains("mixed units"));
+
+        List<String> pu = Arrays.asList(
+            "bus BUS1: voltage magnitude (pu)",
+            "bus BUS2: voltage magnitude (pu)");
+        CurveData same = CurReader.parse(
+                Arrays.asList(" 0.0E+000  0.1E+001  0.1E+001  ;"), null, pu);
+        check("one unit is the common one", "pu", same.commonUnit());
+        CurvePanel plain = new CurvePanel();
+        plain.setData(same);
+        check("no warning when units agree", false,
+                plain.toSvg(600, 400).contains("mixed units"));
+    }
+
+    private static double round(double value) {
+        return Math.round(value * 1e6) / 1e6;
+    }
+
+    private static int count(String haystack, String needle) {
+        int total = 0;
+        int at = haystack.indexOf(needle);
+        while (at >= 0) {
+            total++;
+            at = haystack.indexOf(needle, at + needle.length());
+        }
+        return total;
     }
 
     private static void check(String what, Object expected, Object actual) {
