@@ -1254,7 +1254,9 @@ In `bounds`, compute it and pass it:
 
 ```java
         // A titled panel needs a line for the title above the one the y unit
-        // occupies. 18px is the label row height the legend already uses.
+        // occupies. 18px because the title is drawn in the "title" class, whose
+        // PlotStyle entry is 13px, and 18 clears its ascent and descent with a
+        // little air. Not LEGEND_ROW, which is 14 and sized for 11px labels.
         double padTop = axes.title.isEmpty() ? PAD_TOP : PAD_TOP + 18.0;
         return new Bounds(x[0], x[1], y[0], y[1], xStep, yStep, width, height, padTop);
 ```
@@ -1313,12 +1315,15 @@ per-series loop so that a series carrying `w` is drawn segment by segment:
                 // only one LAT observable exists per panel, so the element
                 // count is bounded by the sample count of a single curve.
                 for (int i = 1; i < one.t.length; i++) {
-                    // The segment wears its START point's flag, matching
-                    // gnuplot's own "with lines palette", which colours a
-                    // segment from the first of its two points. Using w[i]
-                    // instead colours by the end point, which cannot produce a
-                    // latent segment at all when the equipment becomes active
-                    // on the second sample and stays active.
+                    // The segment wears its START point's flag. This is a
+                    // deliberate one-sample CORRECTION, not a reproduction:
+                    // gnuplot's "with lines palette" colours a segment by its
+                    // END point, so the engine's own figures were shifted one
+                    // sample against their own data. simul_decomp.f90 runs
+                    // update_latency after the accepted step, setting the flag
+                    // for the step to come, and only then writes the sample, so
+                    // the flag beside t(i) governs the interval after it and
+                    // holds forward, as a step plot does.
                     sink.line(xs[i - 1], ys[i - 1], xs[i], ys[i],
                             one.w[i - 1] >= 0.5 ? "active" : "latent");
                 }

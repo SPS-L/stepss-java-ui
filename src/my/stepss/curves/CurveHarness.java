@@ -443,6 +443,14 @@ public final class CurveHarness {
         int clipOpen = svg.indexOf("clip-path=\"url(#clip1)\"");
         check("the clip opens before the curves", true,
                 clipOpen >= 0 && clipOpen < curvesAt);
+        if (curvesAt < 0 || legendAt < curvesAt) {
+            // The substring below is only well formed once the three checks
+            // above hold. Returning here reports them as the failures they are,
+            // where falling through raises StringIndexOutOfBoundsException and
+            // takes the whole harness run down with it, hiding every later
+            // check behind a stack trace.
+            return;
+        }
         // Two closes between them: one for the curves group, one for the clip
         // group.
         check("the clip closes before the legend", 2,
@@ -470,7 +478,7 @@ public final class CurveHarness {
     private static void checkHeader() {
         // The real capture from a locally built engine, reproduced byte for
         // byte apart from the leading indentation of the data row.
-        List<String> real = java.util.Arrays.asList(
+        List<String> real = Arrays.asList(
                 "# stepss-cur 1",
                 "# tstop      240.000",
                 "# refresh        1.000",
@@ -501,7 +509,7 @@ public final class CurveHarness {
                 h.observables.get(1).name2);
 
         // ON and TO legitimately carry two names, space delimited, unquoted.
-        List<String> twoNames = java.util.Arrays.asList(
+        List<String> twoNames = Arrays.asList(
                 "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 2",
                 "# obs 1 2 1 ON myinj myobs");
         try {
@@ -512,7 +520,7 @@ public final class CurveHarness {
         }
 
         // A version this build does not know is a loud refusal, never a guess.
-        List<String> future = java.util.Arrays.asList(
+        List<String> future = Arrays.asList(
                 "# stepss-cur 2", "# tstop 30.000", "# refresh 1.000", "# ncol 2",
                 "# obs 1 2 1 BV 4044");
         try {
@@ -527,7 +535,7 @@ public final class CurveHarness {
 
         // No header at all is the state of every engine older than the map.
         try {
-            CurHeader.parse(java.util.Arrays.asList(
+            CurHeader.parse(Arrays.asList(
                     " 0.000000E+00  1.012404E+00 "));
             check("a headerless file refuses", "Unsupported thrown", "parsed anyway");
         } catch (CurHeader.Unsupported ex) {
@@ -539,7 +547,7 @@ public final class CurveHarness {
         // The columns the records claim must add up to what ncol states, or
         // the reader is about to draw one observable's data under another's
         // name. ncol 5 with records covering 2..5 is consistent; ncol 6 is not.
-        List<String> inconsistent = java.util.Arrays.asList(
+        List<String> inconsistent = Arrays.asList(
                 "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 6",
                 "# obs 1 2 1 BV 4044", "# obs 2 3 2 o-d g6", "# obs 3 5 1 MS g6");
         try {
@@ -635,7 +643,7 @@ public final class CurveHarness {
     }
 
     private static void checkAxes() {
-        CurveData one = new CurveData(java.util.Arrays.asList(
+        CurveData one = new CurveData(Arrays.asList(
                 new CurveSeries("V (pu)", "pu",
                         new double[] {0.0, 1.0, 2.0}, new double[] {1.0, 1.1, 0.9})),
                 null, 0);
@@ -672,6 +680,11 @@ public final class CurveHarness {
         check("the title sits above the y unit rather than on it", "true",
                 String.valueOf(textY(liveSvg, "BUS 4044")
                         < textY(liveSvg, "V (pu)")));
+        // And still inside the canvas. Without this, dropping the extra top pad
+        // puts the title's baseline at y=0 where it is invisible, and the check
+        // above still passes because 0 is less than 18.
+        check("and inside the canvas rather than clipped off the top", "true",
+                String.valueOf(textY(liveSvg, "BUS 4044") >= 12.0));
 
         // A titled panel's frame starts below PAD_TOP, so the band between
         // them is not plot area and must report nothing.
@@ -704,7 +717,7 @@ public final class CurveHarness {
 
         // LAT's second column is a 0/1 activity flag, so a segment is drawn
         // in one of exactly two classes.
-        CurveData latency = new CurveData(java.util.Arrays.asList(
+        CurveData latency = new CurveData(Arrays.asList(
                 new CurveSeries("S (MVA)", "MVA",
                         new double[] {0.0, 1.0, 2.0},
                         new double[] {10.0, 11.0, 12.0},
