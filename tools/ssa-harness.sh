@@ -11,4 +11,8 @@ if [ ! -d build/classes ]; then
     echo "build/classes not found - run 'ant compile' (or 'ant jar') first." >&2
     exit 1
 fi
-exec java -cp build/classes my.stepss.ssa.SsaHarness
+# Honour TMPDIR for the same reason tools/curve-harness.sh does: these checks
+# write fixtures into a temporary directory, and a sandboxed or containerised
+# run can have /tmp read-only while TMPDIR points somewhere writable. Without
+# this the checks fail on their fixtures rather than on anything they test.
+exec java -Djava.io.tmpdir="${TMPDIR:-/tmp}" -cp build/classes my.stepss.ssa.SsaHarness

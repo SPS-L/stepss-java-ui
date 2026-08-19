@@ -9,6 +9,7 @@ import java.awt.image.BufferedImage;
 import java.util.Locale;
 import javax.swing.JPanel;
 import javax.swing.UIManager;
+import my.stepss.plot.NiceScale;
 import my.stepss.plot.PlotSink;
 import my.stepss.plot.PlotStyle;
 import my.stepss.plot.SvgSink;
@@ -37,6 +38,7 @@ public final class CurvePanel extends JPanel {
 
     private CurveData data = new CurveData(
             new java.util.ArrayList<CurveSeries>(), null, 0);
+    private CurveAxes axes = CurveAxes.POST;
     /** The zoom window as {tLo, tHi, vLo, vHi}, or null for auto-scale. */
     private double[] zoom;
     /** Where a drag began, in device pixels, or null when not dragging. */
@@ -113,6 +115,12 @@ public final class CurvePanel extends JPanel {
         repaint();
     }
 
+    /** Replaces the frame spec and repaints. Never null. */
+    public void setAxes(CurveAxes axes) {
+        this.axes = axes;
+        repaint();
+    }
+
     public CurveData data() {
         return data;
     }
@@ -143,13 +151,35 @@ public final class CurvePanel extends JPanel {
         if (data.series.isEmpty()) {
             return null;
         }
+        Bounds b = bounds(data, getWidth(), getHeight());
+        // Against the frame's real top rather than the constant: a titled
+        // panel's frame starts lower, and the band above it is not plot area.
         if (px < PAD_LEFT || px > getWidth() - PAD_RIGHT
-                || py < PAD_TOP || py > getHeight() - PAD_BOTTOM) {
+                || py < b.padTop() || py > getHeight() - PAD_BOTTOM) {
             return null;
         }
-        Bounds b = bounds(data, getWidth(), getHeight());
-        return String.format(Locale.ROOT, "t = %.4g, value = %.6g",
-                b.t(px), b.v(py));
+        // Named from the axis spec, not hard-coded to t: the phase-plane panels
+        // put delta on x, and calling that "t" tells the reader the wrong thing
+        // about the number beside it. The post-analysis spec's "t (s)" and
+        // empty y label reduce to the "t" and "value" this always said.
+        return String.format(Locale.ROOT, "%s = %.4g, %s = %.6g",
+                shortName(axes.xLabel, "t"), b.t(px),
+                shortName(axes.yLabel, "value"), b.v(py));
+    }
+
+    /**
+     * An axis caption with its parenthesised unit dropped, for a readout that
+     * has to fit in a tooltip: "delta (pu)" reads out as "delta".
+     *
+     * @param fallback used when the caption is empty or is nothing but a unit
+     */
+    private static String shortName(String label, String fallback) {
+        if (label.isEmpty()) {
+            return fallback;
+        }
+        int paren = label.indexOf('(');
+        String name = (paren < 0 ? label : label.substring(0, paren)).trim();
+        return name.isEmpty() ? fallback : name;
     }
 
     @Override
@@ -220,12 +250,16 @@ public final class CurvePanel extends JPanel {
         sink.endGroup();
 
         sink.group("ticks");
-        for (double x = b.xLo; x <= b.xHi + b.xStep / 2.0; x += b.xStep) {
+        // Tolerance of a tick's width, not half a step. Half a step admits a
+        // tick one whole step past the axis end, which never showed while the
+        // bounds were always rounded onto the ladder and does as soon as a fixed
+        // range is used exactly: an axis to 12.5 grew a label at 15.
+        for (double x = b.xLo; x <= b.xHi + b.xStep * 1e-9; x += b.xStep) {
             double dx = b.px(x);
             sink.line(dx, b.py(b.yLo), dx, b.py(b.yLo) + TICK_LEN, "axis");
             sink.text(dx, b.py(b.yLo) + TICK_LEN + 13.0, tick(x), "middle", "label");
         }
-        for (double y = b.yLo; y <= b.yHi + b.yStep / 2.0; y += b.yStep) {
+        for (double y = b.yLo; y <= b.yHi + b.yStep * 1e-9; y += b.yStep) {
             double dy = b.py(y);
             sink.line(b.px(b.xLo) - TICK_LEN, dy, b.px(b.xLo), dy, "axis");
             sink.text(b.px(b.xLo) - TICK_LEN - 3.0, dy + 4.0, tick(y), "end", "label");
@@ -234,23 +268,42 @@ public final class CurvePanel extends JPanel {
 
         sink.group("axis-titles");
         sink.text((b.px(b.xLo) + b.px(b.xHi)) / 2.0, height - 12.0,
-                "t (s)", "middle", "label");
-        String unit = data.commonUnit();
+                axes.xLabel, "middle", "label");
+        String unit = axes.yLabel.isEmpty() ? data.commonUnit() : axes.yLabel;
         if (!unit.isEmpty()) {
-            sink.text(b.px(b.xLo), PAD_TOP - 12.0, unit, "start", "label");
+            sink.text(b.px(b.xLo), b.padTop() - 12.0, unit, "start", "label");
         } else if (data.distinctUnits() > 1) {
             // Said once, on the figure, so a flat curve is explained rather
             // than mysterious, and so the note survives into an export. The
             // remedy is to extract the groups separately, which now yields
             // one window each.
-            sink.text(b.px(b.xLo), PAD_TOP - 12.0,
+            sink.text(b.px(b.xLo), b.padTop() - 12.0,
                     "mixed units: extract separately to compare fairly",
                     "start", "label");
         }
         sink.endGroup();
 
+        if (!axes.title.isEmpty()) {
+            sink.group("title");
+            sink.text((b.px(b.xLo) + b.px(b.xHi)) / 2.0, b.padTop() - 30.0,
+                    axes.title, "middle", "title");
+            sink.endGroup();
+        }
+
         sink.clipRect(b.px(b.xLo), b.py(b.yHi),
                 b.px(b.xHi) - b.px(b.xLo), b.py(b.yLo) - b.py(b.yHi));
+        if (axes.identity) {
+            // y = x, so a user can see whether the simulation is keeping up
+            // with the wall clock. Inside the clip because the diagonal leaves
+            // the frame whenever the two axes have different extents.
+            sink.group("identity");
+            double lo = Math.max(b.xLo, b.yLo);
+            double hi = Math.min(b.xHi, b.yHi);
+            if (hi > lo) {
+                sink.dashedLine(b.px(lo), b.py(lo), b.px(hi), b.py(hi), "grid");
+            }
+            sink.endGroup();
+        }
         sink.group("curves");
         double[] xs = new double[0];
         double[] ys = new double[0];
@@ -264,20 +317,46 @@ public final class CurvePanel extends JPanel {
                 xs[i] = b.px(one.t[i]);
                 ys[i] = b.py(one.v[i]);
             }
-            sink.polyline(xs, ys, one.t.length, PlotStyle.seriesClass(s));
+            if (one.w == null) {
+                sink.polyline(xs, ys, one.t.length, PlotStyle.seriesClass(s));
+            } else {
+                // One element per segment rather than one per run, because the
+                // class can change at every step. Only LAT takes this path and
+                // only one LAT observable exists per panel, so the element
+                // count is bounded by the sample count of a single curve.
+                //
+                // Coloured by the segment's START point, which is a deliberate
+                // one-sample correction rather than a reproduction. gnuplot's
+                // "with lines palette" colours a segment by its END point, so
+                // the figures the engine used to draw were shifted one sample
+                // against their own data: simul_decomp.f90 runs update_latency
+                // after the accepted step, setting the flag for the step to
+                // come, and only then writes the sample. The flag beside t(i)
+                // therefore governs the interval that follows it and holds
+                // forward, which is what a step plot does. Sample 0 is written
+                // before the first update_latency and carries the initialised
+                // all-active flag, which is also right: the first step solves
+                // everything.
+                for (int i = 1; i < one.t.length; i++) {
+                    sink.line(xs[i - 1], ys[i - 1], xs[i], ys[i],
+                            one.w[i - 1] >= 0.5 ? "active" : "latent");
+                }
+            }
         }
         sink.endGroup();
         sink.endClip();
 
-        sink.group("legend");
-        double ly = PAD_TOP + LEGEND_ROW;
-        for (int s = 0; s < data.series.size(); s++) {
-            double lx = b.px(b.xLo) + 10.0;
-            sink.line(lx, ly - 4.0, lx + 18.0, ly - 4.0, PlotStyle.seriesClass(s));
-            sink.text(lx + 24.0, ly, data.series.get(s).label, "start", "label");
-            ly += LEGEND_ROW;
+        if (axes.legend) {
+            sink.group("legend");
+            double ly = b.padTop() + LEGEND_ROW;
+            for (int s = 0; s < data.series.size(); s++) {
+                double lx = b.px(b.xLo) + 10.0;
+                sink.line(lx, ly - 4.0, lx + 18.0, ly - 4.0, PlotStyle.seriesClass(s));
+                sink.text(lx + 24.0, ly, data.series.get(s).label, "start", "label");
+                ly += LEGEND_ROW;
+            }
+            sink.endGroup();
         }
-        sink.endGroup();
 
         if (dragTo != null) {
             sink.group("zoom-box");
@@ -289,47 +368,6 @@ public final class CurvePanel extends JPanel {
                     dragTo.x + dragTo.width, dragTo.y + dragTo.height, "axis");
             sink.endGroup();
         }
-    }
-
-    /**
-     * The next round number at or below {@code raw = span / targetTicks}, on
-     * the 1, 2, 5 times a power of ten ladder. A zero span means a flat curve,
-     * which still needs a non-zero step or the tick loop cannot advance.
-     */
-    public static double niceStep(double span, int targetTicks) {
-        if (span <= 0.0 || targetTicks <= 0) {
-            return 1.0;
-        }
-        double raw = span / targetTicks;
-        double magnitude = Math.pow(10.0, Math.floor(Math.log10(raw)));
-        double normalised = raw / magnitude;
-        double nice;
-        if (normalised <= 1.0) {
-            nice = 1.0;
-        } else if (normalised <= 2.0) {
-            nice = 2.0;
-        } else if (normalised <= 5.0) {
-            nice = 5.0;
-        } else {
-            nice = 10.0;
-        }
-        return nice * magnitude;
-    }
-
-    /**
-     * {@code lo} and {@code hi} widened outward to whole multiples of
-     * {@code step}, so every tick is a round number and the data sits inside
-     * the frame. Returns {lo, hi}; a flat range is widened by one step so the
-     * axis has an extent.
-     */
-    public static double[] niceBounds(double lo, double hi, double step) {
-        double low = Math.floor(lo / step) * step;
-        double high = Math.ceil(hi / step) * step;
-        if (high - low < step / 2.0) {
-            low -= step;
-            high += step;
-        }
-        return new double[] {low, high};
     }
 
     private Bounds bounds(CurveData data, int width, int height) {
@@ -352,17 +390,43 @@ public final class CurvePanel extends JPanel {
             vLo = 0.0;
             vHi = 1.0;
         }
+        if (axes.xFixed()) {
+            // Before the zoom, so a rubber-band zoom still overrides it: a
+            // fixed range is where the axis starts, not a refusal to look
+            // closer.
+            tLo = axes.xLo;
+            tHi = axes.xHi;
+        }
         if (zoom != null) {
             tLo = zoom[0];
             tHi = zoom[1];
             vLo = zoom[2];
             vHi = zoom[3];
         }
-        double xStep = niceStep(tHi - tLo, X_TICKS);
-        double yStep = niceStep(vHi - vLo, Y_TICKS);
-        double[] x = niceBounds(tLo, tHi, xStep);
-        double[] y = niceBounds(vLo, vHi, yStep);
-        return new Bounds(x[0], x[1], y[0], y[1], xStep, yStep, width, height);
+        double xStep = NiceScale.step(tHi - tLo, X_TICKS);
+        double yStep = NiceScale.step(vHi - vLo, Y_TICKS);
+        // A fixed x range is used exactly, not rounded outward. Rounding it made
+        // a run's last sample land short of the frame's right edge whenever the
+        // stop time was not already on the tick ladder: 12.5 s became an axis to
+        // 15, so a completed run drew to 83% of the width and read as one that
+        // stopped early. gnuplot's own "set xrange [0 : tstop]" did not round
+        // either, so this is the faithful reading as well as the useful one.
+        // Ticks still come off the ladder and simply stop before the end.
+        double[] x = axes.xFixed() && zoom == null
+                ? new double[] {tLo, tHi}
+                : NiceScale.bounds(tLo, tHi, xStep);
+        // y gets a small pad BEFORE rounding, which is what the design asks for.
+        // Without it a curve whose extent happens to equal its rounded bounds is
+        // drawn along the frame edges with half its stroke width clipped: a
+        // trace spanning exactly 0.9 to 1.0 came out on the borders.
+        double vPad = (vHi - vLo) * 0.05;
+        double[] y = NiceScale.bounds(vLo - vPad, vHi + vPad, yStep);
+        // A titled panel needs a line for the title above the one the y unit
+        // occupies. 18px because the title is drawn in the "title" class, whose
+        // PlotStyle entry is 13px, and 18 clears its ascent and descent with a
+        // little air. Not LEGEND_ROW, which is 14 and sized for 11px labels.
+        double padTop = axes.title.isEmpty() ? PAD_TOP : PAD_TOP + 18.0;
+        return new Bounds(x[0], x[1], y[0], y[1], xStep, yStep, width, height, padTop);
     }
 
     /** Short enough that neighbouring ticks do not run into each other. */
@@ -387,9 +451,10 @@ public final class CurvePanel extends JPanel {
         private final double yStep;
         private final int width;
         private final int height;
+        private final double padTop;
 
         Bounds(double xLo, double xHi, double yLo, double yHi,
-                double xStep, double yStep, int width, int height) {
+                double xStep, double yStep, int width, int height, double padTop) {
             this.xLo = xLo;
             this.xHi = xHi;
             this.yLo = yLo;
@@ -398,6 +463,11 @@ public final class CurvePanel extends JPanel {
             this.yStep = yStep;
             this.width = width;
             this.height = height;
+            this.padTop = padTop;
+        }
+
+        double padTop() {
+            return padTop;
         }
 
         double px(double t) {
@@ -409,7 +479,7 @@ public final class CurvePanel extends JPanel {
         double py(double v) {
             double span = yHi - yLo;
             double frac = span == 0.0 ? 0.0 : (v - yLo) / span;
-            return height - PAD_BOTTOM - frac * (height - PAD_TOP - PAD_BOTTOM);
+            return height - PAD_BOTTOM - frac * (height - padTop - PAD_BOTTOM);
         }
 
         /** The time at a device x. The inverse of {@link #px}. */
@@ -421,7 +491,7 @@ public final class CurvePanel extends JPanel {
 
         /** The value at a device y. The inverse of {@link #py}. */
         double v(double deviceY) {
-            double plot = height - PAD_TOP - PAD_BOTTOM;
+            double plot = height - padTop - PAD_BOTTOM;
             double frac = plot == 0.0 ? 0.0
                     : (height - PAD_BOTTOM - deviceY) / plot;
             return yLo + frac * (yHi - yLo);

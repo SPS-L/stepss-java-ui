@@ -29,16 +29,36 @@ public final class CurveSeries {
     public final double[] t;
     /** The value samples; see {@link #t} for the mutability contract. */
     public final double[] v;
+    /**
+     * An optional per-point auxiliary value, or null.
+     *
+     * <p>Only the run-time {@code LAT} display type has one: RAMSES writes a
+     * second column beside the apparent power holding a 0 or a 1 for whether
+     * the equipment was being solved at that step
+     * (simul_decomp.f90:2312-2316), and the panel shades each segment
+     * accordingly. Same length as {@link #t} when present. Same no-mutate
+     * contract as {@link #t}.
+     */
+    public final double[] w;
 
     public CurveSeries(String label, String unit, double[] t, double[] v) {
+        this(label, unit, t, v, null);
+    }
+
+    public CurveSeries(String label, String unit, double[] t, double[] v, double[] w) {
         if (t.length != v.length) {
             throw new IllegalArgumentException(
                     "t and v differ in length: " + t.length + " vs " + v.length);
+        }
+        if (w != null && w.length != t.length) {
+            throw new IllegalArgumentException(
+                    "w and t differ in length: " + w.length + " vs " + t.length);
         }
         this.label = label;
         this.unit = unit;
         this.t = t;
         this.v = v;
+        this.w = w;
     }
 
     /**

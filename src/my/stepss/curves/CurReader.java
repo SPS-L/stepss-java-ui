@@ -51,6 +51,13 @@ public final class CurReader {
             if (line.isEmpty()) {
                 continue;
             }
+            // A comment, not a row. DYNGRAPH writes none, but RAMSES writes
+            // seven at the top of its own .cur and both files live in the same
+            // working directory. Counting them as unreadable rows reported
+            // damage over undamaged data.
+            if (line.startsWith("#")) {
+                continue;
+            }
             // The row terminator, not a field. Written unconditionally by
             // extract.f90, including on the degenerate time-only file.
             if (line.endsWith(";")) {

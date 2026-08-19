@@ -11,4 +11,8 @@ if [ ! -d build/classes ]; then
     echo "build/classes not found - run 'ant compile' (or 'ant jar') first." >&2
     exit 1
 fi
-exec java -cp build/classes my.stepss.curves.CurveHarness
+# The tail checks create a temporary directory, so honour TMPDIR rather than
+# taking java.io.tmpdir's /tmp default: a sandboxed or containerised run can
+# have /tmp read-only while TMPDIR points somewhere writable, and there the
+# checks fail on their fixtures rather than on anything they are testing.
+exec java -Djava.io.tmpdir="${TMPDIR:-/tmp}" -cp build/classes my.stepss.curves.CurveHarness

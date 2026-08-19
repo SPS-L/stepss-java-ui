@@ -36,8 +36,6 @@
                                           <Component id="showKLULicenseButton" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
                                           <Component id="showApacheLicenseButton" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                                          <Component id="showGnupCopyrightButton" min="-2" max="-2" attributes="0"/>
                                       </Group>
                                       <Component id="versionLabel1" alignment="0" min="-2" max="-2" attributes="0"/>
                                   </Group>
@@ -86,7 +84,6 @@
                   <Component id="versionLabel1" min="-2" max="-2" attributes="0"/>
                   <EmptySpace type="separate" max="-2" attributes="0"/>
                   <Group type="103" groupAlignment="3" attributes="0">
-                      <Component id="showGnupCopyrightButton" alignment="3" max="-2" attributes="0"/>
                       <Component id="showApacheLicenseButton" alignment="3" max="-2" attributes="0"/>
                       <Component id="showKLULicenseButton" alignment="3" max="-2" attributes="0"/>
                   </Group>
@@ -115,20 +112,11 @@
         </Component>
         <Component class="javax.swing.JLabel" name="webpageLabel">
           <Properties>
-            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Webpage:&lt;/b&gt; &lt;a href=&quot;https://stepss.sps-lab.org/&quot;&gt;https://stepss.sps-lab.org/&lt;/a&gt; &lt;/html&gt;"/>
+            <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Webpage:&lt;/b&gt; &lt;a href=&quot;https://stepss.sps-lab.org/&quot;&gt;https://stepss.sps-lab.org/&lt;/a&gt;&lt;/html&gt;"/>
             <Property name="name" type="java.lang.String" value="webpageLabel" noResource="true"/>
           </Properties>
           <Events>
             <EventHandler event="mouseClicked" listener="java.awt.event.MouseListener" parameters="java.awt.event.MouseEvent" handler="webpageLabelMouseClicked"/>
-          </Events>
-        </Component>
-        <Component class="javax.swing.JButton" name="showGnupCopyrightButton">
-          <Properties>
-            <Property name="text" type="java.lang.String" value="Gnuplot"/>
-            <Property name="name" type="java.lang.String" value="showGnupCopyrightButton" noResource="true"/>
-          </Properties>
-          <Events>
-            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="showGnupCopyrightButtonActionPerformed"/>
           </Events>
         </Component>
         <Component class="javax.swing.JButton" name="showApacheLicenseButton">
@@ -333,16 +321,16 @@
                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="openTermButtonActionPerformed"/>
               </Events>
             </MenuItem>
-            <MenuItem class="javax.swing.JMenuItem" name="killAllGnupMenuItem">
+            <MenuItem class="javax.swing.JMenuItem" name="closeCurveWindowsMenuItem">
               <Properties>
                 <Property name="accelerator" type="javax.swing.KeyStroke" editor="org.netbeans.modules.form.editors.KeyStrokeEditor">
                   <KeyStroke key="Ctrl+G"/>
                 </Property>
-                <Property name="text" type="java.lang.String" value="Clear all gnuplot instances"/>
-                <Property name="name" type="java.lang.String" value="killAllGnupMenuItem" noResource="true"/>
+                <Property name="text" type="java.lang.String" value="Close all curve windows"/>
+                <Property name="name" type="java.lang.String" value="closeCurveWindowsMenuItem" noResource="true"/>
               </Properties>
               <Events>
-                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="killAllGnupMenuItemActionPerformed"/>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="closeCurveWindowsMenuItemActionPerformed"/>
               </Events>
             </MenuItem>
           </SubComponents>
@@ -865,7 +853,7 @@
                 </Component>
                 <Component class="javax.swing.JLabel" name="jLabel9">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Disturbance file&lt;/b&gt; (required)&lt;/html&gt;"/>
+                    <Property name="text" type="java.lang.String" value="&lt;html&gt;&lt;b&gt;Disturbance file&lt;/b&gt; (optional)&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="jLabel9" noResource="true"/>
                   </Properties>
                 </Component>
@@ -1195,7 +1183,7 @@
                 </Component>
                 <Component class="javax.swing.JTextField" name="runtimeObsName">
                   <Properties>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Here you clarify the name of the equipment you want to observe. For example:&lt;br&gt;&#xa;1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.&lt;br&gt;&#xa;2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.&lt;br&gt;&#xa;3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.&lt;br&gt;&#xa;4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.&lt;br&gt;&lt;br&gt;&#xa;Additionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / &lt;br&gt;&#xa;Such commands might be:&lt;br&gt;&lt;br&gt;&#xa;set yrange[0.9:1.1]&lt;br&gt;&lt;br&gt;&#xa;which will set the range of the y-axes between these values.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Here you clarify the name of the equipment you want to observe. For example:&lt;br&gt;&#xa;1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.&lt;br&gt;&#xa;2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.&lt;br&gt;&#xa;3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.&lt;br&gt;&#xa;4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="runtimeObsName" noResource="true"/>
                   </Properties>
                 </Component>
@@ -1236,7 +1224,7 @@
                 </Component>
                 <Component class="javax.swing.JTextField" name="runtimeObsName1">
                   <Properties>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Here you clarify the name of the equipment you want to observe. For example:&lt;br&gt;&#xa;1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.&lt;br&gt;&#xa;2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.&lt;br&gt;&#xa;3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.&lt;br&gt;&#xa;4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.&lt;br&gt;&lt;br&gt;&#xa;Additionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / &lt;br&gt;&#xa;Such commands might be:&lt;br&gt;&lt;br&gt;&#xa;set yrange[0.9:1.1]&lt;br&gt;&lt;br&gt;&#xa;which will set the range of the y-axes between these values.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Here you clarify the name of the equipment you want to observe. For example:&lt;br&gt;&#xa;1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.&lt;br&gt;&#xa;2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.&lt;br&gt;&#xa;3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.&lt;br&gt;&#xa;4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="runtimeObsName1" noResource="true"/>
                   </Properties>
                 </Component>
@@ -1248,7 +1236,7 @@
                 </Component>
                 <Component class="javax.swing.JTextField" name="runtimeObsName2">
                   <Properties>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Here you clarify the name of the equipment you want to observe. For example:&lt;br&gt;&#xa;1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.&lt;br&gt;&#xa;2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.&lt;br&gt;&#xa;3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.&lt;br&gt;&#xa;4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.&lt;br&gt;&lt;br&gt;&#xa;Additionally you can pass extra commands to gnuplot in order to fine-tune the output. These commands must follow the name of the equipment and should be separated with / &lt;br&gt;&#xa;Such commands might be:&lt;br&gt;&lt;br&gt;&#xa;set yrange[0.9:1.1]&lt;br&gt;&lt;br&gt;&#xa;which will set the range of the y-axes between these values.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Here you clarify the name of the equipment you want to observe. For example:&lt;br&gt;&#xa;1) if you selected Bus Voltage as the type of observable, here you should put the name of the bus.&lt;br&gt;&#xa;2) if you selected Machine Speed or Center of Inertia as the type of observable, here you should put the name of the synchronous machine.&lt;br&gt;&#xa;3) if you selected Wall Time as the type of observable, here you should put RT, as it will plot wall time VS Simulation time.&lt;br&gt;&#xa;4) if you selected Injector Observable or Two-port injector Observable, put two names: the equipment, then the observable within its model, separated by a space.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="runtimeObsName2" noResource="true"/>
                   </Properties>
                 </Component>
@@ -1668,14 +1656,8 @@
                               </Group>
                               <Group type="102" attributes="0">
                                   <Group type="103" groupAlignment="0" attributes="0">
-                                      <Group type="102" alignment="0" attributes="0">
-                                          <Component id="runDyngraphButton" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                                          <Component id="viewCurvesButton" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace max="-2" attributes="0"/>
-                                          <Component id="saveCurrentCurveButton" min="-2" max="-2" attributes="0"/>
-                                      </Group>
-                                      <Component id="clearGnuplotButton" alignment="0" min="-2" max="-2" attributes="0"/>
+                                      <Component id="runDyngraphButton" alignment="0" min="-2" max="-2" attributes="0"/>
+                                      <Component id="closeCurveWindowsButton" alignment="0" min="-2" max="-2" attributes="0"/>
                                       <Group type="102" alignment="0" attributes="0">
                                           <Component id="saveTrajToFileButton" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace max="-2" attributes="0"/>
@@ -1727,13 +1709,9 @@
                               <Component id="loadTrajToFileButton" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace min="-2" pref="12" max="-2" attributes="0"/>
-                          <Group type="103" groupAlignment="3" attributes="0">
-                              <Component id="saveCurrentCurveButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                              <Component id="viewCurvesButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                              <Component id="runDyngraphButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                          </Group>
+                          <Component id="runDyngraphButton" min="-2" max="-2" attributes="0"/>
                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                          <Component id="clearGnuplotButton" min="-2" max="-2" attributes="0"/>
+                          <Component id="closeCurveWindowsButton" min="-2" max="-2" attributes="0"/>
                           <EmptySpace type="separate" max="-2" attributes="0"/>
                           <Component id="jLabel8" min="-2" max="-2" attributes="0"/>
                           <EmptySpace type="separate" max="-2" attributes="0"/>
@@ -1777,17 +1755,6 @@
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="runDyngraphButtonActionPerformed"/>
                   </Events>
                 </Component>
-                <Component class="javax.swing.JButton" name="viewCurvesButton">
-                  <Properties>
-                    <Property name="text" type="java.lang.String" value="Preview curve"/>
-                    <Property name="toolTipText" type="java.lang.String" value="Click to preview the last extracted curve."/>
-                    <Property name="enabled" type="boolean" value="false"/>
-                    <Property name="name" type="java.lang.String" value="viewCurvesButton" noResource="true"/>
-                  </Properties>
-                  <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="viewCurvesButtonActionPerformed"/>
-                  </Events>
-                </Component>
                 <Component class="javax.swing.JButton" name="saveTrajToFileButton">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Save current trajectory"/>
@@ -1799,25 +1766,14 @@
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="saveTrajToFileButtonActionPerformed"/>
                   </Events>
                 </Component>
-                <Component class="javax.swing.JButton" name="clearGnuplotButton">
+                <Component class="javax.swing.JButton" name="closeCurveWindowsButton">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="Clear all gnuplot instances"/>
-                    <Property name="toolTipText" type="java.lang.String" value="Kills all instances of Gnuplot."/>
-                    <Property name="name" type="java.lang.String" value="clearGnuplotButton" noResource="true"/>
+                    <Property name="text" type="java.lang.String" value="Close all curve windows"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Closes every run-time and extracted-curve window this session opened."/>
+                    <Property name="name" type="java.lang.String" value="closeCurveWindowsButton" noResource="true"/>
                   </Properties>
                   <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="clearGnuplotButtonActionPerformed"/>
-                  </Events>
-                </Component>
-                <Component class="javax.swing.JButton" name="saveCurrentCurveButton">
-                  <Properties>
-                    <Property name="text" type="java.lang.String" value="Save extracted curve"/>
-                    <Property name="toolTipText" type="java.lang.String" value="Save the extracted plots."/>
-                    <Property name="enabled" type="boolean" value="false"/>
-                    <Property name="name" type="java.lang.String" value="saveCurrentCurveButton" noResource="true"/>
-                  </Properties>
-                  <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="saveCurrentCurveButtonActionPerformed"/>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="closeCurveWindowsButtonActionPerformed"/>
                   </Events>
                 </Component>
                 <Component class="javax.swing.JButton" name="loadTrajToFileButton">

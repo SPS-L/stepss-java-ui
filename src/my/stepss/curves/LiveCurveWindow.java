@@ -1,0 +1,554 @@
+package my.stepss.curves;
+
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.GridLayout;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import javax.swing.BorderFactory;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+
+/**
+ * Run-time observables, drawn as the engine writes them.
+ *
+ * <p>The engine no longer plots: it writes {@code temp_display.cur} and
+ * flushes on the {@code $GP_REFRESH_RATE} cadence. This tails that file on a
+ * scheduled thread, parses there, and hands the EDT finished snapshots.
+ *
+ * <p>One window per run. A new run opens a new one and leaves the previous one
+ * behind as a static chart, which is what makes two runs comparable. At the end
+ * of a run the window stops polling and stays open: the live view becomes the
+ * post-run view of the same observables.
+ */
+public final class LiveCurveWindow extends JFrame {
+
+    /** Never poll faster than this, whatever the settings file says. */
+    private static final long MIN_POLL_MS = 100L;
+    /**
+     * The cadence before a header has been read, which is also the engine's own
+     * {@code $GP_REFRESH_RATE} default.
+     */
+    private static final long DEFAULT_POLL_MS = 1000L;
+    /**
+     * Never poll slower than this, whatever the settings file says.
+     *
+     * <p>A user who reads "refresh rate" as milliseconds and writes 1000 would
+     * otherwise get one poll every seventeen minutes and a live view that looks
+     * broken. Capping is a better answer than believing the file: the engine is
+     * flushing far more often than any sane cap, so an over-frequent poll costs
+     * nothing while an under-frequent one loses the feature.
+     */
+    private static final long MAX_POLL_MS = 60_000L;
+    /** Appended to the window title once the run has ended. */
+    private static final String FINISHED = " (finished)";
+
+    private final File cur;
+    private final CurTail tail;
+    private final JPanel stack = new JPanel();
+    private final JLabel status = new JLabel(" ");
+    private final List<CurvePanel> panels = new ArrayList<CurvePanel>();
+    /**
+     * The snapshots the EDT was last handed, kept so an export reads finished
+     * immutable data instead of reaching back into the poller's live buffers.
+     * EDT-only, like {@link #panels}.
+     */
+    private final List<CurveData> published = new ArrayList<CurveData>();
+    /** Panel titles, captured on the EDT when the panels are built. */
+    private final List<String> titles = new ArrayList<String>();
+    private final ScheduledExecutorService poller = Executors.newSingleThreadScheduledExecutor(
+            runnable -> {
+                Thread t = new Thread(runnable, "live-curve-poller");
+                t.setDaemon(true);
+                return t;
+            });
+    /**
+     * The parsed header and its buffers, or null before one has been read and
+     * again after a truncation discards it.
+     *
+     * <p>Volatile because the poller thread assigns it and the EDT reads it in
+     * {@link #buildPanels()} and {@link #publish}. It is safely published today
+     * even without this, because every EDT read happens inside a task posted
+     * after the write, but that property is invisible at the declaration and the
+     * first reader arriving by another route would break it silently.
+     */
+    private volatile LiveModel model;
+    private String refusal;
+    private int emptyPolls;
+    private boolean built;
+    private boolean stopped;
+    /**
+     * Set by {@link #finish()} so the last tick stops waiting for more header.
+     *
+     * <p>Waiting is right while the engine might still be writing. Once it has
+     * exited there is no more coming, so a header that still will not parse is
+     * a verdict rather than a race, and the user is owed the reason.
+     */
+    private boolean lastTick;
+    /**
+     * Lines read before the header could be parsed.
+     *
+     * <p>The engine issues the header as several separate Fortran writes and
+     * flushes once at the end, so a poll can land on a file holding only part
+     * of it. Deciding from one batch would let a startup race present as
+     * "this engine wrote no run-time header", which accuses the user of
+     * running an old engine. Lines accumulate here until something proves the
+     * header complete, and the data rows among them are replayed once it is.
+     */
+    private final List<String> pending = new ArrayList<String>();
+
+    /**
+     * @param cur the run's temp_display.cur, which need not exist yet
+     * @return the window, so the caller can tell it the run has ended
+     */
+    public static LiveCurveWindow open(Component parent, File cur, String title) {
+        LiveCurveWindow window = new LiveCurveWindow(cur, title);
+        my.stepss.WindowCascade.track(window, parent);
+        window.setVisible(true);
+        window.start();
+        return window;
+    }
+
+    private LiveCurveWindow(File cur, String title) {
+        super(title);
+        this.cur = cur;
+        this.tail = new CurTail(cur);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        setLayout(new BorderLayout());
+        stack.setLayout(new GridLayout(0, 1));
+        status.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        add(stack, BorderLayout.CENTER);
+        add(toolbar(), BorderLayout.NORTH);
+        add(status, BorderLayout.SOUTH);
+        setSize(720, 560);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosed(java.awt.event.WindowEvent event) {
+                poller.shutdownNow();
+            }
+        });
+    }
+
+    /**
+     * PNG and CSV of whatever is on screen.
+     *
+     * <p>Not decoration: {@code o-d}, {@code P-d} and {@code LAT} are run-time
+     * display types with no DYNGRAPH equivalent, so without this there is no
+     * route at all for getting a phase-plane trajectory or a latency trace out
+     * of STEPSS. The post-analysis window's own exports do not help, because
+     * they only ever show what DYNGRAPH could extract.
+     *
+     * <p>No SVG here, deliberately. {@link my.stepss.plot.SvgSink} emits a whole
+     * document in one panel's coordinate space, so stacking several would mean
+     * composing documents, which is real work and belongs with a sink that
+     * understands panels rather than being improvised here.
+     */
+    private javax.swing.JPanel toolbar() {
+        javax.swing.JPanel bar = new javax.swing.JPanel();
+        javax.swing.JButton png = new javax.swing.JButton("Save PNG...");
+        png.addActionListener(event -> savePng());
+        javax.swing.JButton csv = new javax.swing.JButton("Save CSV...");
+        csv.addActionListener(event -> saveCsv());
+        bar.add(png);
+        bar.add(csv);
+        return bar;
+    }
+
+    /**
+     * The panels one under another, each drawn through the same export path the
+     * post-analysis window uses, so a saved figure is on the light ground
+     * whatever theme the application is wearing.
+     */
+    private void savePng() {
+        if (panels.isEmpty()) {
+            return;
+        }
+        int width = Math.max(stack.getWidth(), 800);
+        int height = Math.max(panels.get(0).getHeight(), 260);
+        java.awt.image.BufferedImage sheet = new java.awt.image.BufferedImage(
+                width, height * panels.size(),
+                java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D g = sheet.createGraphics();
+        try {
+            for (int i = 0; i < panels.size(); i++) {
+                g.drawImage(panels.get(i).toPng(width, height), 0, i * height, null);
+            }
+        } finally {
+            g.dispose();
+        }
+        File target = chooseTarget("png");
+        if (target == null) {
+            return;
+        }
+        try {
+            javax.imageio.ImageIO.write(sheet, "png", target);
+        } catch (IOException ex) {
+            failed(target, ex);
+        }
+    }
+
+    /**
+     * Every panel's samples in one file, one block per observable.
+     *
+     * <p>One file rather than one per panel because the panels share a run, and
+     * blocks rather than columns because a phase-plane panel's x is delta while
+     * a time series panel's x is t, so there is no shared first column to key
+     * them on.
+     */
+    private void saveCsv() {
+        // From what the EDT was last handed, NOT from LiveModel.snapshot(). This
+        // runs on the EDT, and snapshot() reads the growable buffers the poller
+        // thread appends to: calling it here would race a copyOf against a grow
+        // and could write a column of trailing zeros into the user's file. The
+        // published snapshots are already immutable and already on this thread.
+        if (published.isEmpty()) {
+            return;
+        }
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < published.size(); i++) {
+            if (i > 0) {
+                text.append('\n');
+            }
+            String title = i < titles.size() ? titles.get(i) : "";
+            text.append("# ").append(title.isEmpty()
+                    ? "observable " + (i + 1) : title).append('\n');
+            text.append(CurveWindow.toCsv(published.get(i)));
+        }
+        File target = chooseTarget("csv");
+        if (target == null) {
+            return;
+        }
+        try {
+            java.nio.file.Files.write(target.toPath(),
+                    text.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            failed(target, ex);
+        }
+    }
+
+    private File chooseTarget(String extension) {
+        javax.swing.JFileChooser chooser =
+                new javax.swing.JFileChooser(cur.getParentFile());
+        chooser.setDialogTitle("Save run-time curves as " + extension.toUpperCase(
+                java.util.Locale.ROOT));
+        chooser.setSelectedFile(new File("runtime-curves." + extension));
+        if (chooser.showSaveDialog(this) != javax.swing.JFileChooser.APPROVE_OPTION) {
+            return null;
+        }
+        File target = chooser.getSelectedFile();
+        if (!target.getName().toLowerCase(java.util.Locale.ROOT)
+                .endsWith("." + extension)) {
+            target = new File(target.getParentFile(),
+                    target.getName() + "." + extension);
+        }
+        return target;
+    }
+
+    private void failed(File target, IOException ex) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+                "Could not write " + target + "\n\n" + ex.getMessage(),
+                "Save run-time curves", javax.swing.JOptionPane.ERROR_MESSAGE);
+    }
+
+    /** The poll period for a header refresh rate in seconds. */
+    static long pollMillis(double refreshSeconds) {
+        long ms = Math.round(refreshSeconds * 1000.0);
+        return Math.min(MAX_POLL_MS, Math.max(MIN_POLL_MS, ms));
+    }
+
+    /**
+     * Whether a failed header parse over {@code seen} is a verdict or just
+     * impatience.
+     *
+     * <p>The header is contiguous and comes first, so any line that is neither
+     * blank nor a comment proves no more header is coming and a failure is
+     * real. Until one arrives, a failure means the poll landed between the
+     * engine's header writes and its single flush, which is a race rather than
+     * a fault and must not be reported as an unsupported engine.
+     *
+     * <p>Package-private and static so it can be checked without a file, a
+     * poller or a display.
+     */
+    static boolean headerFailureIsFinal(List<String> seen) {
+        for (String line : seen) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void start() {
+        // Zero delay for the first read; every poll then schedules the next one
+        // itself, at the cadence the header asks for. See pump().
+        poller.schedule(this::pump, 0L, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * One poll, then the next scheduled at the interval the header asks for.
+     *
+     * <p>A self-rescheduling one-shot chain rather than
+     * {@code scheduleWithFixedDelay} plus a cancel. The interval is only known
+     * once the header has been read, and re-scheduling a fixed-delay task from
+     * inside its own run needs a handle that the scheduling call has not yet
+     * returned: the first poll fires at zero delay, so it can beat the
+     * assignment of that handle, find it null, and skip the reschedule for the
+     * life of the window. A user's {@code $GP_REFRESH_RATE} would then be
+     * silently ignored, some of the time, depending on how fast the engine
+     * wrote its header. Deciding the next delay at the end of each poll needs
+     * no handle at all, so the race has nowhere to live.
+     */
+    private void pump() {
+        if (stopped) {
+            return;
+        }
+        try {
+            tick();
+        } catch (Throwable fatal) {
+            // tick() catches IOException and RuntimeException itself, so this can
+            // only be an Error. Caught anyway rather than left to end the chain
+            // in silence: the reachable instance is heap exhaustion from the
+            // per-poll history copy on a very long real-time run, and a frozen
+            // window with no message is the worst way to learn that. Say so and
+            // stop, rather than rescheduling straight back into it.
+            refuse("Run-time curves stopped: " + fatal);
+            return;
+        }
+        if (stopped || refusal != null) {
+            // finish() and refuse() both end the chain: there is nothing more to
+            // read, and refuse() has already shut the poller down.
+            return;
+        }
+        LiveModel current = model;
+        long next = current == null
+                ? DEFAULT_POLL_MS : pollMillis(current.refresh());
+        try {
+            poller.schedule(this::pump, next, TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.RejectedExecutionException windowClosed) {
+            // Closed between the poll above and here. Nothing left to schedule.
+        }
+    }
+
+    /**
+     * Stops polling after one last read, and leaves the window open.
+     *
+     * <p>The final read happens after the process has exited so the last flush
+     * lands: the engine writes up to the stop time and flushes on exit, and a
+     * poller shut down on the exit signal alone loses whatever arrived since
+     * the previous tick.
+     */
+    public void finish() {
+        // Never throws, and that is load-bearing rather than defensive habit.
+        // Closing the window shuts the poller down, so a user who closes the
+        // live view before the run ends leaves this executor terminated. The
+        // caller is the run watcher thread, which calls this and then re-enables
+        // the Run button through invokeLater: a RejectedExecutionException here
+        // would kill that thread before it got there and leave the button
+        // disabled for the rest of the session, with no error a user could act
+        // on. The isShutdown check handles the common case and the catch handles
+        // losing the race with a close, because the two cannot be made atomic.
+        if (poller.isShutdown()) {
+            return;
+        }
+        try {
+            poller.execute(() -> {
+                lastTick = true;
+                // A bug inside tick() must not abort before the poller is
+                // marked stopped and shut down: the finally is what makes that
+                // a guarantee rather than something that merely usually holds.
+                try {
+                    tick();
+                    SwingUtilities.invokeLater(this::markFinished);
+                } finally {
+                    stopped = true;
+                    poller.shutdown();
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException windowClosed) {
+            // The window went away between the check above and this call. There
+            // is nothing left to read and nothing left to freeze.
+        }
+    }
+
+    /**
+     * One poll, on the poller thread. Never touches Swing except through
+     * {@code invokeLater}.
+     */
+    private void tick() {
+        if (stopped || refusal != null) {
+            return;
+        }
+        try {
+            List<String> lines = tail.poll();
+            if (tail.truncatedSinceLastPoll()) {
+                // status='replace' from a re-run in the same directory. The
+                // header is about to arrive again, so throw the old run away
+                // rather than drawing the two on one axis.
+                pending.clear();
+                // The whole header, not just the buffers: the new run writes its
+                // own, and a kept header maps the new run's columns through the
+                // old observable list. accept() discards # lines, so nothing
+                // else would ever notice.
+                model = null;
+                emptyPolls = 0;
+                SwingUtilities.invokeLater(this::discardPanels);
+            }
+            // On the last tick, buffered header lines with no model must still
+            // reach the parse attempt below: that is what lets a header that
+            // never completed be reported with the engine's own message
+            // instead of leaving the window blank forever.
+            if (lines.isEmpty() && !(lastTick && model == null && !pending.isEmpty())) {
+                if (model == null && ++emptyPolls == 5) {
+                    say("The engine has not written any run-time observable data yet.");
+                }
+                return;
+            }
+            if (model == null) {
+                pending.addAll(lines);
+                try {
+                    model = new LiveModel(CurHeader.parse(pending));
+                } catch (CurHeader.Unsupported unsupported) {
+                    // Before the first data row this means "the header is not
+                    // all here yet", which is a startup race rather than a
+                    // fault: the engine issues the header as several writes and
+                    // flushes once at the end. Refusing here would tell the
+                    // user their engine is too old on the strength of a poll
+                    // that landed mid-write. After a data row there is no more
+                    // header coming, so the same failure is real. Once the
+                    // engine has exited (lastTick), there is no more header
+                    // coming either, whatever the lines look like, and the
+                    // user is owed the engine's own explanation rather than a
+                    // window that stays blank forever.
+                    if (lastTick || headerFailureIsFinal(pending)) {
+                        refuse(unsupported.getMessage());
+                    }
+                    return;
+                }
+                SwingUtilities.invokeLater(this::buildPanels);
+                // The data rows that arrived while the header was still
+                // incomplete, replayed in order so nothing is lost.
+                lines = new ArrayList<String>(pending);
+                pending.clear();
+            }
+            model.accept(lines);
+            final List<CurveData> snapshots = new ArrayList<CurveData>();
+            for (int i = 0; i < model.panelCount(); i++) {
+                snapshots.add(model.snapshot(i));
+            }
+            final int samples = model.samples();
+            final int skipped = model.skippedRows();
+            SwingUtilities.invokeLater(() -> publish(snapshots, samples, skipped));
+        } catch (IOException ex) {
+            refuse("temp_display.cur could not be read: " + ex.getMessage());
+        } catch (RuntimeException ex) {
+            // An unchecked throw out of here would end the poll chain, since
+            // pump() only schedules a successor on the paths that fall through,
+            // and the window would freeze on its last snapshot with nothing
+            // said. A bug here must be visible, not quiet.
+            refuse("Run-time curves stopped: " + ex);
+        }
+    }
+
+    /** On the EDT: one panel per observable, once the header is known. */
+    private void buildPanels() {
+        if (built) {
+            return;
+        }
+        // Read the field ONCE, and tolerate null. This runs on the EDT after
+        // being posted from the poller, and a truncation on a later poll sets
+        // model back to null: a buildPanels still queued from the discarded run
+        // would then dereference null. Reachable whenever the EDT is busy for
+        // longer than one poll interval, which MIN_POLL_MS allows to be 100 ms.
+        // Returning without setting built lets the next header build its panels.
+        LiveModel current = model;
+        if (current == null) {
+            built = false;
+            return;
+        }
+        built = true;
+        for (int i = 0; i < current.panelCount(); i++) {
+            CurvePanel panel = new CurvePanel();
+            panel.setAxes(current.axesOf(i));
+            panels.add(panel);
+            titles.add(current.axesOf(i).title);
+            stack.add(panel);
+        }
+        stack.revalidate();
+        stack.repaint();
+    }
+
+    /**
+     * On the EDT: say once that this run has ended.
+     *
+     * <p>Idempotent because {@code finish()} is legitimately called twice: the
+     * Stop button freezes the window immediately and the run watcher thread
+     * calls it again up to two seconds later. Appending unconditionally gave
+     * "Run-time curves (finished) (finished)".
+     */
+    private void markFinished() {
+        if (!getTitle().endsWith(FINISHED)) {
+            setTitle(getTitle() + FINISHED);
+        }
+    }
+
+    /** On the EDT: drop the panels so the next header builds its own. */
+    private void discardPanels() {
+        built = false;
+        panels.clear();
+        titles.clear();
+        published.clear();
+        stack.removeAll();
+        stack.revalidate();
+        stack.repaint();
+    }
+
+    /** On the EDT: the snapshots the poller finished. */
+    private void publish(List<CurveData> snapshots, int samples, int skipped) {
+        buildPanels();
+        for (int i = 0; i < panels.size() && i < snapshots.size(); i++) {
+            panels.get(i).setData(snapshots.get(i));
+        }
+        published.clear();
+        published.addAll(snapshots);
+        StringBuilder text = new StringBuilder();
+        text.append(samples).append(" samples");
+        // Once, at the end of the line, rather than a per-row storm: a torn
+        // last line is normal and would otherwise warn every second.
+        if (skipped > 0) {
+            text.append("    ").append(skipped).append(" unreadable row(s) skipped");
+        }
+        status.setText(text.toString());
+    }
+
+    private void refuse(String why) {
+        refusal = why;
+        SwingUtilities.invokeLater(() -> {
+            stack.removeAll();
+            JLabel message = new JLabel("<html><body style='width:420px'>"
+                    + escape(why) + "</body></html>");
+            message.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+            message.setVerticalAlignment(javax.swing.SwingConstants.TOP);
+            stack.add(message);
+            stack.revalidate();
+            stack.repaint();
+            status.setText(cur.getAbsolutePath());
+        });
+        poller.shutdown();
+    }
+
+    private void say(String text) {
+        SwingUtilities.invokeLater(() -> status.setText(text));
+    }
+
+    private static String escape(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+}

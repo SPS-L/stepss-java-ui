@@ -505,17 +505,9 @@
        Only RAMSES is affected; helios, dyngraph and CODEGEN are all statically
        linked. libc6 and libgcc-s1 are already detected from the JRE, but
        libgcc-s1 is named here anyway rather than relied on, because that
-       detection is about the runtime and this line is about the engine.
-
-       gnuplot is the odd one out: nothing links against it, Toolchain.gnuplot()
-       resolves it from PATH on Linux, and real-time plotting and View Curves
-       both shell out to it. Not plain `gnuplot`, which is a metapackage that
-       gnuplot-nox satisfies through Provides: - a terminal-less build that
-       installs cleanly and then draws nothing. getting-started/installation.mdx
-       names gnuplot-x11, so an alternation of the two interactive builds is
-       what that documented instruction means as a dependency. -->
+       detection is about the runtime and this line is about the engine. -->
   <property name="bundle.linux.deps"
-            value="libgfortran5, libgomp1, libopenblas0, libgcc-s1, gnuplot-x11 | gnuplot-qt"/>
+            value="libgfortran5, libgomp1, libopenblas0, libgcc-s1"/>
   <condition property="bundle.platform.args"
              value="--linux-shortcut --linux-menu-group Science --linux-package-name stepss --linux-app-category science --linux-package-deps '${bundle.linux.deps}'">
    <os family="unix"/>

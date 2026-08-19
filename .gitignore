@@ -1,5 +1,9 @@
 # Local Claude Code / MCP configuration
 /.claude/
+# Unanchored too: the leading slash above matches only a .claude at the
+# repository root, and a nested src/my/stepss/.claude/ was slipping past
+# it and into the built jar as a resource.
+.claude/
 .mcp.json
 /.superpowers/
 

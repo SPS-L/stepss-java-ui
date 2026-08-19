@@ -30,10 +30,11 @@ public final class CurveWindow extends JFrame {
     private final CurvePanel panel = new CurvePanel();
 
     /** Opens one extraction in a window of its own. Every call makes a new one. */
-    public static void open(Component parent, CurveData data, String title) {
+    public static CurveWindow open(Component parent, CurveData data, String title) {
         CurveWindow window = new CurveWindow(data, title);
         my.stepss.WindowCascade.track(window, parent);
         window.setVisible(true);
+        return window;
     }
 
     public CurveWindow(CurveData data, String title) {
@@ -78,13 +79,67 @@ public final class CurveWindow extends JFrame {
                 panel.toSvg(exportWidth(), exportHeight())));
         JButton csv = new JButton("Save CSV...");
         csv.addActionListener(event -> saveText("csv", "CSV", toCsv(data)));
+        JButton pair = new JButton("Save gnuplot pair...");
+        pair.setToolTipText("Saves this extraction's .cur and .plt, for plotting"
+                + " it in gnuplot yourself.");
+        pair.addActionListener(event -> saveGnuplotPair());
+        pair.setEnabled(data.source != null && data.source.isFile());
         JButton reset = new JButton("Reset zoom");
         reset.addActionListener(event -> panel.resetZoom());
         bar.add(png);
         bar.add(svg);
         bar.add(csv);
+        bar.add(pair);
         bar.add(reset);
         return bar;
+    }
+
+    /**
+     * Copies this window's own {@code .cur} and {@code .plt} to a chosen name.
+     *
+     * <p>Per window, not per session, which is the whole reason it lives here.
+     * The Analysis tab used to carry this action and act on whichever
+     * extraction was most recent, so opening an older window and pressing Save
+     * wrote the newest extraction's data under the older one's chosen name.
+     * A window knows its own {@code .cur}, because it parsed it, so there is
+     * nothing to get wrong.
+     *
+     * <p>Neither original is modified or removed. The previous implementation
+     * rewrote the source {@code .plt} in place before copying it and then
+     * deleted the source {@code .cur}, so a second save of the same extraction
+     * wrote a {@code .plt} pointing at a {@code .cur} that no longer existed.
+     */
+    private void saveGnuplotPair() {
+        File cur = data.source;
+        if (cur == null || !cur.isFile()) {
+            return;
+        }
+        String base = cur.getName().endsWith(".cur")
+                ? cur.getName().substring(0, cur.getName().length() - 4)
+                : cur.getName();
+        File plt = new File(cur.getParentFile(), base + ".plt");
+        File target = chooseTarget("cur", "gnuplot pair");
+        if (target == null) {
+            return;
+        }
+        String targetBase = target.getName().substring(0, target.getName().length() - 4);
+        try {
+            Files.copy(cur.toPath(), target.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            if (plt.isFile()) {
+                // The .plt names its .cur by path, so the copy has to name the
+                // copy. Rewritten on the way out rather than in place: the
+                // original stays valid for the window that is still showing it.
+                String script = new String(Files.readAllBytes(plt.toPath()),
+                        StandardCharsets.ISO_8859_1);
+                script = script.replace(cur.getAbsolutePath(), targetBase + ".cur")
+                        .replace(cur.getName(), targetBase + ".cur");
+                Files.write(new File(target.getParentFile(), targetBase + ".plt").toPath(),
+                        script.getBytes(StandardCharsets.ISO_8859_1));
+            }
+        } catch (IOException ex) {
+            failed(target, ex);
+        }
     }
 
     private int exportWidth() {

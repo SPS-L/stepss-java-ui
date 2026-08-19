@@ -45,12 +45,6 @@ if [ "${1:-}" = "--in-container" ]; then
   echo "=== the copyright file, where Debian looks for it ==="
   head -3 /usr/share/doc/stepss/copyright
 
-  echo "=== gnuplot came with it ==="
-  # An interactive build, not gnuplot-nox: that one satisfies a bare
-  # Depends: gnuplot through Provides: and then draws nothing.
-  command -v gnuplot || { echo "FAIL: gnuplot is not installed"; exit 1; }
-  gnuplot --version
-
   echo "=== RAMSES resolves every library it needs ==="
   mkdir -p /tmp/payload
   cd /tmp/payload
@@ -113,7 +107,7 @@ check_field() {
 check_field "Maintainer: SPS-Lab <stepss@sps-lab.org>"
 check_field "Section: science"
 check_field "Recommends: gfortran, make, libopenblas-dev"
-for dep in libgfortran5 libgomp1 libopenblas0 "gnuplot-x11 | gnuplot-qt"; do
+for dep in libgfortran5 libgomp1 libopenblas0; do
   if ! dpkg-deb --field "$deb" Depends | grep -qF -- "$dep"; then
     echo "FAIL: Depends: does not name $dep" >&2
     fail=1

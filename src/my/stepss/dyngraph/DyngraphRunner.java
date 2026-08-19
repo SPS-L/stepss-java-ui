@@ -3,7 +3,6 @@ package my.stepss.dyngraph;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.Map;
 
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecuteResultHandler;
@@ -16,8 +15,8 @@ import org.apache.commons.exec.ShutdownHookProcessDestroyer;
  * The two DYNGRAPH invocations behind the observable picker, both with
  * stdout and stderr captured to buffers - the Helios capture precedent
  * (StepssUI's dedicated stderr buffer feeding reportHeliosExitStatus), not
- * viewCurvesButton's no-arg PumpStreamHandler, which inherits the JVM's
- * streams and captures nothing.
+ * a no-arg PumpStreamHandler, which inherits the JVM's streams and captures
+ * nothing.
  *
  * <p><b>Neither call may run on the EDT.</b> get_observ_name rewinds the
  * trajectory several times and the plot run reads the whole time series, so
@@ -53,18 +52,14 @@ public final class DyngraphRunner {
 
     private final File dyngraph;
     private final File workingDir;
-    private final Map environment;
 
     /**
      * @param dyngraph the resolved executable ({@code toolchain.dyngraph()})
      * @param workingDir the temp directory both runs execute in
-     * @param environment the exec environment
-     *        ({@code PlatformLauncher.execEnvironment}'s map); null inherits
      */
-    public DyngraphRunner(File dyngraph, File workingDir, Map environment) {
+    public DyngraphRunner(File dyngraph, File workingDir) {
         this.dyngraph = dyngraph;
         this.workingDir = workingDir;
-        this.environment = environment;
     }
 
     /**
@@ -91,7 +86,7 @@ public final class DyngraphRunner {
         executor.setStreamHandler(new PumpStreamHandler(stdout, stderr));
         executor.setWorkingDirectory(workingDir);
         executor.setProcessDestroyer(new ShutdownHookProcessDestroyer());
-        int exit = executor.execute(cmd, environment);
+        int exit = executor.execute(cmd);
         return new ListResult(exit,
                 new String(stdout.toByteArray(), ReplayFile.CHARSET),
                 new String(stderr.toByteArray(), ReplayFile.CHARSET));
@@ -101,8 +96,8 @@ public final class DyngraphRunner {
      * Runs {@code dyngraph -c -t <selCmd> -o<outputBase>} asynchronously and
      * reports through {@code listener}. Not interactive under -t, so it gets
      * no terminal window. No {@code -eps}: it would export an EPS file
-     * instead of leaving a .plt that viewCurvesButton can open in a gnuplot
-     * window - the same flag choice as today's Extract Curves.
+     * instead of leaving the .plt beside the .cur, which is what a user who
+     * wants gnuplot opens by hand. The same flag choice as Extract Curves.
      *
      * <p>The trajectory path travels as line 1 of the replay file, so it is
      * never an argv token; -o still carries a possibly-space-containing
@@ -140,6 +135,6 @@ public final class DyngraphRunner {
                         new String(stderr.toByteArray(), ReplayFile.CHARSET));
             }
         };
-        executor.execute(cmd, environment, handler);
+        executor.execute(cmd, handler);
     }
 }

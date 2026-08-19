@@ -13,7 +13,6 @@ public final class Toolchain {
     public static final String HELIOS = "helios";
     public static final String DYNGRAPH = "dyngraph";
     public static final String CODEGEN = "codegen";
-    public static final String GNUPLOT = "gnuplot";
     public static final String URAMSES = "uramses";
 
     /**
@@ -75,10 +74,6 @@ public final class Toolchain {
             .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
                 "payload/codegen-macos-arm64-v5.2.0.tar.gz", ToolSpec.Kind.TGZ,
                 "CODEGEN", "CODEGEN", true)));
-
-        s.add(new ToolSpec(GNUPLOT)
-            .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "gpwin.zip", ToolSpec.Kind.ZIP, null, "gnuplot/bin/pgnuplot.exe", false)));
 
         s.add(new ToolSpec(URAMSES)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
@@ -237,16 +232,5 @@ public final class Toolchain {
             case MACOS_ARM64:    return "modules_m";
             default: throw new IllegalArgumentException("No module kit for " + p);
         }
-    }
-
-    /**
-     * Windows bundles gnuplot; elsewhere it is resolved from PATH.
-     * Returns null when not found, so callers can degrade that one feature.
-     */
-    public File gnuplot() {
-        if (platform.isWindows()) {
-            return get(GNUPLOT);
-        }
-        return PlatformLauncher.findOnPath("gnuplot");
     }
 }

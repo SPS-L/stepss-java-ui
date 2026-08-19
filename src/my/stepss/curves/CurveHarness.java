@@ -1,7 +1,10 @@
 package my.stepss.curves;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -35,7 +38,7 @@ public final class CurveHarness {
         "sync mach GEN1: rotor speed (pu)",
         "branch BR1-2: P (MW) entering at FROM end");
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException, CurHeader.Unsupported {
         readsEveryColumn();
         stripsTheTrailingSemicolon();
         parsesThreeDigitExponents();
@@ -45,8 +48,6 @@ public final class CurveHarness {
         skipsNonFiniteRows();
         skipsBlankLines();
         toleratesTheDegenerateTimeOnlyFile();
-        niceStepPicksTheOneTwoFiveLadder();
-        niceBoundsRoundOutward();
         twoPointsLandOnTheDerivedPixels();
         rendersOnePolylinePerSeries();
         namesTheSharedUnitAndFlagsMixedOnes();
@@ -55,6 +56,12 @@ public final class CurveHarness {
         readoutIsNullOutsideThePlotArea();
         curvesAreClippedToTheFrame();
         csvCarriesEveryColumnAndQuotesLabels();
+        toleratesRamsesCommentsAboveTheHeader();
+        checkHeader();
+        checkTail();
+        checkAxes();
+        checkLiveModel();
+        checkLiveWindow();
 
         if (failures > 0) {
             System.err.println(failures + " curve check(s) FAILED");
@@ -175,24 +182,32 @@ public final class CurveHarness {
         check("no rows skipped", 0, data.skippedRows);
     }
 
-    /** Ticks land on 1, 2 or 5 times a power of ten, never on 3.7. */
-    private static void niceStepPicksTheOneTwoFiveLadder() {
-        check("span 1 into 5", 0.2, CurvePanel.niceStep(1.0, 5));
-        // 30/5 is 6, which is above 5 on the ladder, so it rounds up to 10.
-        check("span 30 into 5", 10.0, CurvePanel.niceStep(30.0, 5));
-        check("span 0.004 into 4", 0.001, CurvePanel.niceStep(0.004, 4));
-        check("span 7000 into 5", 2000.0, CurvePanel.niceStep(7000.0, 5));
-        // A flat curve has zero span and must still yield a usable step
-        // rather than 0, which would divide by zero when placing ticks.
-        check("zero span", 1.0, CurvePanel.niceStep(0.0, 5));
-    }
-
-    private static void niceBoundsRoundOutward() {
-        double[] b = CurvePanel.niceBounds(0.83, 1.04, 0.05);
-        check("low rounds down", 0.80, round(b[0]));
-        check("high rounds up", 1.05, round(b[1]));
-        double[] flat = CurvePanel.niceBounds(1.0, 1.0, 1.0);
-        check("flat data still spans", true, flat[1] > flat[0]);
+    /**
+     * Fed a headed RAMSES file, the DYNGRAPH reader must treat the comment
+     * lines as comments. Counting them as unreadable rows made CurveWindow's
+     * header report damage over undamaged data.
+     *
+     * <p>Six of them here, one per header record, because this fixture carries
+     * two observables. A real capture carries one per observable and so has
+     * seven at three observables, which is where the "seven" in the plan that
+     * specified this check came from: it described the capture rather than the
+     * fixture beneath it.
+     */
+    private static void toleratesRamsesCommentsAboveTheHeader() {
+        CurveData headed = CurReader.parse(Arrays.asList(
+                "# stepss-cur 1",
+                "# tstop      240.000",
+                "# refresh        1.000",
+                "# ncol 3",
+                "# obs 1 2 1 BV 1041",
+                "# obs 2 3 1 MS g6",
+                " 0.000000E+00  1.012404E+00  1.000000E+00 ",
+                " 1.000000E-02  1.012000E+00  1.000100E+00 "),
+                null, Arrays.asList("bus voltage (pu)", "speed (pu)"));
+        check("a clean headed file reports no damage", "0",
+                String.valueOf(headed.skippedRows));
+        check("and every data row survives", "2",
+                String.valueOf(headed.series.get(0).v.length));
     }
 
     /**
@@ -207,15 +222,15 @@ public final class CurveHarness {
      *
      * <pre>
      *   plot area   390 - 70 - 20 = 300 wide, 180 - 30 - 50 = 100 high
-     *   t span 4    niceStep(4, 6) = 1.0, niceBounds(0.5, 4.5, 1) = {0, 5}
-     *   v span 4    niceStep(4, 5) = 1.0, niceBounds(0.25, 4.25, 1) = {0, 5}
+     *   t span 4    NiceScale.step(4, 6) = 1.0, NiceScale.bounds(0.5, 4.5, 1) = {0, 5}
+     *   v span 4    NiceScale.step(4, 5) = 1.0, NiceScale.bounds(0.25, 4.25, 1) = {0, 5}
      *   px(0.50) = 70 + (0.50 / 5) * 300 = 70 + 30 = 100
      *   px(4.50) = 70 + (4.50 / 5) * 300 = 70 + 270 = 340
      *   py(0.25) = 180 - 50 - (0.25 / 5) * 100 = 130 - 5 = 125
      *   py(4.25) = 180 - 50 - (4.25 / 5) * 100 = 130 - 85 = 45
      * </pre>
      *
-     * <p>niceBounds widens both axes past the data on purpose, so neither
+     * <p>NiceScale.bounds widens both axes past the data on purpose, so neither
      * point sits on a frame edge where a fraction of 0 or 1 would hide an
      * error in the scaling, and the x and y numbers are all different, so
      * transposing px and py cannot pass. All four padding constants appear in
@@ -431,6 +446,14 @@ public final class CurveHarness {
         int clipOpen = svg.indexOf("clip-path=\"url(#clip1)\"");
         check("the clip opens before the curves", true,
                 clipOpen >= 0 && clipOpen < curvesAt);
+        if (curvesAt < 0 || legendAt < curvesAt) {
+            // The substring below is only well formed once the three checks
+            // above hold. Returning here reports them as the failures they are,
+            // where falling through raises StringIndexOutOfBoundsException and
+            // takes the whole harness run down with it, hiding every later
+            // check behind a stack trace.
+            return;
+        }
         // Two closes between them: one for the curves group, one for the clip
         // group.
         check("the clip closes before the legend", 2,
@@ -455,6 +478,511 @@ public final class CurveHarness {
                 odd.split("\n")[0].contains("\"bus A,B: voltage magnitude (pu)\""));
     }
 
+    private static void checkHeader() {
+        // The real capture from a locally built engine, reproduced byte for
+        // byte apart from the leading indentation of the data row.
+        List<String> real = Arrays.asList(
+                "# stepss-cur 1",
+                "# tstop      240.000",
+                "# refresh        1.000",
+                "# ncol 5",
+                "# obs 1 2 1 BV 1041",
+                "# obs 2 3 2 o-d g6",
+                "# obs 3 5 1 MS g6",
+                " 0.000000E+00  1.012404E+00  1.000000E+00  6.018289E+00  1.000000E+00 ");
+
+        CurHeader h;
+        try {
+            h = CurHeader.parse(real);
+        } catch (CurHeader.Unsupported ex) {
+            check("the real capture parses", "no exception", ex.getMessage());
+            return;
+        }
+        check("tstop comes off the padded f12.3 field", "240.0", String.valueOf(h.tstop));
+        check("refresh comes off the padded f12.3 field", "1.0", String.valueOf(h.refresh));
+        check("ncol is the total column count including time", "5", String.valueOf(h.ncol));
+        check("one record per observable", "3", String.valueOf(h.observables.size()));
+        check("the o-d observable spans two columns", "2",
+                String.valueOf(h.observables.get(1).columnCount));
+        check("the o-d observable starts at column three", "3",
+                String.valueOf(h.observables.get(1).firstColumn));
+        check("the display type is carried so the mapping is checkable", "o-d",
+                h.observables.get(1).type);
+        check("a one-name observable has an empty second name", "",
+                h.observables.get(1).name2);
+
+        // ON and TO legitimately carry two names, space delimited, unquoted.
+        List<String> twoNames = Arrays.asList(
+                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 2",
+                "# obs 1 2 1 ON myinj myobs");
+        try {
+            check("the second name of an ON observable is read", "myobs",
+                    CurHeader.parse(twoNames).observables.get(0).name2);
+        } catch (CurHeader.Unsupported ex) {
+            check("the two-name header parses", "no exception", ex.getMessage());
+        }
+
+        // A version this build does not know is a loud refusal, never a guess.
+        List<String> future = Arrays.asList(
+                "# stepss-cur 2", "# tstop 30.000", "# refresh 1.000", "# ncol 2",
+                "# obs 1 2 1 BV 4044");
+        try {
+            CurHeader.parse(future);
+            check("an unknown version marker refuses", "Unsupported thrown", "parsed anyway");
+        } catch (CurHeader.Unsupported ex) {
+            check("an unknown version marker names the version it found",
+                    "true", String.valueOf(ex.getMessage().contains("version 2,")));
+            check("and the version this build supports", "true",
+                    String.valueOf(ex.getMessage().contains("reads version 1 only")));
+        }
+
+        // No header at all is the state of every engine older than the map.
+        try {
+            CurHeader.parse(Arrays.asList(
+                    " 0.000000E+00  1.012404E+00 "));
+            check("a headerless file refuses", "Unsupported thrown", "parsed anyway");
+        } catch (CurHeader.Unsupported ex) {
+            check("a headerless file says so rather than guessing columns",
+                    "true", String.valueOf(ex.getMessage().toLowerCase(
+                            java.util.Locale.ROOT).contains("no run-time header")));
+        }
+
+        // The columns the records claim must add up to what ncol states, or
+        // the reader is about to draw one observable's data under another's
+        // name. ncol 5 with records covering 2..5 is consistent; ncol 6 is not.
+        List<String> inconsistent = Arrays.asList(
+                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 6",
+                "# obs 1 2 1 BV 4044", "# obs 2 3 2 o-d g6", "# obs 3 5 1 MS g6");
+        try {
+            CurHeader.parse(inconsistent);
+            check("ncol disagreeing with the records refuses",
+                    "Unsupported thrown", "parsed anyway");
+        } catch (CurHeader.Unsupported ex) {
+            check("the ncol disagreement says which number the header stated",
+                    "true", String.valueOf(ex.getMessage().contains("ncol 6")));
+            check("and which the records actually cover", "true",
+                    String.valueOf(ex.getMessage().contains("cover 5")));
+        }
+    }
+
+    /**
+     * CurTail: the offset-based reader a live viewer polls once per flush.
+     * Writes real files into a temporary directory, because the whole point
+     * of the class is file mechanics.
+     */
+    private static void checkTail() throws IOException {
+        File dir = java.nio.file.Files.createTempDirectory("curtail").toFile();
+        File cur = new File(dir, "temp_display.cur");
+        try {
+            CurTail tail = new CurTail(cur);
+            check("a file that does not exist yet is not an error", "false",
+                    String.valueOf(tail.exists()));
+            check("and yields nothing", "0", String.valueOf(tail.poll().size()));
+
+            append(cur, "# stepss-cur 1\n# ncol 2\n");
+            check("the header arrives as lines", "[# stepss-cur 1, # ncol 2]",
+                    tail.poll().toString());
+            check("and is not delivered twice", "[]", tail.poll().toString());
+
+            // A torn final line is the normal state of a file being written:
+            // the reader must hold it back until its newline arrives.
+            append(cur, " 1.0 2.0\n 3.0 4");
+            check("a complete row is delivered and a torn one held back",
+                    "[ 1.0 2.0]", tail.poll().toString());
+            append(cur, ".0\n");
+            check("the held-back row arrives once it is terminated",
+                    "[ 3.0 4.0]", tail.poll().toString());
+
+            // status='replace' truncates, which is what a re-run does. An
+            // offset kept across that would skip the new run's header and
+            // then misparse whatever byte it landed on.
+            write(cur, "# stepss-cur 1\n");
+            List<String> afterRerun = tail.poll();
+            check("a shrunk file is read from the top again",
+                    "[# stepss-cur 1]", afterRerun.toString());
+            check("and the reset is reported so a reader can drop its state",
+                    "true", String.valueOf(tail.truncatedSinceLastPoll()));
+            check("the reset flag clears on the next poll", "false",
+                    String.valueOf(tail.poll().isEmpty() ? tail.truncatedSinceLastPoll() : true));
+
+            // The offset must advance rather than the file being re-read: a
+            // full re-read each second is quadratic over a run.
+            long before = tail.offset();
+            // Nine bytes: space, 9, dot, 0, space, 9, dot, 0, newline. Count
+            // the literal rather than trusting this comment, and if it
+            // disagrees fix the expected value, never the class: an offset
+            // that advances by the wrong amount is the bug this pins.
+            append(cur, " 9.0 9.0\n");
+            tail.poll();
+            check("the offset advances by exactly what was appended",
+                    String.valueOf(before + 9), String.valueOf(tail.offset()));
+
+            // The case the length heuristic cannot see: a replacement whose new
+            // content already reaches past the old offset never looks short, so
+            // poll() reads from a stale position into a different run's bytes
+            // and no later poll can rediscover it. reset() is how a caller that
+            // knows a new run started says so instead of leaving it to
+            // inference.
+            //
+            // These two checks pin the LIMITATION, not the desired behaviour.
+            // If a future change makes replacement detection reliable, these
+            // are the checks to rewrite: do not "fix" them to hide the gap
+            // while it is still there.
+            write(cur, "# stepss-cur 1\n# ncol 2\n 1.0 2.0\n 3.0 4.0\n 5.0 6.0\n");
+            List<String> afterLongerReplacement = tail.poll();
+            check("a replacement longer than the old offset is not detected",
+                    "false", String.valueOf(tail.truncatedSinceLastPoll()));
+            check("so that poll resumes mid-file instead of at the header",
+                    "false",
+                    String.valueOf(afterLongerReplacement.contains("# stepss-cur 1")));
+            tail.reset();
+            check("reset makes the next poll read from the top", "true",
+                    String.valueOf(tail.poll().contains("# stepss-cur 1")));
+            check("and reset reports no truncation of its own", "false",
+                    String.valueOf(tail.truncatedSinceLastPoll()));
+        } finally {
+            deleteRecursively(dir);
+        }
+    }
+
+    private static void checkAxes() {
+        CurveData one = new CurveData(Arrays.asList(
+                new CurveSeries("V (pu)", "pu",
+                        new double[] {0.0, 1.0, 2.0}, new double[] {1.0, 1.1, 0.9})),
+                null, 0);
+
+        CurvePanel post = new CurvePanel();
+        post.setData(one);
+        String postSvg = post.toSvg(800, 500);
+        check("the post-analysis panel still draws a legend entry", "true",
+                String.valueOf(postSvg.contains("V (pu)")));
+        check("and still titles its x axis with time", "true",
+                String.valueOf(postSvg.contains(">t (s)<")));
+
+        // A fixed x range is what makes a live panel's curve grow across a
+        // frame whose extent was known before the first sample arrived. With
+        // x autoscaled to the data, a two-second-old run would fill the frame
+        // and then appear to stop moving.
+        CurvePanel live = new CurvePanel();
+        live.setAxes(new CurveAxes("BUS 4044", "t (s)", "V (pu)",
+                0.0, 30.0, false, false));
+        live.setData(one);
+        String liveSvg = live.toSvg(800, 500);
+        check("a fixed x range reaches the far tick", "true",
+                String.valueOf(liveSvg.contains(">30.0<")));
+        check("a data-fitting tick is absent, so the range is not autoscaled",
+                "false", String.valueOf(liveSvg.contains(">2.000<")));
+        check("the panel title is drawn", "true",
+                String.valueOf(liveSvg.contains("BUS 4044")));
+        check("and the legend is suppressed", "false",
+                String.valueOf(liveSvg.contains("legend")));
+        // The title gets a line of its own above the y unit. Both were drawn
+        // at PAD_TOP - 12 in the first draft of this task, one centred and one
+        // left-anchored: that does not collide at 800px wide and does on a
+        // stacked panel a third that wide.
+        check("the title sits above the y unit rather than on it", "true",
+                String.valueOf(textY(liveSvg, "BUS 4044")
+                        < textY(liveSvg, "V (pu)")));
+        // And still inside the canvas. Without this, dropping the extra top pad
+        // puts the title's baseline at y=0 where it is invisible, and the check
+        // above still passes because 0 is less than 18.
+        check("and inside the canvas rather than clipped off the top", "true",
+                String.valueOf(textY(liveSvg, "BUS 4044") >= 12.0));
+
+        // A titled panel's frame starts below PAD_TOP, so the band between
+        // them is not plot area and must report nothing.
+        CurvePanel hit = new CurvePanel();
+        hit.setAxes(new CurveAxes("BUS 4044", "t (s)", "V (pu)",
+                0.0, 30.0, false, false));
+        hit.setData(one);
+        hit.setSize(800, 500);
+        check("a point in the title band reads out nothing", "null",
+                String.valueOf(hit.readoutAt(400, 36)));
+        check("a point inside the frame still reads out", "true",
+                String.valueOf(hit.readoutAt(400, 250) != null));
+
+        // RT overlays y = x so a user sees at a glance whether the simulation
+        // is keeping up with the wall clock, matching gnuplot.f90:143 which
+        // plots column 1 against itself alongside the trace.
+        CurvePanel rt = new CurvePanel();
+        rt.setAxes(new CurveAxes("Simulated VS Real time", "simulation time (s)",
+                "elapsed time (s)", 0.0, 10.0, false, true));
+        rt.setData(one);
+        String rtSvg = rt.toSvg(800, 500);
+        // On the dash pattern, not on the group id: a group is emitted whether
+        // or not anything lands inside it, so asserting on the id alone cannot
+        // tell "drawn" from "opened and closed empty". Nothing else in this
+        // panel calls dashedLine.
+        check("the identity line is actually drawn", "true",
+                String.valueOf(rtSvg.contains("stroke-dasharray")));
+        check("and a panel that did not ask for one has none", "false",
+                String.valueOf(postSvg.contains("stroke-dasharray")));
+
+        // LAT's second column is a 0/1 activity flag, so a segment is drawn
+        // in one of exactly two classes.
+        CurveData latency = new CurveData(Arrays.asList(
+                new CurveSeries("S (MVA)", "MVA",
+                        new double[] {0.0, 1.0, 2.0},
+                        new double[] {10.0, 11.0, 12.0},
+                        new double[] {0.0, 1.0, 1.0})),
+                null, 0);
+        CurvePanel lat = new CurvePanel();
+        lat.setAxes(new CurveAxes("Equipment: 4041", "t (s)", "S (MVA)",
+                0.0, 30.0, false, false));
+        lat.setData(latency);
+        String latSvg = lat.toSvg(800, 500);
+        check("an idle segment is drawn in the latent class", "true",
+                String.valueOf(latSvg.contains("class=\"latent\"")));
+        check("an active segment is drawn in the active class", "true",
+                String.valueOf(latSvg.contains("class=\"active\"")));
+        // On the absence of a polyline rather than the absence of a series
+        // class. The shaded path draws one <line> per segment where the plain
+        // path draws a single <polyline>, so this says "the shaded path
+        // replaced the plain one" and would catch a bug that drew both. The
+        // series-class form of this check was coupled to the legend being off,
+        // because a legend swatch also carries a series class, so enabling a
+        // legend on a shaded panel broke it for no real reason.
+        check("no plain polyline is drawn for a shaded series", "false",
+                String.valueOf(latSvg.contains("<polyline")));
+
+        // A curve whose extent lands exactly on its rounded bounds used to be
+        // drawn along the frame edges with half its stroke clipped. 0.9 to 1.0
+        // is the case: the tick step comes out at 0.02 and both ends are whole
+        // multiples of it, so the outward rounding had nothing to do. The pad is
+        // what separates the trace from the frame, and it is absorbed silently
+        // whenever the rounding already provides the gap, which is why the
+        // pinned golden above does not move.
+        CurveData flush = new CurveData(Arrays.asList(
+                new CurveSeries("V (pu)", "pu",
+                        new double[] {0.0, 1.0, 2.0},
+                        new double[] {0.9, 1.0, 0.9})),
+                null, 0);
+        CurvePanel edge = new CurvePanel();
+        edge.setData(flush);
+        String edgeSvg = edge.toSvg(800, 500);
+        check("a curve touching its rounded bounds is not drawn on the frame",
+                "false", String.valueOf(edgeSvg.contains(",450.00 ")
+                        || edgeSvg.contains(",30.00 ")));
+
+        // A fixed x range is used exactly, so a run's last sample reaches the
+        // frame's right edge even when the stop time is off the tick ladder.
+        // 12.5 rounds to 15, which drew a completed run to 83% of the width.
+        CurvePanel odd = new CurvePanel();
+        odd.setAxes(new CurveAxes("", "t (s)", "V (pu)", 0.0, 12.5, false, false));
+        odd.setData(one);
+        check("a fixed range that misses the tick ladder still fills the frame",
+                "false", String.valueOf(odd.toSvg(800, 500).contains(">15.0<")));
+    }
+
+    private static void checkLiveModel() throws CurHeader.Unsupported {
+        CurHeader h = CurHeader.parse(Arrays.asList(
+                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 5",
+                "# obs 1 2 1 BV 4044",
+                "# obs 2 3 2 o-d g6",
+                "# obs 3 5 1 MS g6"));
+        LiveModel model = new LiveModel(h);
+        check("one panel per observable", "3", String.valueOf(model.panelCount()));
+        // The value pollMillis would be handed, once a live window reads it
+        // off the model to reschedule its poller: checked here because this
+        // link in that chain runs with no window and no poller.
+        check("the model surfaces the header's own refresh rate", "1.0",
+                String.valueOf(model.refresh()));
+
+        model.accept(Arrays.asList(
+                " 0.000000E+00  1.010000E+00  1.000000E+00  0.100000E+00  1.000000E+00 ",
+                " 1.000000E-02  1.020000E+00  1.001000E+00  0.200000E+00  1.002000E+00 "));
+        check("no row is skipped when the count matches ncol", "0",
+                String.valueOf(model.skippedRows()));
+        check("both samples land", "2", String.valueOf(model.samples()));
+
+        CurveData bv = model.snapshot(0);
+        check("a one-column observable yields one series", "1",
+                String.valueOf(bv.series.size()));
+        check("its x is time", "0.01", String.valueOf(bv.series.get(0).t[1]));
+        check("its y is its own column", "1.02",
+                String.valueOf(bv.series.get(0).v[1]));
+
+        // o-d is a phase plane: gnuplot.f90:147 plots varcol+1 against varcol,
+        // and simul_decomp.f90:2318-2319 writes omega then delta, so x is the
+        // SECOND of the pair and y is the first.
+        CurveData od = model.snapshot(1);
+        check("a phase-plane observable takes x from its second column", "0.2",
+                String.valueOf(od.series.get(0).t[1]));
+        check("and y from its first", "1.001",
+                String.valueOf(od.series.get(0).v[1]));
+        check("a phase plane does not fix x to the run length", "false",
+                String.valueOf(model.axesOf(1).xFixed()));
+        check("a time series does fix x to the run length", "true",
+                String.valueOf(model.axesOf(0).xFixed()));
+        check("and fixes it at tstop", "30.0",
+                String.valueOf(model.axesOf(0).xHi));
+
+        // A short row is the torn last line the writer leaves mid-flush. It is
+        // counted, not drawn, and never grows a buffer.
+        model.accept(Arrays.asList(" 2.000000E-02  1.03"));
+        check("a short row is counted rather than drawn", "1",
+                String.valueOf(model.skippedRows()));
+        check("and does not extend the curves", "2",
+                String.valueOf(model.samples()));
+
+        // A re-run truncates the file, so the model must be able to forget.
+        model.reset();
+        check("a reset empties the buffers", "0", String.valueOf(model.samples()));
+        check("but keeps the panels", "3", String.valueOf(model.panelCount()));
+
+        // The display-type table, which is the whole of what a user reads on
+        // each panel. Values from gnuplot.f90:84-133.
+        check("BV titles its panel with the bus", "BUS 4044",
+                LiveModel.axesFor(h.observables.get(0), 30.0).title);
+        check("BV labels y in per unit volts", "V (pu)",
+                LiveModel.axesFor(h.observables.get(0), 30.0).yLabel);
+        check("a phase plane labels x with delta", "delta (pu)",
+                LiveModel.axesFor(h.observables.get(1), 30.0).xLabel);
+        check("MS titles its panel with the machine", "Machine g6",
+                LiveModel.axesFor(h.observables.get(2), 30.0).title);
+        check("RT asks for the identity line", "true",
+                String.valueOf(LiveModel.axesFor(
+                        new CurHeader.Obs(1, 2, 1, "RT", "RT", ""), 30.0).identity));
+        check("SOL does not", "false",
+                String.valueOf(LiveModel.axesFor(
+                        new CurHeader.Obs(1, 2, 1, "SOL", "SOL", ""), 30.0).identity));
+        check("a lower-case display type is read the same as upper", "BUS 4044",
+                LiveModel.axesFor(
+                        new CurHeader.Obs(1, 2, 1, "bv", "4044", ""), 30.0).title);
+        check("an unknown display type still gets a usable frame", "t (s)",
+                LiveModel.axesFor(
+                        new CurHeader.Obs(1, 2, 1, "ZZZ", "x", ""), 30.0).xLabel);
+
+        // LAT carries the activity flag through to the series, which is the
+        // only reason CurveSeries has a weight array at all.
+        CurHeader lat = CurHeader.parse(Arrays.asList(
+                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 3",
+                "# obs 1 2 2 LAT 4041"));
+        LiveModel latModel = new LiveModel(lat);
+        latModel.accept(Arrays.asList(
+                " 0.000000E+00  1.500000E+02  0 ",
+                " 1.000000E-02  1.510000E+02  1 "));
+        // A header that declares ONE column for a two-column display type is
+        // self-consistent against ncol, so CurHeader accepts it, and the panel
+        // must not then index a column the row does not have. Caught rather than
+        // left to propagate: an uncaught ArrayIndexOutOfBoundsException takes the
+        // whole harness run down before any assertion prints, so the outcome is
+        // wrapped to make this a named failure instead of a stack trace.
+        CurHeader thin = CurHeader.parse(Arrays.asList(
+                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 2",
+                "# obs 1 2 1 LAT eq1"));
+        String thinOutcome;
+        try {
+            LiveModel thinModel = new LiveModel(thin);
+            thinModel.accept(Arrays.asList(" 0.000000E+00  1.500000E+02 "));
+            thinOutcome = thinModel.snapshot(0).series.get(0).w == null
+                    ? "one column plotted" : "weighted anyway";
+        } catch (RuntimeException tooFar) {
+            thinOutcome = tooFar.getClass().getSimpleName();
+        }
+        check("a one-column LAT header plots its column rather than reading"
+                + " past the row", "one column plotted", thinOutcome);
+
+        // And a zero-column observable, which is self-consistent too and would
+        // index past the row even for a one-column display type.
+        String zeroOutcome;
+        try {
+            CurHeader.parse(Arrays.asList(
+                    "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000",
+                    "# ncol 1", "# obs 1 2 0 BV x"));
+            zeroOutcome = "accepted";
+        } catch (CurHeader.Unsupported refused) {
+            zeroOutcome = refused.getMessage().contains("at least one")
+                    ? "refused" : "refused for the wrong reason";
+        }
+        check("a zero-column observable is refused", "refused", zeroOutcome);
+
+        check("the latency flag reaches the series", "[0.0, 1.0]",
+                Arrays.toString(latModel.snapshot(0).series.get(0).w));
+        check("and the apparent power is the y value", "151.0",
+                String.valueOf(latModel.snapshot(0).series.get(0).v[1]));
+    }
+
+    private static void checkLiveWindow() {
+        // pollMillis is the pure arithmetic a refresh rate goes through; these
+        // four checks pin that arithmetic alone. Whether pump() actually calls
+        // it with the header's own refresh() to time the next poll is
+        // integration behaviour this harness cannot exercise: that wiring
+        // only runs inside a live LiveCurveWindow with a live poller thread,
+        // and constructing one here would throw, this JVM being headless.
+        // checkLiveModel's "the model surfaces the header's own refresh rate"
+        // covers the one link in that chain that is checkable without a
+        // window: that a parsed header's refresh value actually reaches the
+        // caller who would pass it to pollMillis.
+        check("pollMillis derives a poll interval from a refresh rate", "1000",
+                String.valueOf(LiveCurveWindow.pollMillis(1.0)));
+        check("a slower flush is polled more slowly", "5000",
+                String.valueOf(LiveCurveWindow.pollMillis(5.0)));
+        // A settings file may set any number, including one that would spin
+        // the poller. Floor it rather than trusting the file.
+        check("an absurd refresh rate is floored", "100",
+                String.valueOf(LiveCurveWindow.pollMillis(0.0)));
+        check("a negative refresh rate is floored too", "100",
+                String.valueOf(LiveCurveWindow.pollMillis(-3.0)));
+
+        // Whether a failed header parse is a verdict or impatience. The engine
+        // issues its header as several writes and flushes once at the end, so
+        // a poll can land on a partial header; calling that an unsupported
+        // engine accuses the user of something that is not true.
+        check("a header still arriving is not a refusal", "false",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        Arrays.asList("# stepss-cur 1", "# tstop 30.000"))));
+        check("nothing read yet is not a refusal either", "false",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        Collections.<String>emptyList())));
+        check("blank lines do not end the header", "false",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        Arrays.asList("# stepss-cur 1", "", "   "))));
+        // A data row proves no more header is coming, so now it is a verdict.
+        check("a data row after a bad header is a refusal", "true",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        Arrays.asList("# stepss-cur 1", " 0.0 1.0"))));
+        check("a file that starts with data refuses at once", "true",
+                String.valueOf(LiveCurveWindow.headerFailureIsFinal(
+                        Arrays.asList(" 0.000000E+00  1.012404E+00 "))));
+    }
+
+    /**
+     * The y coordinate of the SVG text element carrying {@code content}, or
+     * NaN when there is none.
+     *
+     * <p>Reads the attribute rather than matching a formatted number, so a
+     * check about relative position does not also pin the coordinate format.
+     */
+    private static double textY(String svg, String content) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "<text x=\"[^\"]*\" y=\"([^\"]*)\"[^>]*>"
+                        + java.util.regex.Pattern.quote(content) + "</text>").matcher(svg);
+        return m.find() ? Double.parseDouble(m.group(1)) : Double.NaN;
+    }
+
+    private static void append(File f, String s) throws IOException {
+        try (java.io.OutputStream out = new java.io.FileOutputStream(f, true)) {
+            out.write(s.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+        }
+    }
+
+    private static void write(File f, String s) throws IOException {
+        try (java.io.OutputStream out = new java.io.FileOutputStream(f, false)) {
+            out.write(s.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+        }
+    }
+
+    private static void deleteRecursively(File f) {
+        File[] kids = f.listFiles();
+        if (kids != null) {
+            for (File kid : kids) {
+                deleteRecursively(kid);
+            }
+        }
+        f.delete();
+    }
+
     /**
      * The two numbers behind {@code readoutAt}'s "t = %.4g, value = %.6g", as
      * {t, value}.
@@ -473,10 +1001,6 @@ public final class CurveHarness {
 
     private static double number(String half) {
         return Double.parseDouble(half.substring(half.indexOf('=') + 1).trim());
-    }
-
-    private static double round(double value) {
-        return Math.round(value * 1e6) / 1e6;
     }
 
     private static int count(String haystack, String needle) {
