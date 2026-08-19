@@ -1593,8 +1593,13 @@ public final class LiveModel {
             this.obs = obs;
             this.axes = axesFor(obs, tstop);
             String type = obs.type.toUpperCase(Locale.ROOT);
-            this.phasePlane = "O-D".equals(type) || "P-D".equals(type);
-            this.weighted = "LAT".equals(type);
+            // The type says what a second column MEANS; columnCount says
+            // whether it is there. A header declaring one column for a
+            // two-column type is self-consistent against ncol, so CurHeader
+            // accepts it, and without this the append reads past the row.
+            this.phasePlane = ("O-D".equals(type) || "P-D".equals(type))
+                    && obs.columnCount >= 2;
+            this.weighted = "LAT".equals(type) && obs.columnCount >= 2;
             if (weighted) {
                 this.w = new double[256];
             }
@@ -1849,7 +1854,7 @@ git commit -m "feat: map run-time .cur columns onto per-observable buffers"
 
 **Interfaces:**
 - Consumes: `CurHeader`, `CurTail`, `LiveModel`, `CurvePanel`, `CurveAxes`, `my.stepss.WindowCascade`.
-- Produces: `my.stepss.curves.LiveCurveWindow` with `public static LiveCurveWindow open(Component parent, File cur, String title)`, `public void finish()`, `public void close()`.
+- Produces: `my.stepss.curves.LiveCurveWindow` with `public static LiveCurveWindow open(Component parent, File cur, String title)` and `public void finish()`. There is deliberately no `close()`: `dispose()` already stops the poller through the `windowClosed` listener that every close path goes through.
 
 - [ ] **Step 1: Write the one check that does not need a display**
 
@@ -1934,6 +1939,23 @@ public final class LiveCurveWindow extends JFrame {
 
     /** Never poll faster than this, whatever the settings file says. */
     private static final long MIN_POLL_MS = 100L;
+    /**
+     * The cadence before a header has been read, which is also the engine's own
+     * {@code $GP_REFRESH_RATE} default.
+     */
+    private static final long DEFAULT_POLL_MS = 1000L;
+    /**
+     * Never poll slower than this, whatever the settings file says.
+     *
+     * <p>A user who reads "refresh rate" as milliseconds and writes 1000 would
+     * otherwise get one poll every seventeen minutes and a live view that looks
+     * broken. Capping is a better answer than believing the file: the engine is
+     * flushing far more often than any sane cap, so an over-frequent poll costs
+     * nothing while an under-frequent one loses the feature.
+     */
+    private static final long MAX_POLL_MS = 60_000L;
+    /** Appended to the window title once the run has ended. */
+    private static final String FINISHED = " (finished)";
 
     private final File cur;
     private final CurTail tail;
@@ -1946,12 +1968,29 @@ public final class LiveCurveWindow extends JFrame {
                 t.setDaemon(true);
                 return t;
             });
-
-    private LiveModel model;
+    /**
+     * The parsed header and its buffers, or null before one has been read and
+     * again after a truncation discards it.
+     *
+     * <p>Volatile because the poller thread assigns it and the EDT reads it in
+     * {@link #buildPanels()} and {@link #publish}. It is safely published today
+     * even without this, because every EDT read happens inside a task posted
+     * after the write, but that property is invisible at the declaration and the
+     * first reader arriving by another route would break it silently.
+     */
+    private volatile LiveModel model;
     private String refusal;
     private int emptyPolls;
     private boolean built;
     private boolean stopped;
+    /**
+     * Set by {@link #finish()} so the last tick stops waiting for more header.
+     *
+     * <p>Waiting is right while the engine might still be writing. Once it has
+     * exited there is no more coming, so a header that still will not parse is
+     * a verdict rather than a race, and the user is owed the reason.
+     */
+    private boolean lastTick;
     /**
      * Lines read before the header could be parsed.
      *
@@ -1998,7 +2037,7 @@ public final class LiveCurveWindow extends JFrame {
     /** The poll period for a header refresh rate in seconds. */
     static long pollMillis(double refreshSeconds) {
         long ms = Math.round(refreshSeconds * 1000.0);
-        return Math.max(MIN_POLL_MS, ms);
+        return Math.min(MAX_POLL_MS, Math.max(MIN_POLL_MS, ms));
     }
 
     /**
@@ -2040,15 +2079,26 @@ public final class LiveCurveWindow extends JFrame {
      * returned: the first poll fires at zero delay, so it can beat the
      * assignment of that handle, find it null, and skip the reschedule for the
      * life of the window. A user's {@code $GP_REFRESH_RATE} would then be
-     * silently ignored, some of the time, depending on how fast the engine wrote
-     * its header. Deciding the next delay at the end of each poll needs no
-     * handle at all, so the race has nowhere to live.
+     * silently ignored, some of the time, depending on how fast the engine
+     * wrote its header. Deciding the next delay at the end of each poll needs
+     * no handle at all, so the race has nowhere to live.
      */
     private void pump() {
         if (stopped) {
             return;
         }
-        tick();
+        try {
+            tick();
+        } catch (Throwable fatal) {
+            // tick() catches IOException and RuntimeException itself, so this can
+            // only be an Error. Caught anyway rather than left to end the chain
+            // in silence: the reachable instance is heap exhaustion from the
+            // per-poll history copy on a very long real-time run, and a frozen
+            // window with no message is the worst way to learn that. Say so and
+            // stop, rather than rescheduling straight back into it.
+            refuse("Run-time curves stopped: " + fatal);
+            return;
+        }
         if (stopped || refusal != null) {
             // finish() and refuse() both end the chain: there is nothing more to
             // read, and refuse() has already shut the poller down.
@@ -2087,21 +2137,22 @@ public final class LiveCurveWindow extends JFrame {
         }
         try {
             poller.execute(() -> {
-                tick();
-                stopped = true;
-                poller.shutdown();
-                SwingUtilities.invokeLater(() -> setTitle(getTitle() + " (finished)"));
+                lastTick = true;
+                // A bug inside tick() must not abort before the poller is
+                // marked stopped and shut down: the finally is what makes that
+                // a guarantee rather than something that merely usually holds.
+                try {
+                    tick();
+                    SwingUtilities.invokeLater(this::markFinished);
+                } finally {
+                    stopped = true;
+                    poller.shutdown();
+                }
             });
         } catch (java.util.concurrent.RejectedExecutionException windowClosed) {
             // The window went away between the check above and this call. There
             // is nothing left to read and nothing left to freeze.
         }
-    }
-
-    /** Disposes the window and its poller. */
-    public void close() {
-        poller.shutdownNow();
-        dispose();
     }
 
     /**
@@ -2117,16 +2168,21 @@ public final class LiveCurveWindow extends JFrame {
             if (tail.truncatedSinceLastPoll()) {
                 // status='replace' from a re-run in the same directory. The
                 // header is about to arrive again, so throw the old run away
-                // rather than drawing the two on one axis. The panels stay:
-                // a re-run in the same window cannot have a different
-                // observable set, because Task 7 gives every run its own
-                // window and stops this one's poller before that.
+                // rather than drawing the two on one axis.
                 pending.clear();
-                if (model != null) {
-                    model.reset();
-                }
+                // The whole header, not just the buffers: the new run writes its
+                // own, and a kept header maps the new run's columns through the
+                // old observable list. accept() discards # lines, so nothing
+                // else would ever notice.
+                model = null;
+                emptyPolls = 0;
+                SwingUtilities.invokeLater(this::discardPanels);
             }
-            if (lines.isEmpty()) {
+            // On the last tick, buffered header lines with no model must still
+            // reach the parse attempt below: that is what lets a header that
+            // never completed be reported with the engine's own message
+            // instead of leaving the window blank forever.
+            if (lines.isEmpty() && !(lastTick && model == null && !pending.isEmpty())) {
                 if (model == null && ++emptyPolls == 5) {
                     say("The engine has not written any run-time observable data yet.");
                 }
@@ -2143,8 +2199,12 @@ public final class LiveCurveWindow extends JFrame {
                     // flushes once at the end. Refusing here would tell the
                     // user their engine is too old on the strength of a poll
                     // that landed mid-write. After a data row there is no more
-                    // header coming, so the same failure is real.
-                    if (headerFailureIsFinal(pending)) {
+                    // header coming, so the same failure is real. Once the
+                    // engine has exited (lastTick), there is no more header
+                    // coming either, whatever the lines look like, and the
+                    // user is owed the engine's own explanation rather than a
+                    // window that stays blank forever.
+                    if (lastTick || headerFailureIsFinal(pending)) {
                         refuse(unsupported.getMessage());
                     }
                     return;
@@ -2165,6 +2225,12 @@ public final class LiveCurveWindow extends JFrame {
             SwingUtilities.invokeLater(() -> publish(snapshots, samples, skipped));
         } catch (IOException ex) {
             refuse("temp_display.cur could not be read: " + ex.getMessage());
+        } catch (RuntimeException ex) {
+            // An unchecked throw out of here would end the poll chain, since
+            // pump() only schedules a successor on the paths that fall through,
+            // and the window would freeze on its last snapshot with nothing
+            // said. A bug here must be visible, not quiet.
+            refuse("Run-time curves stopped: " + ex);
         }
     }
 
@@ -2173,14 +2239,49 @@ public final class LiveCurveWindow extends JFrame {
         if (built) {
             return;
         }
+        // Read the field ONCE, and tolerate null. This runs on the EDT after
+        // being posted from the poller, and a truncation on a later poll sets
+        // model back to null: a buildPanels still queued from the discarded run
+        // would then dereference null. Reachable whenever the EDT is busy for
+        // longer than one poll interval, which MIN_POLL_MS allows to be 100 ms.
+        // Returning without setting built lets the next header build its panels.
+        LiveModel current = model;
+        if (current == null) {
+            built = false;
+            return;
+        }
         built = true;
-        for (int i = 0; i < model.panelCount(); i++) {
+        for (int i = 0; i < current.panelCount(); i++) {
             CurvePanel panel = new CurvePanel();
-            panel.setAxes(model.axesOf(i));
+            panel.setAxes(current.axesOf(i));
             panels.add(panel);
             stack.add(panel);
         }
         stack.revalidate();
+        stack.repaint();
+    }
+
+    /**
+     * On the EDT: say once that this run has ended.
+     *
+     * <p>Idempotent because {@code finish()} is legitimately called twice: the
+     * Stop button freezes the window immediately and the run watcher thread
+     * calls it again up to two seconds later. Appending unconditionally gave
+     * "Run-time curves (finished) (finished)".
+     */
+    private void markFinished() {
+        if (!getTitle().endsWith(FINISHED)) {
+            setTitle(getTitle() + FINISHED);
+        }
+    }
+
+    /** On the EDT: drop the panels so the next header builds its own. */
+    private void discardPanels() {
+        built = false;
+        panels.clear();
+        stack.removeAll();
+        stack.revalidate();
+        stack.repaint();
     }
 
     /** On the EDT: the snapshots the poller finished. */
@@ -2266,7 +2367,7 @@ task rather than Task 8 because Task 8 deletes the field it reads.
 - Modify: `src/my/stepss/StepssUI.form`
 
 **Interfaces:**
-- Consumes: `LiveCurveWindow.open`, `finish`, `close`.
+- Consumes: `LiveCurveWindow.open` and `finish`. There is no `close()`: dispose the window instead, which stops its poller through the `windowClosed` listener.
 - Produces: nothing for later tasks.
 
 - [ ] **Step 1: Add the live-window field and its bookkeeping**

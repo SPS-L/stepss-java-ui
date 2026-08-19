@@ -170,6 +170,14 @@ public final class CurHeader {
 
         int covered = 1;
         for (Obs o : observables) {
+            if (o.columnCount < 1) {
+                // Every observable occupies at least its own column. A zero is
+                // self-consistent against ncol, so nothing downstream catches
+                // it, and a reader then indexes a column the row does not have.
+                throw new Unsupported("Observable " + o.index + " claims "
+                        + o.columnCount + " columns. Every observable occupies at"
+                        + " least one, so the .cur header is unusable.");
+            }
             if (o.firstColumn != covered + 1) {
                 throw new Unsupported("Observable " + o.index + " claims column "
                         + o.firstColumn + " where column " + (covered + 1)

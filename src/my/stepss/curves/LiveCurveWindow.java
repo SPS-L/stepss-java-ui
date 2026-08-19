@@ -33,10 +33,22 @@ public final class LiveCurveWindow extends JFrame {
     /** Never poll faster than this, whatever the settings file says. */
     private static final long MIN_POLL_MS = 100L;
     /**
-     * The cadence before the header has been read, which is also the engine's
-     * own {@code $GP_REFRESH_RATE} default, so the usual case never changes it.
+     * The cadence before a header has been read, which is also the engine's own
+     * {@code $GP_REFRESH_RATE} default.
      */
     private static final long DEFAULT_POLL_MS = 1000L;
+    /**
+     * Never poll slower than this, whatever the settings file says.
+     *
+     * <p>A user who reads "refresh rate" as milliseconds and writes 1000 would
+     * otherwise get one poll every seventeen minutes and a live view that looks
+     * broken. Capping is a better answer than believing the file: the engine is
+     * flushing far more often than any sane cap, so an over-frequent poll costs
+     * nothing while an under-frequent one loses the feature.
+     */
+    private static final long MAX_POLL_MS = 60_000L;
+    /** Appended to the window title once the run has ended. */
+    private static final String FINISHED = " (finished)";
 
     private final File cur;
     private final CurTail tail;
@@ -50,10 +62,15 @@ public final class LiveCurveWindow extends JFrame {
                 return t;
             });
     /**
-     * The currently scheduled poll, held so it can be replaced once the
-     * header's own refresh rate is known.
+     * The parsed header and its buffers, or null before one has been read and
+     * again after a truncation discards it.
+     *
+     * <p>Volatile because the poller thread assigns it and the EDT reads it in
+     * {@link #buildPanels()} and {@link #publish}. It is safely published today
+     * even without this, because every EDT read happens inside a task posted
+     * after the write, but that property is invisible at the declaration and the
+     * first reader arriving by another route would break it silently.
      */
-
     private volatile LiveModel model;
     private String refusal;
     private int emptyPolls;
@@ -113,7 +130,7 @@ public final class LiveCurveWindow extends JFrame {
     /** The poll period for a header refresh rate in seconds. */
     static long pollMillis(double refreshSeconds) {
         long ms = Math.round(refreshSeconds * 1000.0);
-        return Math.max(MIN_POLL_MS, ms);
+        return Math.min(MAX_POLL_MS, Math.max(MIN_POLL_MS, ms));
     }
 
     /**
@@ -163,7 +180,18 @@ public final class LiveCurveWindow extends JFrame {
         if (stopped) {
             return;
         }
-        tick();
+        try {
+            tick();
+        } catch (Throwable fatal) {
+            // tick() catches IOException and RuntimeException itself, so this can
+            // only be an Error. Caught anyway rather than left to end the chain
+            // in silence: the reachable instance is heap exhaustion from the
+            // per-poll history copy on a very long real-time run, and a frozen
+            // window with no message is the worst way to learn that. Say so and
+            // stop, rather than rescheduling straight back into it.
+            refuse("Run-time curves stopped: " + fatal);
+            return;
+        }
         if (stopped || refusal != null) {
             // finish() and refuse() both end the chain: there is nothing more to
             // read, and refuse() has already shut the poller down.
@@ -208,7 +236,7 @@ public final class LiveCurveWindow extends JFrame {
                 // a guarantee rather than something that merely usually holds.
                 try {
                     tick();
-                    SwingUtilities.invokeLater(() -> setTitle(getTitle() + " (finished)"));
+                    SwingUtilities.invokeLater(this::markFinished);
                 } finally {
                     stopped = true;
                     poller.shutdown();
@@ -291,10 +319,10 @@ public final class LiveCurveWindow extends JFrame {
         } catch (IOException ex) {
             refuse("temp_display.cur could not be read: " + ex.getMessage());
         } catch (RuntimeException ex) {
-            // scheduleWithFixedDelay swallows an unchecked throw into a future
-            // nobody reads and stops re-scheduling, so without this the live
-            // view freezes on its last snapshot with nothing said. A bug here
-            // must be visible, not quiet.
+            // An unchecked throw out of here would end the poll chain, since
+            // pump() only schedules a successor on the paths that fall through,
+            // and the window would freeze on its last snapshot with nothing
+            // said. A bug here must be visible, not quiet.
             refuse("Run-time curves stopped: " + ex);
         }
     }
@@ -304,15 +332,40 @@ public final class LiveCurveWindow extends JFrame {
         if (built) {
             return;
         }
+        // Read the field ONCE, and tolerate null. This runs on the EDT after
+        // being posted from the poller, and a truncation on a later poll sets
+        // model back to null: a buildPanels still queued from the discarded run
+        // would then dereference null. Reachable whenever the EDT is busy for
+        // longer than one poll interval, which MIN_POLL_MS allows to be 100 ms.
+        // Returning without setting built lets the next header build its panels.
+        LiveModel current = model;
+        if (current == null) {
+            built = false;
+            return;
+        }
         built = true;
-        for (int i = 0; i < model.panelCount(); i++) {
+        for (int i = 0; i < current.panelCount(); i++) {
             CurvePanel panel = new CurvePanel();
-            panel.setAxes(model.axesOf(i));
+            panel.setAxes(current.axesOf(i));
             panels.add(panel);
             stack.add(panel);
         }
         stack.revalidate();
         stack.repaint();
+    }
+
+    /**
+     * On the EDT: say once that this run has ended.
+     *
+     * <p>Idempotent because {@code finish()} is legitimately called twice: the
+     * Stop button freezes the window immediately and the run watcher thread
+     * calls it again up to two seconds later. Appending unconditionally gave
+     * "Run-time curves (finished) (finished)".
+     */
+    private void markFinished() {
+        if (!getTitle().endsWith(FINISHED)) {
+            setTitle(getTitle() + FINISHED);
+        }
     }
 
     /** On the EDT: drop the panels so the next header builds its own. */

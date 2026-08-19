@@ -834,6 +834,41 @@ public final class CurveHarness {
         latModel.accept(Arrays.asList(
                 " 0.000000E+00  1.500000E+02  0 ",
                 " 1.000000E-02  1.510000E+02  1 "));
+        // A header that declares ONE column for a two-column display type is
+        // self-consistent against ncol, so CurHeader accepts it, and the panel
+        // must not then index a column the row does not have. Caught rather than
+        // left to propagate: an uncaught ArrayIndexOutOfBoundsException takes the
+        // whole harness run down before any assertion prints, so the outcome is
+        // wrapped to make this a named failure instead of a stack trace.
+        CurHeader thin = CurHeader.parse(Arrays.asList(
+                "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000", "# ncol 2",
+                "# obs 1 2 1 LAT eq1"));
+        String thinOutcome;
+        try {
+            LiveModel thinModel = new LiveModel(thin);
+            thinModel.accept(Arrays.asList(" 0.000000E+00  1.500000E+02 "));
+            thinOutcome = thinModel.snapshot(0).series.get(0).w == null
+                    ? "one column plotted" : "weighted anyway";
+        } catch (RuntimeException tooFar) {
+            thinOutcome = tooFar.getClass().getSimpleName();
+        }
+        check("a one-column LAT header plots its column rather than reading"
+                + " past the row", "one column plotted", thinOutcome);
+
+        // And a zero-column observable, which is self-consistent too and would
+        // index past the row even for a one-column display type.
+        String zeroOutcome;
+        try {
+            CurHeader.parse(Arrays.asList(
+                    "# stepss-cur 1", "# tstop 30.000", "# refresh 1.000",
+                    "# ncol 1", "# obs 1 2 0 BV x"));
+            zeroOutcome = "accepted";
+        } catch (CurHeader.Unsupported refused) {
+            zeroOutcome = refused.getMessage().contains("at least one")
+                    ? "refused" : "refused for the wrong reason";
+        }
+        check("a zero-column observable is refused", "refused", zeroOutcome);
+
         check("the latency flag reaches the series", "[0.0, 1.0]",
                 Arrays.toString(latModel.snapshot(0).series.get(0).w));
         check("and the apparent power is the y value", "151.0",
