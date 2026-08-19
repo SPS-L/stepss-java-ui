@@ -437,6 +437,16 @@ and the methods before `count`:
                 PlotStyle.seriesClass(PlotStyle.SERIES_COLOURS));
         check("wraps twice round", "series1",
                 PlotStyle.seriesClass(PlotStyle.SERIES_COLOURS * 2 + 1));
+        // The two above pass under either operator, because `%` and floorMod
+        // agree on non-negative operands, so neither guards the regression
+        // this method exists to catch. The next one does: `-1 % 8` is -1,
+        // giving "series-1", which of() would resolve silently to the axis
+        // colour. The one after it pins the wrap direction at an exact
+        // multiple, where the two operators do agree.
+        check("wraps a negative index", "series" + (PlotStyle.SERIES_COLOURS - 1),
+                PlotStyle.seriesClass(-1));
+        check("wraps a negative index past the end", "series0",
+                PlotStyle.seriesClass(-PlotStyle.SERIES_COLOURS));
     }
 
     /** The style block is generated from ENTRIES, so every class must appear. */
