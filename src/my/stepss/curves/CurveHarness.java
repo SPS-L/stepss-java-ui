@@ -226,13 +226,18 @@ public final class CurveHarness {
         CurvePanel panel = new CurvePanel();
         panel.setData(CurReader.parse(SMOKE, null, SMOKE_LABELS));
         check("starts unzoomed", false, panel.zoomed());
+        panel.setSize(600, 400);
+        String unzoomed = panel.readoutAt(300, 200);
         panel.setZoom(0.0, 0.25, 1.0, 1.25);
         check("zoom is recorded", true, panel.zoomed());
-        String zoomedSvg = panel.toSvg(600, 400);
+        check("zooming changes what a device point reads", false,
+                unzoomed.equals(panel.readoutAt(300, 200)));
         check("still one polyline per curve when zoomed", 4,
-                count(zoomedSvg, "<polyline"));
+                count(panel.toSvg(600, 400), "<polyline"));
         panel.resetZoom();
         check("reset clears it", false, panel.zoomed());
+        check("resetting restores what the point read before", unzoomed,
+                panel.readoutAt(300, 200));
     }
 
     private static void readoutIsNullOutsideThePlotArea() {
