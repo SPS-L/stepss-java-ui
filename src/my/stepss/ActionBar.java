@@ -10,6 +10,7 @@ import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JSeparator;
 import javax.swing.SwingConstants;
+import javax.swing.ToolTipManager;
 import javax.swing.UIManager;
 
 /**
@@ -28,11 +29,40 @@ import javax.swing.UIManager;
  */
 final class ActionBar {
 
-    private final JPanel bar = new JPanel();
+    private final JPanel bar = new Bar();
 
     private ActionBar() {
         bar.setLayout(new BoxLayout(bar, BoxLayout.LINE_AXIS));
         bar.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        // See Bar: the panel answers for its disabled children.
+        ToolTipManager.sharedInstance().registerComponent(bar);
+    }
+
+    /**
+     * A bar that shows the tooltip of a disabled button under the pointer.
+     *
+     * <p>Swing does not. A disabled component receives no mouse events at all,
+     * so ToolTipManager never hears that the pointer is over it and nothing
+     * appears. On these bars that inverts the help: five of Codegen's six
+     * buttons and six of the Power Flow tab's eight start disabled, and being
+     * disabled is precisely when someone wants to know what the button is for
+     * and what would enable it.
+     *
+     * <p>The panel is the component the manager knows about, and it answers
+     * for whichever child is under the pointer. Enabled children are left
+     * alone and answer for themselves, so this changes nothing about the ones
+     * that already worked.
+     */
+    private static final class Bar extends JPanel {
+
+        @Override
+        public String getToolTipText(java.awt.event.MouseEvent event) {
+            Component under = getComponentAt(event.getPoint());
+            if (under instanceof JComponent && under != this && !under.isEnabled()) {
+                return ((JComponent) under).getToolTipText();
+            }
+            return null;
+        }
     }
 
     static ActionBar create() {
