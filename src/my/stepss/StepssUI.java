@@ -287,6 +287,7 @@ public class StepssUI extends javax.swing.JFrame {
         helpMenu.setMnemonic(KeyEvent.VK_H);
         styleEditButtons();
         styleConsoles();
+        labelsShareTheirFieldsTooltips();
         addThemeToggle();
         addUpdateToggle();
         applyBranding();
@@ -966,6 +967,21 @@ public class StepssUI extends javax.swing.JFrame {
     }
 
     /**
+     * Puts each Analysis field's tooltip on the label beside it.
+     *
+     * <p>A label is the larger target and the likelier place to hover when the
+     * question is what the field is for, and Swing gives a label no tooltip of
+     * its own. Copied rather than written twice so the two cannot drift; the
+     * real-part and PF-threshold pair are left out here because
+     * {@link #applyEngineCapabilities} rewrites theirs on every engine change
+     * and sets the labels in the same breath.
+     */
+    private void labelsShareTheirFieldsTooltips() {
+        ssaBasenameLabel.setToolTipText(ssaBasename.getToolTipText());
+        ssaTimeLabel.setToolTipText(ssaTime.getToolTipText());
+    }
+
+    /**
      * Gives the three console panes a monospaced font at the size the rest of
      * the interface is using.
      *
@@ -1444,6 +1460,7 @@ public class StepssUI extends javax.swing.JFrame {
         jLabel1.setName("jLabel1"); // NOI18N
 
         clearDataFiles.setText("Clear files");
+        clearDataFiles.setToolTipText("Empties every row on this tab: the ten data files, the disturbance file and the one-line diagram.");
         clearDataFiles.setName("clearDataFiles"); // NOI18N
         clearDataFiles.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1774,6 +1791,7 @@ public class StepssUI extends javax.swing.JFrame {
         jPanel4.setName("jPanel4"); // NOI18N
 
         clearObsFileButton.setText("Clear files");
+        clearObsFileButton.setToolTipText("<html>Empties the whole tab: the three runtime rows, the four recording checkboxes,<br>\nthe observables file, and anything chosen in the dialog.</html>");
         clearObsFileButton.setName("clearObsFileButton"); // NOI18N
         clearObsFileButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1782,7 +1800,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         saveOutputTrajButton.setText("Save output trajectory");
-        saveOutputTrajButton.setToolTipText("<html>Click to save the trajectories of certain observables during the simulation. <br>\nThese observables need to be specified in a file and loaded below or with the Observable File Wizard.</html>");
+        saveOutputTrajButton.setToolTipText("<html>Click to save the trajectories of certain observables during the simulation. <br>\nThese observables need to be specified in a file and loaded below, or built with Show observable dialog.</html>");
         saveOutputTrajButton.setName("saveOutputTrajButton"); // NOI18N
         saveOutputTrajButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1791,7 +1809,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         loadObsButton.setText("Load file");
-        loadObsButton.setToolTipText("<html>Click to load the file with the list of observables to be saved during the simulation.<br><br>\nEach observable needs to be on one line. The possibilities are: <br>\nBUS: followed by one bus name or * to denote all buses <br>\nSYNC: followed by one synchronous machine name or * to denote all sync machines<br>\nSHUNT: followed by a bus name or * to denote all buses<br>\nBRANCH: followed by the branch name or * to denote all branches<br>\nINJEC: followed by the injector name or * to denote all injectors<br>\nLINK: followed by the dclink name or * to denote all dclinks<br><br>\nAn example of an observable file is:<br><br>\nBUS B01 <br>\nSYNC SM01 <br>\nSYNC SM02 <br>\nSYNC SM03 <br>\nBRANCH *<br><br>\nwhich will save BUS B01 observables, synchronous machines SM01, SM02 and SM03 and all the branches observables.</html>");
+        loadObsButton.setToolTipText("<html>Click to load the file listing the observables saved during the simulation.<br><br>\nOne request per line: a type, then the equipment's name, or * for every one of that type.<br>\nThe eight types are BUS, SHUNT, IMPLOAD, BRANCH, SYNC, INJEC, TWOP and DCTL.<br><br>\nFor example:<br><br>\nBUS b7<br>\nSYNC g1<br>\nSYNC g2<br>\nBRANCH *<br><br>\nBUS-REC and BRANCH-CUR record rectangular voltages and currents instead.<br>\nThe ? beside this row opens the full reference.</html>");
         loadObsButton.setName("loadObsButton"); // NOI18N
         loadObsButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1810,6 +1828,7 @@ public class StepssUI extends javax.swing.JFrame {
         saveDumpButton.setName("saveDumpButton"); // NOI18N
 
         observFileWizButton.setText("Show observable dialog");
+        observFileWizButton.setToolTipText("Builds an observables file by picking equipment from the case, instead of writing one by hand.");
         observFileWizButton.setName("observFileWizButton"); // NOI18N
         observFileWizButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1958,7 +1977,7 @@ public class StepssUI extends javax.swing.JFrame {
         jScrollPane3.setViewportView(pfcPane);
 
         runPF.setText("Run power flow");
-        runPF.setToolTipText("Click to run the simulation.");
+        runPF.setToolTipText("Solves the power flow with Helios, giving the operating point the dynamic simulation starts from.");
         runPF.setName("runPF"); // NOI18N
         runPF.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -1967,7 +1986,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         loadBusOverview.setText("Bus overview");
-        loadBusOverview.setToolTipText("<html>Click to see the discrete trace of the simulation.<br>\nThis involves a detailed view on the discrete changes happening during the simulation.</html>");
+        loadBusOverview.setToolTipText("<html>Shows the solved bus voltages and angles in the pane above.<br>\nRead back from in_net.res.</html>");
         loadBusOverview.setEnabled(false);
         loadBusOverview.setName("loadBusOverview"); // NOI18N
         loadBusOverview.addActionListener(new java.awt.event.ActionListener() {
@@ -1987,7 +2006,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         loadLFRESV2DAT.setText("Add Helios results to data");
-        loadLFRESV2DAT.setToolTipText("<html>Click to see the discrete trace of the simulation.<br>\nThis involves a detailed view on the discrete changes happening during the simulation.</html>");
+        loadLFRESV2DAT.setToolTipText("<html>Puts this run's in_volt_trfo.dat into system data row 10.<br>\nThe dynamic simulation then starts from the operating point just solved.</html>");
         loadLFRESV2DAT.setEnabled(false);
         loadLFRESV2DAT.setName("loadLFRESV2DAT"); // NOI18N
         loadLFRESV2DAT.addActionListener(new java.awt.event.ActionListener() {
@@ -2007,7 +2026,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         loadGens.setText("Generators & SVCs");
-        loadGens.setToolTipText("<html>Click to see the discrete trace of the simulation.<br>\nThis involves a detailed view on the discrete changes happening during the simulation.</html>");
+        loadGens.setToolTipText("<html>Shows generator and SVC output against their limits, in the pane above.<br>\nRead back from in_gen.res and in_svc.res.</html>");
         loadGens.setEnabled(false);
         loadGens.setName("loadGens"); // NOI18N
         loadGens.addActionListener(new java.awt.event.ActionListener() {
@@ -2017,7 +2036,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         loadTrfos.setText("Adjustable transformers");
-        loadTrfos.setToolTipText("<html>Click to see the discrete trace of the simulation.<br>\nThis involves a detailed view on the discrete changes happening during the simulation.</html>");
+        loadTrfos.setToolTipText("<html>Shows the transformer ratios in the pane above, including any Helios adjusted.<br>\nRead back from in_trfo.res.</html>");
         loadTrfos.setEnabled(false);
         loadTrfos.setName("loadTrfos"); // NOI18N
         loadTrfos.addActionListener(new java.awt.event.ActionListener() {
@@ -2027,7 +2046,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         loadPow.setText("Global power balance");
-        loadPow.setToolTipText("<html>Click to see the discrete trace of the simulation.<br>\nThis involves a detailed view on the discrete changes happening during the simulation.</html>");
+        loadPow.setToolTipText("<html>Shows generation, load, shunts and network losses in the pane above.<br>\nRead back from in_bal.res.</html>");
         loadPow.setEnabled(false);
         loadPow.setName("loadPow"); // NOI18N
         loadPow.addActionListener(new java.awt.event.ActionListener() {
@@ -2186,7 +2205,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         searchTextField.setText("Search...");
-        searchTextField.setToolTipText("Serch in the information above for some keyxords.");
+        searchTextField.setToolTipText("<html>Finds text in the pane above.<br>\nEnter highlights the next match, and starts again from the top once there are no more.</html>");
         searchTextField.setName("searchTextField"); // NOI18N
         searchTextField.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusGained(java.awt.event.FocusEvent evt) {
@@ -2325,6 +2344,7 @@ public class StepssUI extends javax.swing.JFrame {
         jLabel8.setName("jLabel8"); // NOI18N
 
         ssaButton1.setText("Run small-signal stability analysis");
+        ssaButton1.setToolTipText("<html>Linearises the case at the analysis time and computes its eigenvalues.<br>\nEach run opens its own results window; the engine's own output goes to the Dynamic Simulation pane.</html>");
         ssaButton1.setName("ssaButton1"); // NOI18N
         ssaButton1.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2478,6 +2498,7 @@ public class StepssUI extends javax.swing.JFrame {
         jScrollPane2.setViewportView(codegenPane);
 
         loadCodegenFiles.setText("Load files for Codegen");
+        loadCodegenFiles.setToolTipText("Takes one or more model descriptions written in the CODEGEN language, as .txt files.");
         loadCodegenFiles.setName("loadCodegenFiles"); // NOI18N
         loadCodegenFiles.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2486,6 +2507,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         execCodegen.setText("Run Codegen");
+        execCodegen.setToolTipText("Translates the loaded descriptions into Fortran, reporting each block with its equation and state counts.");
         execCodegen.setEnabled(false);
         execCodegen.setName("execCodegen"); // NOI18N
         execCodegen.addActionListener(new java.awt.event.ActionListener() {
@@ -2495,6 +2517,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         displayCGfiles.setText("Display loaded files");
+        displayCGfiles.setToolTipText("Lists the Fortran files Run Codegen has generated so far in the working directory.");
         displayCGfiles.setEnabled(false);
         displayCGfiles.setName("displayCGfiles"); // NOI18N
         displayCGfiles.addActionListener(new java.awt.event.ActionListener() {
@@ -2504,6 +2527,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         saveCGFiles.setText("Save converted files");
+        saveCGFiles.setToolTipText("Copies the generated .f90 files into a directory of your choosing.");
         saveCGFiles.setEnabled(false);
         saveCGFiles.setName("saveCGFiles"); // NOI18N
         saveCGFiles.addActionListener(new java.awt.event.ActionListener() {
@@ -2513,6 +2537,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         Compile.setText("Compile");
+        Compile.setToolTipText("<html>Builds and links the generated Fortran against the engine, giving a custom simulator.<br>\nNeeds a Fortran toolchain on the machine; translating a model does not.</html>");
         Compile.setEnabled(false);
         Compile.setName("Compile"); // NOI18N
         Compile.addActionListener(new java.awt.event.ActionListener() {
@@ -2522,6 +2547,7 @@ public class StepssUI extends javax.swing.JFrame {
         });
 
         savedynsim.setText("Save executable");
+        savedynsim.setToolTipText("Keeps the compiled simulator as a file, rather than rebuilding it next time.");
         savedynsim.setEnabled(false);
         savedynsim.setName("savedynsim"); // NOI18N
         savedynsim.addActionListener(new java.awt.event.ActionListener() {
@@ -7297,7 +7323,9 @@ public class StepssUI extends javax.swing.JFrame {
         if (eigParametersSupported) {
             String tip = "Passed to the EIG record and recorded in the results header.";
             ssaRealLimit.setToolTipText(tip);
+            ssaRealLimitLabel.setToolTipText(tip);
             ssaPfThreshold.setToolTipText(tip);
+            ssaPfThresholdLabel.setToolTipText(tip);
         } else {
             // Naming the version read, rather than repeating a fixed sentence,
             // is what distinguishes "the bundled engine is old" from "you
@@ -7313,7 +7341,9 @@ public class StepssUI extends javax.swing.JFrame {
                     + ". It would ignore these values silently, so they are"
                     + " disabled rather than misleading.";
             ssaRealLimit.setToolTipText(tip);
+            ssaRealLimitLabel.setToolTipText(tip);
             ssaPfThreshold.setToolTipText(tip);
+            ssaPfThresholdLabel.setToolTipText(tip);
             ssaEngineNote.setToolTipText(tip);
         }
     }

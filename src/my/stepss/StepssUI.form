@@ -759,6 +759,7 @@
                 <Component class="javax.swing.JButton" name="clearDataFiles">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Clear files"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Empties every row on this tab: the ten data files, the disturbance file and the one-line diagram."/>
                     <Property name="name" type="java.lang.String" value="clearDataFiles" noResource="true"/>
                   </Properties>
                   <Events>
@@ -1109,6 +1110,7 @@
                 <Component class="javax.swing.JButton" name="clearObsFileButton">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Clear files"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Empties the whole tab: the three runtime rows, the four recording checkboxes,&lt;br&gt;&#xa;the observables file, and anything chosen in the dialog.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="clearObsFileButton" noResource="true"/>
                   </Properties>
                   <Events>
@@ -1118,7 +1120,7 @@
                 <Component class="javax.swing.JCheckBox" name="saveOutputTrajButton">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Save output trajectory"/>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to save the trajectories of certain observables during the simulation. &lt;br&gt;&#xa;These observables need to be specified in a file and loaded below or with the Observable File Wizard.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to save the trajectories of certain observables during the simulation. &lt;br&gt;&#xa;These observables need to be specified in a file and loaded below, or built with Show observable dialog.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="saveOutputTrajButton" noResource="true"/>
                   </Properties>
                   <Events>
@@ -1128,7 +1130,7 @@
                 <Component class="javax.swing.JButton" name="loadObsButton">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Load file"/>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to load the file with the list of observables to be saved during the simulation.&lt;br&gt;&lt;br&gt;&#xa;Each observable needs to be on one line. The possibilities are: &lt;br&gt;&#xa;BUS: followed by one bus name or * to denote all buses &lt;br&gt;&#xa;SYNC: followed by one synchronous machine name or * to denote all sync machines&lt;br&gt;&#xa;SHUNT: followed by a bus name or * to denote all buses&lt;br&gt;&#xa;BRANCH: followed by the branch name or * to denote all branches&lt;br&gt;&#xa;INJEC: followed by the injector name or * to denote all injectors&lt;br&gt;&#xa;LINK: followed by the dclink name or * to denote all dclinks&lt;br&gt;&lt;br&gt;&#xa;An example of an observable file is:&lt;br&gt;&lt;br&gt;&#xa;BUS B01 &lt;br&gt;&#xa;SYNC SM01 &lt;br&gt;&#xa;SYNC SM02 &lt;br&gt;&#xa;SYNC SM03 &lt;br&gt;&#xa;BRANCH *&lt;br&gt;&lt;br&gt;&#xa;which will save BUS B01 observables, synchronous machines SM01, SM02 and SM03 and all the branches observables.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to load the file listing the observables saved during the simulation.&lt;br&gt;&lt;br&gt;&#xa;One request per line: a type, then the equipment's name, or * for every one of that type.&lt;br&gt;&#xa;The eight types are BUS, SHUNT, IMPLOAD, BRANCH, SYNC, INJEC, TWOP and DCTL.&lt;br&gt;&lt;br&gt;&#xa;For example:&lt;br&gt;&lt;br&gt;&#xa;BUS b7&lt;br&gt;&#xa;SYNC g1&lt;br&gt;&#xa;SYNC g2&lt;br&gt;&#xa;BRANCH *&lt;br&gt;&lt;br&gt;&#xa;BUS-REC and BRANCH-CUR record rectangular voltages and currents instead.&lt;br&gt;&#xa;The ? beside this row opens the full reference.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="loadObsButton" noResource="true"/>
                   </Properties>
                   <Events>
@@ -1157,6 +1159,7 @@
                 <Component class="javax.swing.JCheckBox" name="observFileWizButton">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Show observable dialog"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Builds an observables file by picking equipment from the case, instead of writing one by hand."/>
                     <Property name="name" type="java.lang.String" value="observFileWizButton" noResource="true"/>
                   </Properties>
                   <Events>
@@ -1331,7 +1334,7 @@
                 <Component class="javax.swing.JButton" name="runPF">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Run power flow"/>
-                    <Property name="toolTipText" type="java.lang.String" value="Click to run the simulation."/>
+                    <Property name="toolTipText" type="java.lang.String" value="Solves the power flow with Helios, giving the operating point the dynamic simulation starts from."/>
                     <Property name="name" type="java.lang.String" value="runPF" noResource="true"/>
                   </Properties>
                   <Events>
@@ -1341,7 +1344,7 @@
                 <Component class="javax.swing.JButton" name="loadBusOverview">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Bus overview"/>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the discrete trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the discrete changes happening during the simulation.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Shows the solved bus voltages and angles in the pane above.&lt;br&gt;&#xa;Read back from in_net.res.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadBusOverview" noResource="true"/>
                   </Properties>
@@ -1352,7 +1355,7 @@
                 <Component class="javax.swing.JButton" name="loadLFRESV2DAT">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Add Helios results to data"/>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the discrete trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the discrete changes happening during the simulation.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Puts this run's in_volt_trfo.dat into system data row 10.&lt;br&gt;&#xa;The dynamic simulation then starts from the operating point just solved.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadLFRESV2DAT" noResource="true"/>
                   </Properties>
@@ -1385,7 +1388,7 @@
                 <Component class="javax.swing.JButton" name="loadGens">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Generators &amp; SVCs"/>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the discrete trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the discrete changes happening during the simulation.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Shows generator and SVC output against their limits, in the pane above.&lt;br&gt;&#xa;Read back from in_gen.res and in_svc.res.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadGens" noResource="true"/>
                   </Properties>
@@ -1396,7 +1399,7 @@
                 <Component class="javax.swing.JButton" name="loadTrfos">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Adjustable transformers"/>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the discrete trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the discrete changes happening during the simulation.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Shows the transformer ratios in the pane above, including any Helios adjusted.&lt;br&gt;&#xa;Read back from in_trfo.res.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadTrfos" noResource="true"/>
                   </Properties>
@@ -1407,7 +1410,7 @@
                 <Component class="javax.swing.JButton" name="loadPow">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Global power balance"/>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the discrete trace of the simulation.&lt;br&gt;&#xa;This involves a detailed view on the discrete changes happening during the simulation.&lt;/html&gt;"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Shows generation, load, shunts and network losses in the pane above.&lt;br&gt;&#xa;Read back from in_bal.res.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="loadPow" noResource="true"/>
                   </Properties>
@@ -1619,7 +1622,7 @@
                 <Component class="javax.swing.JTextField" name="searchTextField">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Search..."/>
-                    <Property name="toolTipText" type="java.lang.String" value="Serch in the information above for some keyxords."/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Finds text in the pane above.&lt;br&gt;&#xa;Enter highlights the next match, and starts again from the top once there are no more.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="searchTextField" noResource="true"/>
                   </Properties>
                   <Events>
@@ -1822,6 +1825,7 @@
                 <Component class="javax.swing.JButton" name="ssaButton1">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Run small-signal stability analysis"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Linearises the case at the analysis time and computes its eigenvalues.&lt;br&gt;&#xa;Each run opens its own results window; the engine's own output goes to the Dynamic Simulation pane.&lt;/html&gt;"/>
                     <Property name="name" type="java.lang.String" value="ssaButton1" noResource="true"/>
                   </Properties>
                   <Events>
@@ -1988,6 +1992,7 @@
                 <Component class="javax.swing.JButton" name="loadCodegenFiles">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Load files for Codegen"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Takes one or more model descriptions written in the CODEGEN language, as .txt files."/>
                     <Property name="name" type="java.lang.String" value="loadCodegenFiles" noResource="true"/>
                   </Properties>
                   <Events>
@@ -1997,6 +2002,7 @@
                 <Component class="javax.swing.JButton" name="execCodegen">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Run Codegen"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Translates the loaded descriptions into Fortran, reporting each block with its equation and state counts."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="execCodegen" noResource="true"/>
                   </Properties>
@@ -2007,6 +2013,7 @@
                 <Component class="javax.swing.JButton" name="displayCGfiles">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Display loaded files"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Lists the Fortran files Run Codegen has generated so far in the working directory."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="displayCGfiles" noResource="true"/>
                   </Properties>
@@ -2017,6 +2024,7 @@
                 <Component class="javax.swing.JButton" name="saveCGFiles">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Save converted files"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Copies the generated .f90 files into a directory of your choosing."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="saveCGFiles" noResource="true"/>
                   </Properties>
@@ -2027,6 +2035,7 @@
                 <Component class="javax.swing.JButton" name="Compile">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Compile"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Builds and links the generated Fortran against the engine, giving a custom simulator.&lt;br&gt;&#xa;Needs a Fortran toolchain on the machine; translating a model does not.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="Compile" noResource="true"/>
                   </Properties>
@@ -2037,6 +2046,7 @@
                 <Component class="javax.swing.JButton" name="savedynsim">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Save executable"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Keeps the compiled simulator as a file, rather than rebuilding it next time."/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="savedynsim" noResource="true"/>
                   </Properties>
