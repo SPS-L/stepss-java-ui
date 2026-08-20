@@ -2780,6 +2780,18 @@ public class StepssUI extends javax.swing.JFrame {
                     out.newLine();
                 }
             }
+            // Last, which is what makes it an override. The engine restores
+            // its defaults and then applies the $ records in the order the
+            // files were read, keeping the last of each, so a file listed
+            // after the case's own decides the settings the run uses. The two
+            // records in it are the two the analysis refuses to run without,
+            // and writing them here rather than asking the user to edit their
+            // solver settings is why the button works on any case. Non-null
+            // only for the duration of an SSA run; see the EIG button.
+            if (ssaSettings != null) {
+                out.append(ssaSettings);
+                out.newLine();
+            }
 
             out.newLine();
 
@@ -4058,9 +4070,10 @@ public class StepssUI extends javax.swing.JFrame {
             // The basename becomes both a filename and a Fortran record, so it
             // is checked before either is written. An apostrophe closes the EIG
             // argument early and the engine then writes nothing, which would
-            // surface as the "No results were produced" dialog below, naming
-            // solver settings that were never the problem. A path separator
-            // writes the files somewhere the loader will not look.
+            // surface as the "No results were produced" dialog below, sending
+            // the user to look for an engine message that was never about the
+            // basename. A path separator writes the files somewhere the loader
+            // will not look.
             if (!my.stepss.ssa.SsaDisturbance.validBasename(base)) {
                 banner.warn("The results basename \"" + base + "\" cannot be used.\n\n"
                         + "It names the three results files and is written into the\n"
@@ -4117,12 +4130,61 @@ public class StepssUI extends javax.swing.JFrame {
                     : my.stepss.ssa.SsaDisturbance.text(base, analysisTime);
             FileUtils.writeStringToFile(dstFile, dstText, "UTF-8");
 
+            // The analysis is refused under $SCHEME IN or $OMEGA_REF COI, and
+            // COI is the engine's default, so a case that says nothing about
+            // either lands on a refusal. The settings the run needs are
+            // generated the way the disturbance above is and appended to the
+            // data files, where being last makes them win; see SsaSettings.
+            // The user's own solver settings file is never touched, so the
+            // next time-domain run is unaffected by having analysed the case.
+            File settingsFile = new File(myTempDir.getAbsolutePath()
+                    + System.getProperty("file.separator")
+                    + my.stepss.ssa.SsaSettings.fileName(base));
+            // Refused rather than written, for the reason the diagram template
+            // check in createPFCCommandFile gives: a loaded data file of this
+            // name is the user's, and writing over it would destroy it
+            // silently, the run continuing on the two records that replaced
+            // their case.
+            for (JTextField s : dataFileList) {
+                if (!s.getText().isEmpty()
+                        && sameFile(inWorkingDir(s.getText()), settingsFile)) {
+                    banner.warn("The run needs to write " + settingsFile.getName()
+                            + ", which is one of the loaded data files.\n\n"
+                            + "Choose a different results basename, or move that file,"
+                            + " so the analysis does not overwrite it.");
+                    return;
+                }
+            }
+            FileUtils.writeStringToFile(settingsFile,
+                    my.stepss.ssa.SsaSettings.text(), "UTF-8");
+
             String tmpString = fileDist.getText();
             fileDist.setText(dstFile.getName());
+            ssaSettings = settingsFile.getName();
             ssa = true;
-            runSimulationActionPerformed(evt);
-            simulExecutorResultHandler.waitFor();
-            fileDist.setText(tmpString);
+            // The engine's output goes to the simulation output pane, which
+            // keeps what earlier runs wrote, so the analysis says where it
+            // starts. Without this an SSA run that produced nothing leaves a
+            // reason that reads as part of the previous run's tail.
+            if (outputstream != null) {
+                outputstream.message("--- small-signal stability analysis: "
+                        + base + " ---");
+            }
+            try {
+                runSimulationActionPerformed(evt);
+                simulExecutorResultHandler.waitFor();
+            } finally {
+                // In a finally because all three outlive this handler if they
+                // are not put back: the disturbance field is the user's, and
+                // the other two decide what the *next* command file says. The
+                // ssa flag used to be cleared inside runSimulation instead,
+                // which left it set on every path that returns before the
+                // engine is launched, and the next ordinary run then had its
+                // observables silently suppressed.
+                fileDist.setText(tmpString);
+                ssaSettings = null;
+                ssa = false;
+            }
 
             // The analysis refuses rather than guessing when it cannot produce a
             // result it can justify, and says so through the exit code, so a
@@ -4130,9 +4192,15 @@ public class StepssUI extends javax.swing.JFrame {
             File modes = new File(myTempDir.getAbsolutePath()
                     + System.getProperty("file.separator") + base + "_modes.dat");
             if (!modes.exists()) {
-                banner.warn("No results were produced. Small-signal analysis needs $OMEGA_REF SYN and\n"
-                        + "$SCHEME DE in the solver settings, and a system within $EIG_MAX_STATES.\n"
-                        + "See the log for the reason.");
+                // The two settings the analysis needs are no longer worth
+                // naming here: the run was given them itself, so a failure is
+                // something else and pointing at the solver settings would
+                // send the user to edit a file that is already correct.
+                banner.warn("No results were produced. The run was given $SCHEME DE and\n"
+                        + "$OMEGA_REF SYN, so the reason is elsewhere: usually a system\n"
+                        + "with more states than $EIG_MAX_STATES allows, or one with no\n"
+                        + "differential states at all. The engine says which, at the end\n"
+                        + "of the simulation output on the Dynamic Simulation tab.");
                 return;
             }
 
@@ -4957,12 +5025,11 @@ public class StepssUI extends javax.swing.JFrame {
     private void runSimulationActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runSimulationActionPerformed
         // Captured here, not at the point of use. Small-signal analysis reaches
         // this method with the ssa flag set (see the EIG button, which sets it
-        // and then calls this), createCommandFile writes no observable rows
-        // when it is set, and the flag is cleared further down this method
-        // before the process is launched. Testing it later therefore reads
-        // false on an SSA run and would open a live window for a run whose
-        // engine was told to write no observables, leaving it waiting for data
-        // that never arrives.
+        // and then calls this) and createCommandFile writes no observable rows
+        // when it is set, so a live curve window opened for such a run would
+        // wait for data the engine was told not to write. Reading the flag
+        // once, before any of the work below, is what keeps the two decisions
+        // from disagreeing; the button clears it when its run is over.
         final boolean runtimeCurves = !ssa && anyRuntimeObservable();
         String problem = createCommandFile();
         if (problem != null) {
@@ -4986,12 +5053,22 @@ public class StepssUI extends javax.swing.JFrame {
         simulExecutor = new DefaultExecutor();
         simulExecutor.setExitValue(1);
         ShutdownHookProcessDestroyer processDestroyer = new ShutdownHookProcessDestroyer();
-        if (!ssa) {
-            PumpStreamHandler streamHandler = new PumpStreamHandler(outputstream, outputstreamErr);
-            simulExecutor.setStreamHandler(streamHandler);
-        } else {
-            ssa = false;
-        }
+        // On every run, small-signal included. A small-signal run used to be
+        // launched with no stream handler at all, which does not discard the
+        // engine's output so much as hide it: Commons Exec then falls back to
+        // the JVM's own stdout, which a windowed application has no view of.
+        // The engine has no log file to fall back on either -- run as an
+        // executable it writes to the terminal (ramses.f90 sets log to
+        // OUTPUT_UNIT; only the C API takes a file) -- so the reason a refused
+        // analysis gives for refusing was reaching nowhere at all, while the
+        // dialog told the user to go and read it.
+        //
+        // Safe from the EIG button, which blocks the event thread in waitFor()
+        // until the engine exits: the sink marshals its appends with
+        // invokeLater, so the pump threads never wait on the blocked thread,
+        // and the queued text lands as soon as the handler returns.
+        PumpStreamHandler streamHandler = new PumpStreamHandler(outputstream, outputstreamErr);
+        simulExecutor.setStreamHandler(streamHandler);
         simulExecutor.setWorkingDirectory(myTempDir);
         simulExecutor.setProcessDestroyer(processDestroyer);
         final File runtimeCur = new File(myTempDir, "temp_display.cur");
@@ -6868,6 +6945,12 @@ public class StepssUI extends javax.swing.JFrame {
     private static final String RELEASES_URL = "https://github.com/SPS-L/stepss-java-ui/releases";
     private static final String RELEASES_LATEST_URL = RELEASES_URL + "/latest";
     private boolean ssa = false;
+    // The generated settings file the current small-signal run is to be given
+    // after its data files, or null when no such run is in progress. A name
+    // rather than a flag because createCommandFile writes it verbatim, and
+    // null outside the run because that method also serves File->Save command
+    // file, where an override the user never asked for has no business.
+    private String ssaSettings = null;
     // Whether the engine in use accepts real_limit and pf_threshold on its EIG
     // record. Set by applyEngineCapabilities() from the engine's own banner on
     // every initRamses(), so an adopted Codegen build re-decides it. False
