@@ -669,9 +669,9 @@ public final class CurveHarness {
         live.setData(one);
         String liveSvg = live.toSvg(800, 500);
         check("a fixed x range reaches the far tick", "true",
-                String.valueOf(liveSvg.contains(">30.0<")));
+                String.valueOf(liveSvg.contains(">30<")));
         check("a data-fitting tick is absent, so the range is not autoscaled",
-                "false", String.valueOf(liveSvg.contains(">2.000<")));
+                "false", String.valueOf(liveSvg.contains(">2.0<")));
         check("the panel title is drawn", "true",
                 String.valueOf(liveSvg.contains("BUS 4044")));
         check("and the legend is suppressed", "false",
@@ -764,6 +764,36 @@ public final class CurveHarness {
                 "false", String.valueOf(edgeSvg.contains(",450.00 ")
                         || edgeSvg.contains(",30.00 ")));
 
+        // Tick labels must distinguish adjacent ticks. A machine speed near
+        // 1.0 pu steps by a fraction of a thousandth, and formatting by the
+        // value's magnitude gave a six-tick axis reading 1.000, 1.000, 1.000,
+        // 1.000, 0.999, 0.999. Speed and voltage are the two most common
+        // observables and both sit near 1.0, so this was the common case. Found
+        // by looking at a real run's window, not by any check here.
+        CurveData narrow = new CurveData(Arrays.asList(
+                new CurveSeries("Omega (pu)", "pu",
+                        new double[] {0.0, 1.0, 2.0, 3.0},
+                        new double[] {1.0, 0.9988, 1.0002, 0.9995})),
+                null, 0);
+        CurvePanel fine = new CurvePanel();
+        fine.setAxes(new CurveAxes("Machine G1", "t (s)", "Omega (pu)",
+                0.0, 60.0, false, false));
+        fine.setData(narrow);
+        String fineSvg = fine.toSvg(1000, 300);
+        java.util.Set<String> labels = new java.util.LinkedHashSet<String>();
+        int dupes = 0;
+        java.util.regex.Matcher lm = java.util.regex.Pattern.compile(
+                "text-anchor=\"end\" class=\"label\">([^<]*)</text>").matcher(fineSvg);
+        while (lm.find()) {
+            if (!labels.add(lm.group(1))) {
+                dupes++;
+            }
+        }
+        check("every y tick label on a narrow axis is distinct", "0",
+                String.valueOf(dupes));
+        check("and there is more than one of them", "true",
+                String.valueOf(labels.size() > 1));
+
         // A fixed x range is used exactly, so a run's last sample reaches the
         // frame's right edge even when the stop time is off the tick ladder.
         // 12.5 rounds to 15, which drew a completed run to 83% of the width.
@@ -771,7 +801,7 @@ public final class CurveHarness {
         odd.setAxes(new CurveAxes("", "t (s)", "V (pu)", 0.0, 12.5, false, false));
         odd.setData(one);
         check("a fixed range that misses the tick ladder still fills the frame",
-                "false", String.valueOf(odd.toSvg(800, 500).contains(">15.0<")));
+                "false", String.valueOf(odd.toSvg(800, 500).contains(">15<")));
     }
 
     private static void checkLiveModel() throws CurHeader.Unsupported {

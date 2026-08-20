@@ -257,12 +257,12 @@ public final class CurvePanel extends JPanel {
         for (double x = b.xLo; x <= b.xHi + b.xStep * 1e-9; x += b.xStep) {
             double dx = b.px(x);
             sink.line(dx, b.py(b.yLo), dx, b.py(b.yLo) + TICK_LEN, "axis");
-            sink.text(dx, b.py(b.yLo) + TICK_LEN + 13.0, tick(x), "middle", "label");
+            sink.text(dx, b.py(b.yLo) + TICK_LEN + 13.0, tick(x, b.xStep), "middle", "label");
         }
         for (double y = b.yLo; y <= b.yHi + b.yStep * 1e-9; y += b.yStep) {
             double dy = b.py(y);
             sink.line(b.px(b.xLo) - TICK_LEN, dy, b.px(b.xLo), dy, "axis");
-            sink.text(b.px(b.xLo) - TICK_LEN - 3.0, dy + 4.0, tick(y), "end", "label");
+            sink.text(b.px(b.xLo) - TICK_LEN - 3.0, dy + 4.0, tick(y, b.yStep), "end", "label");
         }
         sink.endGroup();
 
@@ -429,13 +429,32 @@ public final class CurvePanel extends JPanel {
         return new Bounds(x[0], x[1], y[0], y[1], xStep, yStep, width, height, padTop);
     }
 
-    /** Short enough that neighbouring ticks do not run into each other. */
-    private static String tick(double value) {
+    /**
+     * A tick label carrying enough decimals to tell it from its neighbours.
+     *
+     * <p>The decimal count comes from the STEP, not from the value's magnitude.
+     * Choosing it by magnitude produced a machine-speed axis reading 1.000,
+     * 1.000, 1.000, 1.000, 0.999, 0.999: six ticks and four identical labels,
+     * because the step was 0.0005 and the format was fixed at three decimals.
+     * Speed and voltage both sit near 1.0 in per unit, so that was the common
+     * case rather than an edge one, and it also made the axis actively
+     * misleading rather than merely coarse.
+     *
+     * <p>Not caught by any check, and not catchable by reading either: every
+     * fixture plotted a range wide enough for three decimals to separate, and
+     * the defect is only visible in rendered label text. It turned up the first
+     * time the window was pointed at a real run.
+     */
+    private static String tick(double value, double step) {
+        double absStep = Math.abs(step);
         double abs = Math.abs(value);
-        String text = String.format(Locale.ROOT,
-                abs >= 1000.0 ? "%.0f"
-                        : abs >= 10.0 ? "%.1f"
-                        : abs >= 0.01 || abs == 0.0 ? "%.3f" : "%.1e", value);
+        String text;
+        if (absStep <= 0.0 || absStep >= 1.0e6 || (abs != 0.0 && abs < 1.0e-3)) {
+            text = String.format(Locale.ROOT, "%.1e", value);
+        } else {
+            int decimals = (int) Math.max(0.0, Math.ceil(-Math.log10(absStep)));
+            text = String.format(Locale.ROOT, "%." + Math.min(decimals, 6) + "f", value);
+        }
         return text.startsWith("-") && text.matches("-0(\\.0+)?")
                 ? text.substring(1) : text;
     }
