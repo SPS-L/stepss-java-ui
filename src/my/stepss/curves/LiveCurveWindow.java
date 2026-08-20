@@ -156,8 +156,22 @@ public final class LiveCurveWindow extends JFrame {
         png.addActionListener(event -> savePng());
         javax.swing.JButton csv = new javax.swing.JButton("Save CSV...");
         csv.addActionListener(event -> saveCsv());
+        // Every panel, not the one under the pointer. The panels share this
+        // window's x axis and are read together, so resetting one and leaving
+        // its neighbours zoomed makes them silently incomparable. Double
+        // clicking a panel still resets that panel alone, which is the finer
+        // grained control and the one nobody discovers.
+        javax.swing.JButton reset = new javax.swing.JButton("Reset zoom");
+        reset.setToolTipText("Resets the zoom on every panel."
+                + " Drag a box on a panel to zoom it.");
+        reset.addActionListener(event -> {
+            for (CurvePanel panel : panels) {
+                panel.resetZoom();
+            }
+        });
         bar.add(png);
         bar.add(csv);
+        bar.add(reset);
         return bar;
     }
 
