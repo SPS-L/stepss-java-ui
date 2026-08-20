@@ -124,14 +124,18 @@ above are simple, so they are safe to interpret.
 
 ## If nothing is produced
 
-Two settings are required, and `solveroptions.dat` already has both. If you
-adapt this to your own system and the results files do not appear, check them
-first:
+Two settings are required, and `solveroptions.dat` already has both:
 
 - **`$OMEGA_REF SYN`.** Under the default centre-of-inertia reference frame the
   analysis refuses, because reducing under COI would silently produce a
   plausible but wrong spectrum.
 - **`$SCHEME DE`.** The integrated scheme is not supported.
+
+**Run small-signal stability analysis** supplies both itself, as one extra data
+file read after your own, so the button works on a case whose solver settings
+say otherwise and leaves those settings untouched for the next time-domain run.
+The two are yours to get right only on the command line and from Python, where
+nothing is added to what you list.
 
 Both refusals exit with code **78** and state the reason in the log, so a run
 that produced nothing and exited 0 is a different problem, most likely an engine

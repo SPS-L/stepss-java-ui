@@ -285,6 +285,9 @@ public final class SsaHarness {
         checkEngineVersionGuardsTheBoundary();
         checkDisturbanceCarriesParameters();
         checkDisturbanceRejectsUnreadableParameters();
+        checkSettingsCarryTheTwoRequiredRecords();
+        checkSettingsOverrideNothingElse();
+        checkSettingsFileNameCannotCollide();
         checkManifestRoundTrip();
         checkManifestOmitsWhatWasNotRecorded();
         checkManifestRefusals();
@@ -905,6 +908,93 @@ public final class SsaHarness {
         } catch (IllegalArgumentException expected) {
             pass(what);
         }
+    }
+
+    /**
+     * The two records the engine refuses the analysis without, spelled as
+     * {@code get_settings.f90} reads them: one field each, terminated by a
+     * semicolon, one record per line.
+     */
+    private static void checkSettingsCarryTheTwoRequiredRecords() {
+        String dat = SsaSettings.text();
+        expect("the decomposed scheme is set", true,
+                dat.contains("\n$SCHEME DE "));
+        expect("the synchronous reference frame is set", true,
+                dat.contains("\n$OMEGA_REF SYN "));
+        // One field each: get_settings refuses either record with any other
+        // count, which would stop the whole run rather than the analysis.
+        expect("$SCHEME carries one field", 1,
+                fieldsOfRecord(dat, "$SCHEME"));
+        expect("$OMEGA_REF carries one field", 1,
+                fieldsOfRecord(dat, "$OMEGA_REF"));
+        expect("both records are terminated", 2, countOf(dat, ";"));
+        expect("the file ends with a newline", true, dat.endsWith("\n"));
+    }
+
+    /**
+     * Nothing else is in the file. Every record here lands after the case's
+     * own and therefore replaces it, so an extra one would change a user's
+     * run without being asked. $EIG_MAX_STATES is the one most likely to be
+     * added in sympathy: it is a memory guard, and raising it on the user's
+     * behalf trades a refusal for an out-of-memory kill.
+     */
+    private static void checkSettingsOverrideNothingElse() {
+        String dat = SsaSettings.text();
+        expect("exactly two settings records", 2, countOf(dat, "$"));
+        expect("$EIG_MAX_STATES is not raised behind the user's back", false,
+                dat.contains("$EIG_MAX_STATES"));
+        // Comments are '#', which loadrec skips. A '!' line is kept as a
+        // comment record and would be carried into the run's output.
+        for (String line : dat.split("\n")) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty() && !trimmed.startsWith("$")) {
+                expect("a non-record line is a skipped comment: " + trimmed,
+                        true, trimmed.startsWith("#"));
+            }
+        }
+    }
+
+    /**
+     * The generated file cannot be mistaken for, or overwrite, anything else
+     * the same run writes into the same directory.
+     */
+    private static void checkSettingsFileNameCannotCollide() {
+        expect("named from the basename", "ssaEig.dat", SsaSettings.fileName("ssa"));
+        expect("and follows a renamed run", "run2Eig.dat",
+                SsaSettings.fileName("run2"));
+        String name = SsaSettings.fileName("ssa");
+        for (String suffix : SsaDisturbance.JACOBIAN_SUFFIXES) {
+            expect("does not collide with the Jacobian's " + suffix,
+                    false, name.equals("ssa" + suffix));
+        }
+        for (String suffix : new String[] {"_modes.dat", "_pf.dat", "_ms.dat"}) {
+            expect("does not collide with the results' " + suffix,
+                    false, name.equals("ssa" + suffix));
+        }
+        expect("nor with the disturbance the same run generates", false,
+                name.equals("ssaEig.dst"));
+        // The name is written into the command file and opened as a file, so
+        // it inherits the disturbance's basename rules rather than a second,
+        // laxer set of its own.
+        try {
+            SsaSettings.fileName("two words");
+            fail("an invalid basename is rejected: no exception");
+        } catch (IllegalArgumentException expected) {
+            pass("an invalid basename is rejected");
+        }
+    }
+
+    /** How many whitespace-separated fields a record carries, ';' excluded. */
+    private static int fieldsOfRecord(String text, String type) {
+        for (String line : text.split("\n")) {
+            String trimmed = line.trim();
+            if (!trimmed.startsWith(type + " ")) {
+                continue;
+            }
+            String body = trimmed.substring(type.length()).replace(";", "").trim();
+            return body.isEmpty() ? 0 : body.split("\\s+").length;
+        }
+        return -1;
     }
 
     // ------------------------------------------------------------ archives
