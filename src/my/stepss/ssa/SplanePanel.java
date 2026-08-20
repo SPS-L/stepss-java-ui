@@ -16,13 +16,20 @@ import javax.swing.JPanel;
 
 /**
  * The s-plane, following the python-ui notebook's cell 20: a crimson
- * stability boundary at Re = 0, dashed constant-damping rays, one hollow
- * circle per mode labelled with its frequency, and unstable modes
- * overplotted as a crimson cross.
+ * stability boundary at Re = 0, dashed constant-damping rays, and one circle
+ * per mode labelled with its frequency.
  *
- * <p>The notebook's window is the MINIMUM extent, not the fixed one, so this
- * works on systems other than Kundur. Unlike the notebook it is interactive:
- * clicking a pole selects that mode, and the selection is ringed.
+ * <p>It parts from the notebook in two places. The notebook's window is the
+ * MINIMUM extent here rather than the fixed one, so this works on systems
+ * other than Kundur, and this panel is interactive: clicking a pole selects
+ * that mode, and that mode's circle is filled.
+ *
+ * <p>A mode is marked by the one circle it already has, drawn crimson when it
+ * is unstable. Both facts used to add a glyph instead: a crimson cross over an
+ * unstable mode's circle, and a second, larger circle around the selected
+ * one, so the markers doubled up in exactly the part of the plot worth reading
+ * closely, near the boundary. The notebook's cell 20 lost its cross in the
+ * same pass, so the two still show a mode the same way.
  */
 public final class SplanePanel extends JPanel {
 
@@ -215,40 +222,39 @@ public final class SplanePanel extends JPanel {
         }
         sink.endGroup();
 
+        // One circle per mode and nothing over it: crimson says unstable, a
+        // filled disc says this is the one the table and the panels below are
+        // showing. Compared by mode index rather than by identity, so a
+        // selection survives a caller that rebuilt its list.
+        boolean anyUnstable = false;
         sink.group("poles");
         for (Mode mode : shown) {
-            sink.circle(b.x(mode.re), b.y(mode.im), POLE_R, "pole");
-        }
-        sink.endGroup();
-
-        boolean anyUnstable = false;
-        sink.group("unstable");
-        for (Mode mode : shown) {
-            if (mode.zeta < 0.0) {
-                sink.cross(b.x(mode.re), b.y(mode.im), POLE_R + 2.0, "unstable");
-                anyUnstable = true;
+            boolean unstable = mode.zeta < 0.0;
+            anyUnstable |= unstable;
+            String cls = unstable ? "unstable" : "pole";
+            double x = b.x(mode.re);
+            double y = b.y(mode.im);
+            if (selected != null && mode.index == selected.index) {
+                sink.filledCircle(x, y, POLE_R, cls);
+            } else {
+                sink.circle(x, y, POLE_R, cls);
             }
         }
         sink.endGroup();
 
-        // The crimson cross and the crimson Re = 0 boundary are two different
+        // The crimson circle and the crimson Re = 0 boundary are two different
         // meanings in one colour, so the marker that flags data is named. Only
         // drawn when there is something to name: a legend entry for a marker
         // that is not on the figure is its own small untruth. It carries the
-        // same class as the crosses, so one hex edit restyles both.
+        // same class as the unstable poles, so one hex edit restyles both, and
+        // the same radius, so the key and the plot show the same marker.
         if (anyUnstable) {
             double lx = width - PAD_RIGHT - LEGEND_W;
             double ly = PAD_TOP + 10.0;
             sink.group("legend");
-            sink.cross(lx, ly, POLE_R + 2.0, "unstable");
+            sink.circle(lx, ly, POLE_R, "unstable");
             sink.text(lx + POLE_R + 9.0, ly + 4.0, "unstable (zeta < 0)",
                     "start", "label");
-            sink.endGroup();
-        }
-
-        if (selected != null) {
-            sink.group("selected");
-            sink.circle(b.x(selected.re), b.y(selected.im), POLE_R + 4.0, "pole");
             sink.endGroup();
         }
 

@@ -582,19 +582,27 @@ public final class SsaHarness {
         expect("constant-damping rays are dashed", true,
                 svg.contains("stroke-dasharray"));
         expect("both rays are drawn", 2, countOf(svg, "class=\"ray\""));
-        expect("one circle per mode shown", 2, countOf(svg, "class=\"pole\""));
-        // Two lines for the mode's cross and two for the legend sample, which
-        // shares the class so one hex edit restyles both.
-        expect("the unstable cross and its legend sample are two lines each", 4,
+
+        // One glyph per mode, its class carrying the stability. The fixture
+        // holds one stable mode and one unstable one, so a second marker over
+        // either of them would show up as a third element in this group.
+        String poles = groupBody(svg, "poles");
+        expect("one circle per mode shown", 2, countOf(poles, "<circle"));
+        expect("nothing is overplotted on a pole", 0, countOf(poles, "<line"));
+        expect("the stable mode is drawn as a pole", 1,
+                countOf(poles, "class=\"pole\""));
+        expect("the unstable mode is a crimson circle", 1,
+                countOf(poles, "class=\"unstable\""));
+        // The legend sample shares the class, so one hex edit restyles both.
+        expect("the unstable class is used by the mode and its legend", 2,
                 countOf(svg, "class=\"unstable\""));
-        expect("exactly one cross sits on the plot", 2,
-                countOf(groupBody(svg, "unstable"), "class=\"unstable\""));
         expect("frequencies are labelled", true, svg.contains("0.62 Hz"));
         expect("axes are labelled", true, svg.contains("Re"));
         expect("the pole group is present", true, svg.contains("<g id=\"poles\""));
 
-        // Verify all poles are within the plot area
-        int poleCount = countOf(svg, "class=\"pole\"");
+        // Verify all poles are within the plot area. The poles are the first
+        // circles the file carries, so their indices are 0 to poleCount - 1.
+        int poleCount = countOf(poles, "<circle");
         for (int i = 0; i < poleCount; i++) {
             double cx = extractAttribute(svg, "circle", i, "cx");
             double cy = extractAttribute(svg, "circle", i, "cy");
@@ -631,7 +639,7 @@ public final class SsaHarness {
     }
 
     /**
-     * The crimson cross and the crimson Re = 0 boundary are the same colour
+     * The crimson pole and the crimson Re = 0 boundary are the same colour
      * and different meanings, which the design answers with a legend.
      */
     private static void checkSplaneLegendFollowsTheData() {
@@ -642,7 +650,9 @@ public final class SsaHarness {
                 svg.contains("<g id=\"legend\">"));
         expect("the legend names the marker", true,
                 groupBody(svg, "legend").contains("unstable"));
-        expect("the legend sample is a cross", 2,
+        expect("the legend sample is a circle", 1,
+                countOf(groupBody(svg, "legend"), "<circle"));
+        expect("the legend sample is not a cross", 0,
                 countOf(groupBody(svg, "legend"), "<line"));
 
         java.util.List<Mode> stable = new java.util.ArrayList<Mode>();
@@ -652,7 +662,7 @@ public final class SsaHarness {
         String stableSvg = none.toSvg();
         expect("with nothing unstable there is no legend", false,
                 stableSvg.contains("<g id=\"legend\">"));
-        expect("and no cross either", 0,
+        expect("and nothing is drawn in the unstable class", 0,
                 countOf(stableSvg, "class=\"unstable\""));
     }
 
@@ -701,12 +711,40 @@ public final class SsaHarness {
                 cy1 >= 20 && cy1 <= 355);
     }
 
+    /**
+     * The selection is the mode's own circle filled, not a second circle drawn
+     * around it, so selecting a mode adds no ink to the plot.
+     */
     private static void checkSplaneMarksSelection() {
         java.util.List<Mode> em = emFixture();
         SvgSink sink = new SvgSink(500, 400);
         SplanePanel.render(sink, em, em.get(0), 500, 400);
         String svg = sink.toSvg();
-        expect("the selected pole is ringed", true, svg.contains("<g id=\"selected\""));
+        String poles = groupBody(svg, "poles");
+        expect("the selected pole is filled", 1,
+                countOf(poles, "class=\"pole filled\""));
+        expect("selecting adds no marker", 2, countOf(poles, "<circle"));
+        expect("the fill is declared in the style block, not inline", true,
+                svg.contains(".pole.filled { fill:"));
+        expect("no colour is written onto the element", false,
+                poles.contains("fill=\""));
+
+        // Selecting an unstable mode fills it in its own colour: the fill says
+        // which mode is shown below and the class still says it is unstable.
+        SvgSink crimson = new SvgSink(500, 400);
+        SplanePanel.render(crimson, em, em.get(1), 500, 400);
+        String crimsonSvg = crimson.toSvg();
+        expect("an unstable selection stays crimson", 1,
+                countOf(groupBody(crimsonSvg, "poles"), "class=\"unstable filled\""));
+        expect("and its fill rule is the crimson one", true,
+                crimsonSvg.contains(".unstable.filled { fill: #dc143c"));
+
+        // A rule for a marker the figure has not got is the same small untruth
+        // as a legend entry for one, and is left out for the same reason.
+        SvgSink none = new SvgSink(500, 400);
+        SplanePanel.render(none, em, null, 500, 400);
+        expect("nothing selected leaves no fill rule behind", false,
+                none.toSvg().contains(".filled"));
     }
 
     /**

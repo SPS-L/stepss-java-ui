@@ -20,6 +20,9 @@ public final class PlotHarness {
         polylineHonoursCount();
         polylineOnGraphicsDoesNotThrow();
         polylineWithNoPointsIsIgnored();
+        filledCircleCarriesItsFillInTheStyleBlock();
+        filledCircleRuleAppearsOnlyWhenOneIsDrawn();
+        filledCircleOnGraphicsDoesNotThrow();
         seriesClassesResolve();
         seriesClassesWrap();
         seriesClassesReachTheSvgStyleBlock();
@@ -74,6 +77,57 @@ public final class PlotHarness {
         SvgSink sink = new SvgSink(200, 100);
         sink.polyline(new double[0], new double[0], 0, "series0");
         check("no element for an empty series", 0, count(sink.toSvg(), "<polyline"));
+    }
+
+    /**
+     * A filled marker is styled by class like everything else. An inline fill
+     * colour would draw the same circle and quietly cost the file the one
+     * property the whole sink exists for: restylable by editing the style
+     * block and nothing else.
+     */
+    private static void filledCircleCarriesItsFillInTheStyleBlock() {
+        SvgSink sink = new SvgSink(200, 100);
+        sink.filledCircle(50, 50, 5, "pole");
+        String svg = sink.toSvg();
+        check("one circle element", 1, count(svg, "<circle"));
+        check("carries both classes", true, svg.contains("class=\"pole filled\""));
+        // The element itself, not the whole file: toSvg paints the export
+        // ground with a fill attribute of its own.
+        int at = svg.indexOf("<circle");
+        String element = svg.substring(at, svg.indexOf("/>", at));
+        check("no colour on the element", false, element.contains("fill="));
+        check("the fill rule is declared", true,
+                svg.contains(".pole.filled { fill: " + PlotStyle.of("pole").lightHex));
+        // .pole.filled outranks .pole on specificity, so the class's own
+        // "fill: none" cannot win whatever order the two rules end up in.
+        check("the class keeps its outline rule too", true, svg.contains(".pole "));
+    }
+
+    /** No rule for a marker the figure has not got. */
+    private static void filledCircleRuleAppearsOnlyWhenOneIsDrawn() {
+        SvgSink hollow = new SvgSink(200, 100);
+        hollow.circle(50, 50, 5, "pole");
+        check("a hollow circle declares no fill rule", false,
+                hollow.toSvg().contains(".filled"));
+
+        SvgSink twice = new SvgSink(200, 100);
+        twice.filledCircle(10, 10, 5, "pole");
+        twice.filledCircle(20, 20, 5, "pole");
+        check("one rule however many circles use it", 1,
+                count(twice.toSvg(), ".pole.filled"));
+    }
+
+    private static void filledCircleOnGraphicsDoesNotThrow() {
+        BufferedImage image = new BufferedImage(80, 60, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = image.createGraphics();
+        try {
+            new SwingSink(g, false).filledCircle(40, 30, 5, "pole");
+            check("SwingSink.filledCircle completes", true, true);
+        } catch (RuntimeException ex) {
+            check("SwingSink.filledCircle completes", true, false);
+        } finally {
+            g.dispose();
+        }
     }
 
     /** Every cycle slot must be a real entry, not the axis fallback. */

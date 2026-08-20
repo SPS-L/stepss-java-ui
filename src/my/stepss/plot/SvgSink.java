@@ -15,6 +15,14 @@ package my.stepss.plot;
 public final class SvgSink implements PlotSink {
 
     private final StringBuilder body = new StringBuilder();
+    /**
+     * The classes a filled circle was drawn in, in the order first drawn. The
+     * fill rule for a class is emitted only when the figure contains one, so a
+     * plot with nothing selected carries no rule for a marker it does not
+     * have, exactly as the legend carries no entry for a marker that is absent.
+     */
+    private final java.util.Set<String> filledClasses =
+            new java.util.LinkedHashSet<String>();
     private final int width;
     private final int height;
     private int openGroups;
@@ -70,6 +78,22 @@ public final class SvgSink implements PlotSink {
                 .append("\" class=\"").append(escape(cls)).append("\"/>\n");
     }
 
+    /**
+     * The same element as {@link #circle}, carrying a second class rather than
+     * an inline fill colour. {@code .pole.filled} outranks {@code .pole} on
+     * specificity whatever order the two rules end up in, so the file stays
+     * restylable by editing the style block and nothing else.
+     */
+    @Override
+    public void filledCircle(double cx, double cy, double r, String cls) {
+        filledClasses.add(cls);
+        body.append("    <circle cx=\"").append(fmt(cx))
+                .append("\" cy=\"").append(fmt(cy))
+                .append("\" r=\"").append(fmt(r))
+                .append("\" class=\"").append(escape(cls))
+                .append(" filled\"/>\n");
+    }
+
     @Override
     public void polyline(double[] xs, double[] ys, int n, String cls) {
         if (n < 2) {
@@ -104,12 +128,6 @@ public final class SvgSink implements PlotSink {
     @Override
     public void endClip() {
         endGroup();
-    }
-
-    @Override
-    public void cross(double cx, double cy, double r, String cls) {
-        emitLine(cx - r, cy - r, cx + r, cy + r, cls, null);
-        emitLine(cx - r, cy + r, cx + r, cy - r, cls, null);
     }
 
     @Override
@@ -153,7 +171,7 @@ public final class SvgSink implements PlotSink {
         return out.toString();
     }
 
-    private static String buildStyleBlock() {
+    private String buildStyleBlock() {
         StringBuilder sb = new StringBuilder();
         for (PlotStyle.Entry entry : PlotStyle.ENTRIES) {
             sb.append("    .");
@@ -179,6 +197,13 @@ public final class SvgSink implements PlotSink {
             }
 
             sb.append("}\n");
+        }
+        // Specificity, not order, is what makes this win over the class's own
+        // "fill: none" above, so the rules can sit together at the end where a
+        // reader editing the file finds them rather than interleaved.
+        for (String cls : filledClasses) {
+            sb.append("    .").append(cls).append(".filled { fill: ")
+                    .append(PlotStyle.of(cls).lightHex).append("; }\n");
         }
         return sb.toString();
     }

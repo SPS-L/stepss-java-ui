@@ -64,6 +64,19 @@ public final class SwingSink implements PlotSink {
         g.draw(new Ellipse2D.Double(cx - r, cy - r, 2 * r, 2 * r));
     }
 
+    /**
+     * Filled and stroked, so a filled marker covers exactly the disc its
+     * hollow twin outlines. Filling alone leaves it a stroke width smaller,
+     * which on a plot where both forms appear reads as two sizes of marker.
+     */
+    @Override
+    public void filledCircle(double cx, double cy, double r, String cls) {
+        style(cls, false);
+        Ellipse2D.Double disc = new Ellipse2D.Double(cx - r, cy - r, 2 * r, 2 * r);
+        g.fill(disc);
+        g.draw(disc);
+    }
+
     @Override
     public void polyline(double[] xs, double[] ys, int n, String cls) {
         if (n < 2) {
@@ -88,13 +101,6 @@ public final class SwingSink implements PlotSink {
     public void endClip() {
         g.setClip(savedClip);
         savedClip = null;
-    }
-
-    @Override
-    public void cross(double cx, double cy, double r, String cls) {
-        style(cls, false);
-        g.draw(new Line2D.Double(cx - r, cy - r, cx + r, cy + r));
-        g.draw(new Line2D.Double(cx - r, cy + r, cx + r, cy - r));
     }
 
     @Override
