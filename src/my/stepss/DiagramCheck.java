@@ -30,6 +30,9 @@ public final class DiagramCheck {
         checkNotConvergedCarriesItsReason();
         checkInputErrorIsAnError();
         checkUndocumentedStatusIsAnError();
+        checkUnreadableDataFileIsNamed();
+        checkWindowsPathShortensToItsName();
+        checkAPlainInputErrorKeepsItsWording();
         checkMissingStatusLineLeavesTheHeadlineAlone();
         checkRenderFailureIsItsOwnOutcome();
         checkTheLauncherDoesNotForceATextEditor();
@@ -83,6 +86,40 @@ public final class DiagramCheck {
         HeliosOutcome outcome = HeliosOutcome.of(1, "");
         check("exit 1 errors", outcome.severity() == HeliosOutcome.Severity.ERROR);
         check("exit 1 names the input", outcome.headline().contains("could not process"));
+    }
+
+    /**
+     * The real Nordic failure: the power-flow tab was handed dyn_A.dat, which
+     * is the dynamic form of the network, and Helios reported a file it had
+     * opened and could not parse as one it could not open.
+     */
+    private static void checkUnreadableDataFileIsNamed() {
+        HeliosOutcome outcome = HeliosOutcome.of(1,
+                "helios: /home/u/ieee-nordic/PFCcmd.txt:1: cannot open data file"
+                + " '/home/u/ieee-nordic/dyn_A.dat'\n");
+        check("an unreadable data file errors",
+                outcome.severity() == HeliosOutcome.Severity.ERROR);
+        check("and the headline names the file, not the path",
+                outcome.headline().contains("dyn_A.dat")
+                && !outcome.headline().contains("/home/u"));
+        check("and the detail says the file may well be there",
+                outcome.detail().contains("there on disk"));
+        check("and points at the load-flow file",
+                outcome.detail().contains("load-flow file"));
+    }
+
+    private static void checkWindowsPathShortensToItsName() {
+        HeliosOutcome outcome = HeliosOutcome.of(1,
+                "helios: cmd.txt:1: cannot open data file 'C:\\cases\\dyn_A.dat'\n");
+        check("a Windows path shortens to its file name",
+                outcome.headline().contains("dyn_A.dat")
+                && !outcome.headline().contains("C:"));
+    }
+
+    private static void checkAPlainInputErrorKeepsItsWording() {
+        HeliosOutcome outcome = HeliosOutcome.of(1, "helios: status: ERROR (usage)\n");
+        check("an input error with no data file keeps the general wording",
+                outcome.headline().contains("could not process"));
     }
 
     private static void checkUndocumentedStatusIsAnError() {

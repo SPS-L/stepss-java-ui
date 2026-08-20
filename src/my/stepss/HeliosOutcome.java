@@ -44,6 +44,20 @@ public final class HeliosOutcome {
     private static final Pattern STATUS_LINE
             = Pattern.compile("helios: status: (\\S+)(?: \\(([^)]*)\\))?");
 
+    /**
+     * Matches the message Helios writes when a data file will not load, for
+     * example {@code helios: PFCcmd.txt:1: cannot open data file '/x/dyn_A.dat'}.
+     *
+     * <p>Worth singling out because the message is not true as written: Helios
+     * reports a record it cannot parse exactly as it reports a file it cannot
+     * find, so the usual cause is a data file that is present and readable and
+     * carries something the power-flow reader does not accept. Left to the
+     * generic exit-1 wording, the user is told to look for a missing file that
+     * is sitting right there.
+     */
+    private static final Pattern UNREADABLE_DATA
+            = Pattern.compile("cannot open data file '([^']*)'");
+
     private final Severity severity;
     private final String headline;
     private final String detail;
@@ -92,6 +106,21 @@ public final class HeliosOutcome {
                         "Helios still produced and exported result files, but they"
                         + " are NOT a valid power-flow solution. Do not use these values.");
             case 1:
+                Matcher data = UNREADABLE_DATA.matcher(stderrText == null ? "" : stderrText);
+                if (data.find()) {
+                    String name = fileName(data.group(1));
+                    return new HeliosOutcome(Severity.ERROR,
+                            "Helios could not read " + name + ".",
+                            "It says it cannot open the file, which is also what it"
+                            + " says about a file it can open and cannot parse. If "
+                            + name + " is there on disk, the problem is a record"
+                            + " inside it.\n\nA power flow needs the power-flow form"
+                            + " of the network, with the bus loads and the generator"
+                            + " dispatch. A file of dynamic models is read by RAMSES"
+                            + " and not by Helios, so a case set up for the Dynamic"
+                            + " Simulation tab may need its load-flow file in the data"
+                            + " slot instead.");
+                }
                 return new HeliosOutcome(Severity.ERROR,
                         "Helios could not process the input" + reason + ".",
                         "It reported an input or usage error and stopped early."
@@ -102,6 +131,22 @@ public final class HeliosOutcome {
                         "That is not a documented outcome. Treat any displayed"
                         + " results with suspicion.");
         }
+    }
+
+    /**
+     * The last path segment of *path*, or the whole of it when there is none.
+     *
+     * <p>Splits on both separators rather than using {@code File}: Helios
+     * writes the path it was given, and a Windows path read back on any
+     * platform must still shorten to its file name.
+     *
+     * @param path the path Helios named
+     * @return the file name to put in the message
+     */
+    private static String fileName(String path) {
+        int cut = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        String name = cut < 0 ? path : path.substring(cut + 1);
+        return name.isEmpty() ? path : name;
     }
 
     /**
