@@ -121,10 +121,6 @@ public final class CurvePanel extends JPanel {
         repaint();
     }
 
-    public CurveData data() {
-        return data;
-    }
-
     /**
      * Narrows both axes to this data window. The buffers are untouched:
      * zooming is a view concern, so it can never lose a sample.
@@ -139,6 +135,7 @@ public final class CurvePanel extends JPanel {
         repaint();
     }
 
+    /** Whether a zoom is in force. Read by {@link CurveHarness}. */
     public boolean zoomed() {
         return zoom != null;
     }

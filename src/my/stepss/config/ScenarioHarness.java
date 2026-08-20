@@ -95,6 +95,7 @@ public final class ScenarioHarness {
         checkMissingFilesAreReported();
         checkIsEmpty();
         checkBindingRejectsAShortWiring();
+        checkDisturbanceFileGuard();
         System.out.println(failures == 0 ? "ALL CHECKS PASSED"
                 : failures + " CHECK(S) FAILED");
         System.exit(failures == 0 ? 0 : 1);
@@ -498,6 +499,81 @@ public final class ScenarioHarness {
             continuous.setSelected(false);
             discrete.setSelected(false);
             dump.setSelected(false);
+        }
+    }
+
+    /**
+     * The disturbance-file guard, which decides whether a run may start.
+     *
+     * <p>Every case here mirrors a rule in the engine's own reader
+     * ({@code src/io/disturb.f90}). A guard that refused a file the engine
+     * accepts would stop a run that would have worked, so these checks are as
+     * much about what passes as about what does not.
+     */
+    private static void checkDisturbanceFileGuard() throws IOException {
+        File dir = tempDir("dst");
+
+        File good = temp(dir, "good.dst");
+        write(good, "  0.000 CONTINUE SOLVER BD 0.020 0.001 0. ABL",
+                "  1.000 FAULT BUS 4032 0. 0.8",
+                "240.000 STOP");
+        expect("a complete disturbance file passes", null,
+                DisturbanceFile.problem(good));
+
+        File trailing = temp(dir, "trailing.dst");
+        write(trailing, "240.000 STOP ;");
+        expect("STOP may carry trailing text", null,
+                DisturbanceFile.problem(trailing));
+
+        File early = temp(dir, "early.dst");
+        write(early, "240.000 STOP", "300.000 FAULT BUS 4032 0. 0.8");
+        expect("the engine stops reading at STOP, so what follows is ignored",
+                null, DisturbanceFile.problem(early));
+
+        File commented = temp(dir, "commented.dst");
+        write(commented, "# a comment", "", "! another",
+                "  1.0 FAULT BUS 4032 0. 0.8", "  9.0 STOP");
+        expect("comments and blank lines are skipped", null,
+                DisturbanceFile.problem(commented));
+
+        File inComment = temp(dir, "in-comment.dst");
+        write(inComment, "# 240.000 STOP", "  1.0 FAULT BUS 4032 0. 0.8");
+        says("a STOP inside a comment does not count",
+                DisturbanceFile.problem(inComment), "no STOP record");
+
+        File noStop = temp(dir, "nostop.dst");
+        write(noStop, "  1.000 FAULT BUS 4032 0. 0.8");
+        says("a file with no STOP is refused",
+                DisturbanceFile.problem(noStop), "no STOP record");
+        says("and the refusal names the file",
+                DisturbanceFile.problem(noStop), "nostop.dst");
+        says("and says what to add",
+                DisturbanceFile.problem(noStop), "240.0 STOP");
+
+        File onlyComments = temp(dir, "comments.dst");
+        write(onlyComments, "# nothing here");
+        says("a file of only comments has no records",
+                DisturbanceFile.problem(onlyComments), "no disturbance records");
+
+        File untimed = temp(dir, "untimed.dst");
+        write(untimed, "  1.0 FAULT BUS 4032 0. 0.8", "STOP");
+        says("a STOP with no time is named for what it is",
+                DisturbanceFile.problem(untimed), "STOP without a time");
+
+        says("a file that is not there is refused",
+                DisturbanceFile.problem(temp(dir, "absent.dst")), "does not exist");
+        says("and so is a directory", DisturbanceFile.problem(dir),
+                "does not exist");
+        expect("as is no file at all", true,
+                DisturbanceFile.problem(null) != null);
+    }
+
+    /** Fails unless *problem* is a sentence carrying *needle*. */
+    private static void says(String what, String problem, String needle) {
+        if (problem != null && problem.contains(needle)) {
+            pass(what);
+        } else {
+            fail(what + ": <" + problem + "> does not mention <" + needle + ">");
         }
     }
 

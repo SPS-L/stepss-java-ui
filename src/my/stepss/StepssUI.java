@@ -44,6 +44,7 @@ import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
 import javax.swing.text.Utilities;
 import my.stepss.compile.ModelCompiler;
+import my.stepss.config.DisturbanceFile;
 import my.stepss.config.Scenario;
 import my.stepss.config.ScenarioBinding;
 import my.stepss.config.ScenarioFile;
@@ -2746,6 +2747,23 @@ public class StepssUI extends javax.swing.JFrame {
      * mistake, and the second one carried no information. The caller says it
      * once now, in the banner.
      */
+    /**
+     * A path from one of the file fields, resolved the way the engine will.
+     *
+     * <p>The engine runs with {@code myTempDir} as its working directory (see
+     * {@link #runSimulationActionPerformed}), so a relative name in the command
+     * file resolves against that and not against the JVM's own directory. The
+     * fields hold both forms: an absolute path when the user picked the file,
+     * a bare name for a generated one such as the SSA disturbance.
+     *
+     * @param path the field's text
+     * @return the file the engine will open
+     */
+    private File inWorkingDir(String path) {
+        File named = new File(path);
+        return named.isAbsolute() ? named : new File(myTempDir, path);
+    }
+
     private String createCommandFile() {
         try {
             FileWriter ryt = new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "cmd.txt");
@@ -2772,13 +2790,20 @@ public class StepssUI extends javax.swing.JFrame {
                 out.newLine();
             }
 
-            if (!fileDist.getText().equals("")) {
-                out.append(fileDist.getText());
-                out.newLine();
-            } else {
+            if (fileDist.getText().equals("")) {
                 out.close();
                 return "No disturbance file is loaded. Add one on the System Data tab.";
             }
+            // Checked here rather than when the file is chosen, because the
+            // .dst can be edited in between: the button beside the field opens
+            // it in an editor.
+            String distProblem = DisturbanceFile.problem(inWorkingDir(fileDist.getText()));
+            if (distProblem != null) {
+                out.close();
+                return distProblem;
+            }
+            out.append(fileDist.getText());
+            out.newLine();
             if (saveOutputTrajButton.isSelected() && !ssa) {
                 if (!fileObs.getText().equals("") && !observFileWizButton.isSelected()) {
                     out.append("output.trj");

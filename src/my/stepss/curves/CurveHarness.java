@@ -620,14 +620,14 @@ public final class CurveHarness {
             // The case the length heuristic cannot see: a replacement whose new
             // content already reaches past the old offset never looks short, so
             // poll() reads from a stale position into a different run's bytes
-            // and no later poll can rediscover it. reset() is how a caller that
-            // knows a new run started says so instead of leaving it to
-            // inference.
+            // and no later poll can rediscover it.
             //
             // These two checks pin the LIMITATION, not the desired behaviour.
-            // If a future change makes replacement detection reliable, these
-            // are the checks to rewrite: do not "fix" them to hide the gap
-            // while it is still there.
+            // What keeps it harmless is that a run opens its own window and so
+            // its own CurTail: no offset outlives the run that set it. A change
+            // that reuses one across runs has to detect the replacement some
+            // other way, and these are the checks that will fail first.
+            // Do not "fix" them to hide the gap while it is still there.
             write(cur, "# stepss-cur 1\n# ncol 2\n 1.0 2.0\n 3.0 4.0\n 5.0 6.0\n");
             List<String> afterLongerReplacement = tail.poll();
             check("a replacement longer than the old offset is not detected",
@@ -635,11 +635,9 @@ public final class CurveHarness {
             check("so that poll resumes mid-file instead of at the header",
                     "false",
                     String.valueOf(afterLongerReplacement.contains("# stepss-cur 1")));
-            tail.reset();
-            check("reset makes the next poll read from the top", "true",
-                    String.valueOf(tail.poll().contains("# stepss-cur 1")));
-            check("and reset reports no truncation of its own", "false",
-                    String.valueOf(tail.truncatedSinceLastPoll()));
+            check("and a fresh reader on the same file starts at the header",
+                    "true",
+                    String.valueOf(new CurTail(cur).poll().contains("# stepss-cur 1")));
         } finally {
             deleteRecursively(dir);
         }
@@ -854,11 +852,6 @@ public final class CurveHarness {
                 String.valueOf(model.skippedRows()));
         check("and does not extend the curves", "2",
                 String.valueOf(model.samples()));
-
-        // A re-run truncates the file, so the model must be able to forget.
-        model.reset();
-        check("a reset empties the buffers", "0", String.valueOf(model.samples()));
-        check("but keeps the panels", "3", String.valueOf(model.panelCount()));
 
         // The display-type table, which is the whole of what a user reads on
         // each panel. Values from gnuplot.f90:84-133.

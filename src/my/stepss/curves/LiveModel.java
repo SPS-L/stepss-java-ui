@@ -21,7 +21,14 @@ import java.util.Locale;
  * volatile array reference and a captured length would avoid that at the cost
  * of a copy-on-grow race no headless check can demonstrate.
  *
- * <p>Not thread safe. One poller thread owns an instance.
+ * <p>Two threads touch an instance, and the split is not the usual one. The
+ * poller owns everything mutable: {@link #accept}, {@link #snapshot},
+ * {@link #samples} and {@link #skippedRows} are its alone, and none of them is
+ * synchronised. The EDT calls {@link #panelCount} and {@link #axesOf} while
+ * building the panels, which is safe only because both read state fixed by the
+ * constructor and never written again. Adding a panel after construction, or
+ * making the axes mutable, breaks that silently: there is no lock here to
+ * catch it.
  */
 public final class LiveModel {
 
@@ -76,10 +83,6 @@ public final class LiveModel {
             n++;
         }
 
-        void reset() {
-            n = 0;
-        }
-
         CurveData snapshot() {
             double[] xs = Arrays.copyOf(x, n);
             double[] ys = Arrays.copyOf(y, n);
@@ -127,15 +130,6 @@ public final class LiveModel {
     /** How many rows have been drawn, over the whole run. */
     public int samples() {
         return samples;
-    }
-
-    /** Throws the buffers away, keeping the panels, for a re-run's truncation. */
-    public void reset() {
-        for (Panel p : panels) {
-            p.reset();
-        }
-        samples = 0;
-        skipped = 0;
     }
 
     /**

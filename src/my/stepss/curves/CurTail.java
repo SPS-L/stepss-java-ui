@@ -36,7 +36,13 @@ public final class CurTail {
         this.file = file;
     }
 
-    /** Whether the writer has created the file yet. */
+    /**
+     * Whether the writer has created the file yet.
+     *
+     * <p>{@link #poll()} tests this itself rather than calling here, so this
+     * exists for {@link CurveHarness} to check the file-absent path from
+     * outside. Same for {@link #offset()}.
+     */
     public boolean exists() {
         return file.isFile();
     }
@@ -62,26 +68,14 @@ public final class CurTail {
      * file never looks short and the replacement goes unnoticed. The reader
      * then resumes from a stale offset into a different run's bytes, and
      * because the file only grows from there, no later poll can rediscover the
-     * mistake. Use {@link #reset()} whenever the caller knows a new run has
-     * started: a caller that knows should never be relying on this inference.
+     * mistake. It cannot happen here: a run opens its own window, and with it
+     * a fresh instance, so an offset never outlives the run that set it. That
+     * is the mitigation, not the heuristic. Anything that reuses one instance
+     * across runs must be told a new run began, because this class cannot
+     * infer it.
      */
     public boolean truncatedSinceLastPoll() {
         return truncated;
-    }
-
-    /**
-     * Forgets the offset and any held-back partial line, so the next
-     * {@link #poll()} reads from the top.
-     *
-     * <p>The reliable counterpart to the length heuristic documented on
-     * {@link #truncatedSinceLastPoll()}. A caller that knows a new run has
-     * begun should say so rather than leaving the class to infer it from a file
-     * size, which can be wrong in one direction and is then wrong permanently.
-     */
-    public void reset() {
-        offset = 0L;
-        partial.setLength(0);
-        truncated = false;
     }
 
     /**
