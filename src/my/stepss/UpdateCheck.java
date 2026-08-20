@@ -2,7 +2,7 @@ package my.stepss;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
 
 /**
  * The two halves of "is there a newer STEPSS", kept apart so one of them can
@@ -32,10 +32,18 @@ final class UpdateCheck {
      * <p>The timeouts are not optional. The manual check runs this on the EDT,
      * and an unreachable host with no timeout freezes the window until the OS
      * gives up, which is minutes on some networks.
+     *
+     * <p>Through {@code URI} rather than {@code new URL(String)}, which JDK 20
+     * deprecated. Both callers pass the releases constant, so the one
+     * behavioural difference cannot be reached in practice: a syntactically
+     * bad string would now raise an unchecked {@code IllegalArgumentException}
+     * where the constructor raised a {@code MalformedURLException} that both
+     * of them catch. {@code toURL()} still throws that for a URI with no
+     * scheme.
      */
     static String latestLocation(String releasesLatestUrl) throws IOException {
-        HttpURLConnection connection =
-                (HttpURLConnection) new URL(releasesLatestUrl).openConnection();
+        HttpURLConnection connection = (HttpURLConnection)
+                URI.create(releasesLatestUrl).toURL().openConnection();
         try {
             connection.setInstanceFollowRedirects(false);
             connection.setConnectTimeout(5000);
