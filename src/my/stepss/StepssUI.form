@@ -1887,7 +1887,7 @@
                 </Component>
                 <Component class="javax.swing.JLabel" name="ssaPfThresholdLabel">
                   <Properties>
-                    <Property name="text" type="java.lang.String" value="PF threshold"/>
+                    <Property name="text" type="java.lang.String" value="Participation factor (PF) threshold"/>
                     <Property name="enabled" type="boolean" value="false"/>
                     <Property name="name" type="java.lang.String" value="ssaPfThresholdLabel" noResource="true"/>
                   </Properties>

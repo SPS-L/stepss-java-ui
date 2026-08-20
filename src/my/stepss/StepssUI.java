@@ -2313,7 +2313,7 @@ public class StepssUI extends javax.swing.JFrame {
         ssaRealLimit.setEnabled(false);
         ssaRealLimit.setName("ssaRealLimit"); // NOI18N
 
-        ssaPfThresholdLabel.setText("PF threshold");
+        ssaPfThresholdLabel.setText("Participation factor (PF) threshold");
         ssaPfThresholdLabel.setEnabled(false);
         ssaPfThresholdLabel.setName("ssaPfThresholdLabel"); // NOI18N
 
@@ -4115,7 +4115,8 @@ public class StepssUI extends javax.swing.JFrame {
                     realLimit = my.stepss.ssa.SsaDisturbance.parseParameter(
                             ssaRealLimit.getText(), "Real part limit");
                     pfThreshold = my.stepss.ssa.SsaDisturbance.parseParameter(
-                            ssaPfThreshold.getText(), "PF threshold");
+                            ssaPfThreshold.getText(),
+                            "Participation factor (PF) threshold");
                 } catch (IllegalArgumentException ex) {
                     banner.warn(ex.getMessage());
                     return;

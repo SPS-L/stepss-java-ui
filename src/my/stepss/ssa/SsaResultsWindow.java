@@ -245,6 +245,14 @@ public final class SsaResultsWindow extends JFrame {
             } else {
                 text.append(String.format(java.util.Locale.ROOT, "Mode %d, %.4f Hz%n%n",
                         mode.index, mode.freqHz));
+                // The columns are named because the last of them is not
+                // self-evident: PF is the abbreviation a reader meets here and
+                // in the Analysis tab's threshold field, and it is spelt out
+                // under the table rather than in the header, where it would
+                // not fit the width the rows set.
+                text.append(String.format(java.util.Locale.ROOT,
+                        "  %-8s %-20s %-10s %s%n", "family", "device",
+                        "variable", "PF"));
                 for (Participation p : rows) {
                     // p.device is written as parsed. Columns.slice already
                     // removed the a20 padding, and a LEADING blank is part of
@@ -254,7 +262,9 @@ public final class SsaResultsWindow extends JFrame {
                             "  %-8s %-20s %-10s %.3f%n",
                             p.family, p.device, p.variable, p.pf));
                 }
-                text.append("\nEntries below pf_threshold ")
+                text.append("\nPF is the participation factor, normalised so")
+                        .append(" the largest in each mode is 1.\n")
+                        .append("Entries below pf_threshold ")
                         .append(show(results.modes().pfThreshold()))
                         .append(" are not written, so an absent device is below")
                         .append(" it, not zero.\n");

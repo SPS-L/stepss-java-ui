@@ -151,7 +151,8 @@ public final class SsaDisturbance {
         }
         if (!isFinite(pfThreshold)) {
             throw new IllegalArgumentException(
-                    "PF threshold must be a finite number.");
+                    "Participation factor (PF) threshold must be a"
+                            + " finite number.");
         }
         String base = text(basename, t);
         // Rebuild only the EIG line, so the JAC record, the solver record and
