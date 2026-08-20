@@ -408,16 +408,19 @@ public class StepssUI extends javax.swing.JFrame {
         JPanel settings = new JPanel(new GridBagLayout());
         settings.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         int row = 0;
-        settings.add(heading(jLabel30), span(row++));
+        settings.add(heading(jLabel30, "the observables plotted while a run goes",
+                Docs.RUNTIME_OBSERVABLES), span(row++));
         settings.add(observableRow(runtimeObsType, runtimeObsName), stretch(row++));
         settings.add(observableRow(runtimeObsType1, runtimeObsName1), stretch(row++));
         settings.add(observableRow(runtimeObsType2, runtimeObsName2), stretch(row++));
 
-        settings.add(heading(new JLabel("Recording to file")), span(row++));
+        settings.add(heading(new JLabel("Recording to file"),
+                "what a run writes to disk", Docs.RECORDING_TO_FILE), span(row++));
         settings.add(leftRow(saveContTrace, saveDiscTrace, saveOutputTrajButton,
                 saveDumpButton), span(row++));
 
-        settings.add(heading(jLabel10), span(row++));
+        settings.add(heading(jLabel10, "the observables file",
+                Docs.OBSERVABLES_FILE_ROW), span(row++));
         settings.add(fileRow("", loadObsButton, fileObs, nppObsButton), stretch(row++));
         settings.add(leftRow(observFileWizButton), span(row++));
 
@@ -452,7 +455,8 @@ public class StepssUI extends javax.swing.JFrame {
         JPanel content = new JPanel(new GridBagLayout());
         content.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         int row = 0;
-        content.add(heading(jLabel4), span(row++));
+        content.add(heading(jLabel4, "turning a trajectory into curves",
+                Docs.TIME_DOMAIN_ANALYSIS), span(row++));
         content.add(ActionBar.create()
                 .add(runDyngraphButton)
                 .separate()
@@ -462,7 +466,8 @@ public class StepssUI extends javax.swing.JFrame {
                 .add(closeCurveWindowsButton)
                 .build(), stretch(row++));
 
-        content.add(heading(jLabel8), span(row++));
+        content.add(heading(jLabel8, "small-signal stability analysis",
+                Docs.SMALL_SIGNAL_ANALYSIS), span(row++));
         content.add(pathRow(loadSSADir, ssaDirectory), stretch(row++));
         content.add(leftRow(ssaBasenameLabel, ssaBasename, ssaTimeLabel, ssaTime,
                 ssaRealLimitLabel, ssaRealLimit, ssaPfThresholdLabel, ssaPfThreshold),
@@ -497,12 +502,52 @@ public class StepssUI extends javax.swing.JFrame {
      * would make the whole line shout instead.
      */
     private static JPanel heading(JLabel label) {
+        return heading(label, null);
+    }
+
+    /**
+     * The same heading with a ? on the end of the title, opening the pages
+     * that document the section it names.
+     *
+     * <p>Beside the title rather than at the right-hand edge of the rule. The
+     * heading spans the tab, so an EAST placement would put the mark most of a
+     * maximised window away from the words it belongs to, where it reads as
+     * something to do with whatever row happens to be under it.
+     *
+     * @param subject the noun phrase {@link Docs#helpButton} completes
+     * @param pages   what the ? offers, in menu order
+     */
+    private static JPanel heading(JLabel label, String subject, Docs.Page... pages) {
+        return heading(label, Docs.helpButton(subject, pages));
+    }
+
+    private static JPanel heading(JLabel label, JButton help) {
         if (!label.getText().toLowerCase(java.util.Locale.ROOT).startsWith("<html")) {
             label.setFont(label.getFont().deriveFont(java.awt.Font.BOLD));
         }
         JPanel block = new JPanel(new BorderLayout(0, 3));
         block.setBorder(BorderFactory.createEmptyBorder(14, 0, 4, 0));
-        block.add(label, BorderLayout.NORTH);
+        if (help == null) {
+            block.add(label, BorderLayout.NORTH);
+        } else {
+            // FlowLayout rather than a Box, which was the first attempt and
+            // put the mark at the far right edge of a maximised window: a
+            // BoxLayout shares slack out among whatever will take it, and a
+            // JLabel and a JButton both claim an unbounded maximum, so the two
+            // of them split about 1,900px of it between them. FlowLayout gives
+            // each its preferred size and packs them left, which is the whole
+            // requirement. The gap goes in as a strut rather than as the
+            // layout's hgap, because FlowLayout lays that down before the
+            // first component too and would indent every heading 6px past the
+            // rows beneath it.
+            JPanel title = new JPanel(
+                    new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0));
+            title.setOpaque(false);
+            title.add(label);
+            title.add(Box.createRigidArea(new Dimension(6, 1)));
+            title.add(help);
+            block.add(title, BorderLayout.NORTH);
+        }
         block.add(new javax.swing.JSeparator(), BorderLayout.CENTER);
         return block;
     }
@@ -628,6 +673,8 @@ public class StepssUI extends javax.swing.JFrame {
                 .add(loadPow)
                 .toTheEnd()
                 .add(clearPFCOutput)
+                .add(Docs.helpButton("the Power Flow Simulation tab",
+                        Docs.POWER_FLOW_TAB))
                 .build();
         console(jPanel6, jScrollPane3, bar);
     }
@@ -650,6 +697,8 @@ public class StepssUI extends javax.swing.JFrame {
                 .toTheEnd()
                 .add(searchTextField)
                 .add(clearSimulOutput)
+                .add(Docs.helpButton("the Dynamic Simulation tab",
+                        Docs.DYNAMIC_SIMULATION_TAB))
                 .build();
         // The search field would otherwise stretch to fill the glue it follows.
         searchTextField.setMaximumSize(new Dimension(220, 28));
@@ -672,6 +721,8 @@ public class StepssUI extends javax.swing.JFrame {
                 .separate()
                 .add(Compile)
                 .add(savedynsim)
+                .toTheEnd()
+                .add(Docs.helpButton("the Codegen tab", Docs.CODEGEN_TAB))
                 .build();
         console(jPanel3, jScrollPane2, bar);
     }
@@ -707,17 +758,20 @@ public class StepssUI extends javax.swing.JFrame {
             nppData8Button, nppData9Button, nppData10Button};
 
         int row = 0;
-        rows.add(heading(jLabel1), span(row++));
+        rows.add(heading(jLabel1, "the system data files",
+                Docs.SYSTEM_DATA_FILES), span(row++));
         for (int i = 0; i < fields.length; i++) {
             rows.add(fileRow(String.valueOf(i + 1), loaders[i], fields[i], editors[i]),
                     stretch(row++));
         }
         rows.add(Box.createVerticalStrut(10), span(row++));
-        rows.add(heading(jLabel9), span(row++));
+        rows.add(heading(jLabel9, "the disturbance file",
+                Docs.DISTURBANCE_FILE), span(row++));
         rows.add(fileRow("", loadDist, fileDist, nppDstButton), stretch(row++));
         rows.add(Box.createVerticalStrut(10), span(row++));
         rows.add(heading(new JLabel(
-                "<html><b>One-line diagram annotated SVG</b> (optional)</html>")),
+                "<html><b>One-line diagram annotated SVG</b> (optional)</html>"),
+                "the annotated one-line diagram", Docs.DIAGRAM_FILE),
                 span(row++));
         rows.add(fileRow("", loadDiagram, fileDiagram, nppDiagramButton), stretch(row++));
         // Absorbs the leftover height so the rows stay together at the top
@@ -3860,7 +3914,7 @@ public class StepssUI extends javax.swing.JFrame {
     }
 
     private void showUserGuideButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showUserGuideButtonActionPerformed
-        PlatformLauncher.openUrl("https://stepss.sps-lab.org/");
+        PlatformLauncher.openUrl(Docs.SITE);
     }//GEN-LAST:event_showUserGuideButtonActionPerformed
 
     private void selWorkDirButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_selWorkDirButtonActionPerformed
@@ -4000,8 +4054,7 @@ public class StepssUI extends javax.swing.JFrame {
     static final String CHECK_UPDATES_KEY = "checkUpdatesAtStartup";
 
     private void webpageLabelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_webpageLabelMouseClicked
-        String url = "https://stepss.sps-lab.org";
-        PlatformLauncher.openUrl(url);
+        PlatformLauncher.openUrl(Docs.SITE);
     }//GEN-LAST:event_webpageLabelMouseClicked
 
     private void showApacheLicenseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showApacheLicenseButtonActionPerformed
