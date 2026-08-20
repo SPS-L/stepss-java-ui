@@ -5015,8 +5015,10 @@ public class StepssUI extends javax.swing.JFrame {
                         runtimeCur.getName());
             }
         }
+        boolean started = false;
         try {
             simulExecutor.execute(command, simulExecutorResultHandler);
+            started = true;
             statusBar.running("Simulating");
             runSimulation.setEnabled(false);
             runDyngraphButton.setEnabled(false);
@@ -5024,6 +5026,11 @@ public class StepssUI extends javax.swing.JFrame {
         } catch (IOException ex) {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
         }
+        // Whether there is a process to wait for at all. execute() only throws
+        // synchronously when the working directory is missing, and in that case
+        // the result handler is never completed: a watcher waiting on it would
+        // block for the rest of the session and never re-enable Run.
+        final boolean launched = started;
         clearSimulOutput.setEnabled(true);
         loadOutput.setEnabled(true);
         saveSimulOutput.setEnabled(true);
@@ -5052,23 +5059,39 @@ public class StepssUI extends javax.swing.JFrame {
         // watcher is still sleeping: reading the field then would finish the new
         // run's window and leave the old one polling forever.
         final my.stepss.curves.LiveCurveWindow myCurves = opened;
+        // This run's handler, captured like myCurves: a second run replaces the
+        // field, and this thread must wait for the process it was started for.
+        final DefaultExecuteResultHandler myHandler = simulExecutorResultHandler;
         (new Thread() {
             @Override
             public void run() {
                 try {
-                    Thread.sleep(2000);
-                    File f = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + ".lock_RAMSES");
-                    while (f.exists()) {
-                        Thread.sleep(2000);
+                    // The process itself, not a sentinel file. This used to
+                    // sleep two seconds and then wait for .lock_RAMSES to
+                    // disappear, but the engine no longer writes that file
+                    // (.kill_RAMSES is still there; .lock_RAMSES is not in the
+                    // binary at all), so the wait always fell through at
+                    // exactly 2.000s whatever the engine was doing. Anything
+                    // still being written after that was lost: on the Nordic
+                    // example the run-time window froze at 90713 bytes of a
+                    // temp_display.cur that reached 240092, drawing t up to
+                    // 62.4s of a run that went to 165.4s, and "Simulation
+                    // finished" appeared while the engine was still going.
+                    // waitFor() returns when the child has exited and its
+                    // output pumps have been joined, so the file on disk is
+                    // complete and closed before anything below reads it.
+                    if (launched) {
+                        myHandler.waitFor();
                     }
                 } catch (InterruptedException ex) {
                     Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
+                    Thread.currentThread().interrupt();
                 }
-                // After the lock has gone, so the engine's final flush has
-                // landed. LiveCurveWindow.finish does one last read on its own
-                // thread rather than here, and never throws, which matters
-                // because the invokeLater below is what re-enables the Run
-                // button: see the contract on finish().
+                // After the engine has exited, so its final flush has landed.
+                // LiveCurveWindow.finish does one last read on its own thread
+                // rather than here, and never throws, which matters because
+                // the invokeLater below is what re-enables the Run button: see
+                // the contract on finish().
                 //
                 // myCurves, not the liveCurves field. This thread belongs to one
                 // run and must finish that run's window even if another run has
