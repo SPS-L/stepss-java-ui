@@ -19,8 +19,8 @@ This one is a Java (Swing) desktop application. It bundles the complete simulati
 - **Bundled examples**: *File → Open Examples* extracts a ready-to-run test system (Kundur two-area, IEEE Nordic, or the 5-bus tutorial) into your examples directory and fills in the case, so there is something to run on a fresh install
 - **Dynamic simulation**: runs the bundled RAMSES engine on the loaded data and disturbance files
 - **Power flow**: drives the bundled Helios power-flow engine
-- **Real-time plotting**: fill in a run-time observable and a curve window opens with the run and follows the engine as it writes, one stacked panel per observable (bus voltages, machine speeds, branch flows, latency, phase-plane trajectories, wall time against simulation time, and more). It stops when the run does and stays open as a static chart, so two runs can be compared side by side, and saves as PNG or CSV. That export is the only route out for the phase-plane and latency observables, which exist only during a run and have no *Extract Curves* equivalent. Drawn by STEPSS itself: no external plotting program is needed or bundled
-- **Result extraction**: *Extract Curves* drives the bundled DYNGRAPH over a saved trajectory and draws the result in a curve window of its own, one per extraction, so two extractions can be put side by side and compared. Zoom by dragging a box, reset with a double-click, and save the figure as PNG, SVG or CSV. *Save gnuplot pair* keeps that window's own `.cur` and `.plt`, which STEPSS writes but never reads, for anyone who would rather plot it in gnuplot themselves. It is a window action rather than a tab-bar one so that it always saves the extraction you are looking at
+- **Real-time plotting**: fill in a run-time observable and a curve window opens with the run and follows the engine as it writes, one stacked panel per observable (bus voltages, machine speeds, branch flows, latency, phase-plane trajectories, wall time against simulation time, and more). It stops when the run does and stays open as a static chart, so two runs can be compared side by side. Zoom by dragging a box, reset from the toolbar, and save as PNG or CSV: that export is the route out for the phase-plane and latency observables, which exist only during a run and have no *Extract Curves* equivalent. Drawn by STEPSS itself: no external plotting program is needed or bundled
+- **Result extraction**: *Extract Curves* drives the bundled DYNGRAPH over a saved trajectory and draws the result in a curve window of its own, one per extraction, so two extractions can be put side by side and compared. Zoom by dragging a box, reset with a double-click, and save the figure as PNG, SVG or CSV. *Save gnuplot pair* keeps that window's own `.cur` and `.plt`, which STEPSS writes but never reads, for plotting in gnuplot
 - **Analysis tools**: Jacobian matrix extraction, and small-signal stability analysis computed by the engine itself (see `examples/kundur-ssa/`)
 - **User models**: the Codegen tab generates user-written model source with CODEGEN and compiles it into a custom simulator with gfortran
 - **Observable wizard**: dialog for selecting buses, machines, shunts, branches, and injectors to record
@@ -118,11 +118,10 @@ Then, in the GUI:
 5. Run the simulation from the *Dynamic Simulation* tab
 6. Plot results with **Extract Curves**, which opens a curve window of its own, or watch the run-time curves in the window that opens with the run
 
-Run-time curves need a RAMSES release that publishes its column map, which the
-engine writes into a short header at the top of the file the curves are read
-from. Against an older engine the window says so plainly rather than guessing
-which column belongs to which observable. Extract Curves is unaffected: it reads
-DYNGRAPH's output, which needs no header.
+Run-time curves need a RAMSES release that writes a column map into the header
+of its observable file. Against an engine that does not, the window says so
+rather than drawing. Extract Curves is independent of this: it reads DYNGRAPH's
+output, which carries no header.
 
 ## Bundled tools
 
@@ -137,7 +136,7 @@ The jar embeds the toolchain executables for the platform it runs on and extract
 | Model compilation | Custom models | yes (MSYS2/MinGW) | yes (gfortran) | yes (Homebrew gcc) |
 | Data file editing | OS default editor | yes | yes | yes |
 
-DYNGRAPH is the same console program on all three platforms, but Extract Curves no longer opens it in a terminal window: STEPSS reads the trajectory's observables with `dyngraph --list`, presents them in a selection dialog, drives the extraction through a generated command file (`-t`), and then draws the extracted curves itself. Running DYNGRAPH by hand, outside STEPSS, still gives the console prompts.
+DYNGRAPH is the same console program on all three platforms, and Extract Curves drives it without a terminal window: STEPSS reads the trajectory's observables with `dyngraph --list`, presents them in a selection dialog, drives the extraction through a generated command file (`-t`), and then draws the extracted curves itself. Running DYNGRAPH by hand, outside STEPSS, gives the console prompts.
 
 The bundled RAMSES runs limited (up to 1000 buses, 2 cores) unless a `LICENSE` record is supplied among the data files. There is only one engine build; the limit is lifted by the licence the engine itself reads, not by a different binary, so STEPSS cannot tell which of the two you are running and does not claim to. The engine's own banner in the simulation output reports it.
 
