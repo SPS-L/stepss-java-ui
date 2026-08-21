@@ -66,13 +66,13 @@ public final class Toolchain {
 
         s.add(new ToolSpec(CODEGEN)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "payload/codegen-windows-x86_64-v5.2.0.zip", ToolSpec.Kind.ZIP,
+                "payload/codegen-windows-x86_64-v5.3.zip", ToolSpec.Kind.ZIP,
                 "CODEGEN.exe", "CODEGEN.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "payload/codegen-linux-x86_64-v5.2.0.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/codegen-linux-x86_64-v5.3.tar.gz", ToolSpec.Kind.TGZ,
                 "CODEGEN", "CODEGEN", true))
             .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
-                "payload/codegen-macos-arm64-v5.2.0.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/codegen-macos-arm64-v5.3.tar.gz", ToolSpec.Kind.TGZ,
                 "CODEGEN", "CODEGEN", true)));
 
         s.add(new ToolSpec(URAMSES)
