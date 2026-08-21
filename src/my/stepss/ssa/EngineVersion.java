@@ -12,14 +12,17 @@ import java.util.regex.Pattern;
  * engine need not be it: a build adopted from the Codegen tab replaces it for
  * the rest of the session, and the pin says nothing about that build.
  *
- * <p>This matters for exactly one reason. {@code disturb.f90} reads its
- * records list-directed, and a list-directed read of two items silently
- * ignores anything after them. So an engine older than
- * {@link #EIG_PARAMETERS_SINCE} accepts an {@code EIG} record carrying
- * {@code real_limit} and {@code pf_threshold} without any error at all, and
- * quietly analyses with its own defaults. Nothing on the engine side can
- * report that back. This check is the only thing standing between that and a
- * window presenting thresholds the run never used.
+ * <p>What it decides is what the engine's results will contain. From
+ * {@link #EVERY_MODE_SINCE} the analysis writes participation factors and a
+ * mode shape for every mode and leaves the filtering to whoever reads them;
+ * before it, the engine filtered by a real_limit fixed on the EIG record and
+ * wrote those two files for its dominant modes alone. Both open, and the
+ * results window explains either, but only one of them can answer a question
+ * about a mode the old engine dropped.
+ *
+ * <p>The record itself needs no check. It is a basename and a time, which is
+ * the whole grammar now and was the two-argument form every older engine
+ * accepted, so what this class gates is the reading and never the writing.
  *
  * <p>Deliberately pure: it parses text and compares numbers, and never runs
  * anything. Obtaining the banner needs a process and so lives in the UI, which
@@ -30,17 +33,18 @@ import java.util.regex.Pattern;
 public final class EngineVersion {
 
     /**
-     * First RAMSES whose {@code EIG} disturbance accepts {@code real_limit}
-     * and {@code pf_threshold}. Before this, both are hardcoded in
-     * {@code disturb.f90} for any record-triggered analysis.
+     * First RAMSES that writes results for every mode, i.e. that writes v2
+     * files. From here {@code EIG} takes a basename alone, the participation
+     * floor is the {@code $PF_THRES} solver setting, and the real part limit
+     * is applied when the results are read.
      */
-    public static final double EIG_PARAMETERS_SINCE = 3.74;
+    public static final double EVERY_MODE_SINCE = 3.79;
 
     /**
      * The banner prints the version with Fortran {@code f5.2} from a single
      * precision constant, so the text carries two decimals and the parsed
      * value can sit an ulp either side of the literal. Comparing with this
-     * slack keeps 3.74 from failing a {@code >= 3.74} test.
+     * slack keeps 3.79 from failing a {@code >= 3.79} test.
      */
     private static final double EPS = 1e-4;
 
@@ -76,13 +80,14 @@ public final class EngineVersion {
     }
 
     /**
-     * Whether a version accepts the two {@code EIG} parameters.
+     * Whether a version writes participation factors and mode shapes for
+     * every mode.
      *
-     * <p>An unreadable version is treated as unsupported. That is the safe
-     * direction: the cost of being wrong the other way is a run whose
-     * displayed thresholds are not the ones it used.
+     * <p>An unreadable version is treated as not doing so. That is the safe
+     * direction: it shows a note a current engine does not need, where the
+     * other way round hides one an old engine does.
      */
-    public static boolean supportsEigParameters(double version) {
-        return !Double.isNaN(version) && version >= EIG_PARAMETERS_SINCE - EPS;
+    public static boolean writesEveryMode(double version) {
+        return !Double.isNaN(version) && version >= EVERY_MODE_SINCE - EPS;
     }
 }

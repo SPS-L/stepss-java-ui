@@ -23,16 +23,17 @@ import javax.swing.JPanel;
  * looking exactly as authoritative. Refusing is the honest option.
  *
  * <p>A simple mode with no entries is a second case, and which explanation is
- * honest there depends on the engine's own dom flag, never on the emptiness
- * alone. When dom is 0 the engine filtered the mode by real_limit and wrote
- * no mode shape for it, so saying so is correct. When dom is 1 the engine
- * marked the mode dominant and should have written rows, so the file is
- * missing or incomplete: naming real_limit there would invent a reason.
- * &lt;base&gt;_ms.dat is optional to {@link SsaResults#load}, and the copy-out
- * in StepssUI copies only the files that exist, so that state is reachable.
- * The no-selection state, reached through {@link #clear()}, is a third case
- * again: no mode has been chosen yet, so it draws the plain dial with
- * neither arrows nor a message.
+ * honest there depends on {@link Mode#dominant}, never on the emptiness
+ * alone. A current engine writes a mode shape for every mode, so the flag is
+ * null and an absence means the file is missing or incomplete. Only an
+ * archive saved by a v1 engine can carry {@link Boolean#FALSE}, which is the
+ * one case where real_limit really is the reason and saying so is correct.
+ * Naming it anywhere else would invent a cause for an absence that has
+ * another one. &lt;base&gt;_ms.dat is optional to {@link SsaResults#load}, and
+ * the copy-out in StepssUI copies only the files that exist, so the missing
+ * case is reachable on either version. The no-selection state, reached
+ * through {@link #clear()}, is a third case again: no mode has been chosen
+ * yet, so it draws the plain dial with neither arrows nor a message.
  */
 public final class ModeShapePanel extends JPanel {
 
@@ -42,7 +43,7 @@ public final class ModeShapePanel extends JPanel {
 
     private List<ModeShapeEntry> entries = new ArrayList<ModeShapeEntry>();
     private boolean simple = true;
-    private boolean dominant = true;
+    private Boolean dominant;
     private int modeIndex;
     private boolean noSelection = true;
 
@@ -78,18 +79,19 @@ public final class ModeShapePanel extends JPanel {
         this.entries = new ArrayList<ModeShapeEntry>();
         this.modeIndex = 0;
         this.simple = true;
-        this.dominant = true;
+        this.dominant = null;
         this.noSelection = true;
         repaint();
     }
 
     /**
      * @param simple the mode's smp flag, false for a degenerate eigenvalue
-     * @param dominant the mode's dom flag, which is what distinguishes a mode
-     *     the engine filtered from one it kept but wrote no rows for
+     * @param dominant the mode's {@link Mode#dominant}, null on any current
+     *     results file, and what distinguishes a mode a v1 engine filtered
+     *     from one it kept but wrote no rows for
      */
     public void show(List<ModeShapeEntry> entries, int modeIndex, boolean simple,
-            boolean dominant) {
+            Boolean dominant) {
         this.entries = new ArrayList<ModeShapeEntry>(entries);
         this.modeIndex = modeIndex;
         this.simple = simple;
@@ -145,7 +147,7 @@ public final class ModeShapePanel extends JPanel {
     }
 
     static void render(PlotSink sink, List<ModeShapeEntry> entries, boolean simple,
-            boolean dominant, int width, int height) {
+            Boolean dominant, int width, int height) {
         double cx = width / 2.0;
         double cy = height / 2.0;
         double radius = radius(width, height);
@@ -166,25 +168,30 @@ public final class ModeShapePanel extends JPanel {
 
         if (entries.isEmpty()) {
             // Same absence the participation panel reports, and split the same
-            // way. The engine's own dom flag is the authority on which of the
-            // two reasons applies; the empty list on its own cannot tell them
-            // apart, and guessing real_limit for a dominant mode states a
-            // cause that did not happen.
-            if (dominant) {
-                sink.group("no-rows");
-                sink.text(cx, cy - 8.0,
-                        "The engine marked this mode dominant, but no mode"
-                        + " shape rows were written for it.",
-                        "middle", "title");
-                sink.text(cx, cy + 12.0,
-                        "The mode-shape file may be missing from this directory.",
-                        "middle", "label");
-            } else {
+            // way. Boolean.FALSE, and nothing else, means a v1 engine filtered
+            // this mode out by real_limit; on every current file the flag is
+            // null and naming real_limit would state a cause that did not
+            // happen. Compared rather than unboxed, because null is the
+            // ordinary case here and would throw.
+            if (Boolean.FALSE.equals(dominant)) {
                 sink.group("filtered");
                 sink.text(cx, cy - 8.0, "This mode was filtered out by real_limit.",
                         "middle", "title");
                 sink.text(cx, cy + 12.0,
-                        "No mode shape was written for it, so none is shown here.",
+                        "The engine that saved this run wrote mode shapes only for"
+                        + " modes above it, so there is none to show.",
+                        "middle", "label");
+                sink.text(cx, cy + 28.0,
+                        "Re-running the analysis writes one for every mode.",
+                        "middle", "label");
+            } else {
+                sink.group("no-rows");
+                sink.text(cx, cy - 8.0,
+                        "No mode shape rows were written for this mode.",
+                        "middle", "title");
+                sink.text(cx, cy + 12.0,
+                        "Every mode should have one, so the mode-shape file is"
+                        + " missing from this directory or is incomplete.",
                         "middle", "label");
             }
             sink.endGroup();

@@ -44,6 +44,38 @@ public final class SsaResultsWindow extends JFrame {
     private final JTextArea participation = new JTextArea();
     private final JCheckBox emOnly =
             new JCheckBox("electromechanical only (0.1 to 2.5 Hz)", true);
+    private final JCheckBox realLimitOn = new JCheckBox("real part above");
+    private final javax.swing.JTextField realLimit = new javax.swing.JTextField(6);
+    private final javax.swing.JTextField pfThreshold = new javax.swing.JTextField(6);
+    private final JLabel shownCount = new JLabel();
+    private final JButton resetZoom = new JButton("Reset zoom");
+
+    /**
+     * The real part limit the table, the s-plane and the mode shape are
+     * filtered by, and the participation floor the Participation panel is
+     * trimmed at. Both are held as numbers, and the fields are only their
+     * text: a half-typed "-" is not a threshold, so nothing re-filters until
+     * the field commits and parses.
+     */
+    private double realLimitValue = DEFAULT_REAL_LIMIT;
+    private double pfThresholdValue = DEFAULT_PF_THRESHOLD;
+
+    /**
+     * The limit offered when the run does not name one, which is every run a
+     * current engine makes. It is the value the retired {@code real_limit}
+     * parameter defaulted to, so ticking the box reproduces exactly what that
+     * default used to select.
+     */
+    private static final double DEFAULT_REAL_LIMIT = -1.0;
+
+    /**
+     * The participation floor offered by default, which is what the retired
+     * {@code pf_threshold} parameter defaulted to. The engine's own floor is
+     * lower ({@code pf_floor}, $PF_THRES), so this trims a file that already
+     * holds more than this; lowering it shows more without re-running, down
+     * to that floor.
+     */
+    private static final double DEFAULT_PF_THRESHOLD = 0.05;
 
     /**
      * Opens one run in a window of its own. Every call makes a new window on
@@ -62,8 +94,19 @@ public final class SsaResultsWindow extends JFrame {
         super("Small-signal results - " + results.basename()
                 + " - " + results.directory().getAbsolutePath());
         this.results = results;
-        this.model = new ModesTableModel(SsaResults.electromechanical(
-                results.modes().modes()));
+        // An archived v1 run recorded the limit it was analysed under. Using
+        // it here is not a filter the file imposes -- the tick still starts
+        // off -- but it makes the box, when ticked, reproduce what that run
+        // actually contains rather than some other number's worth of it.
+        Double recorded = results.modes().realLimit();
+        if (recorded != null) {
+            this.realLimitValue = recorded.doubleValue();
+        }
+        Double recordedPf = results.modes().pfThreshold();
+        if (recordedPf != null) {
+            this.pfThresholdValue = recordedPf.doubleValue();
+        }
+        this.model = new ModesTableModel(visible());
         this.table = new JTable(model);
 
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
@@ -87,25 +130,67 @@ public final class SsaResultsWindow extends JFrame {
             }
         });
 
-        emOnly.addActionListener(event -> {
-            model.setRows(emOnly.isSelected()
-                    ? SsaResults.electromechanical(results.modes().modes())
-                    : results.modes().modes());
-            splane.setModes(model.rows());
-            clearDetail();
+        emOnly.addActionListener(event -> refilter());
+        realLimitOn.addActionListener(event -> refilter());
+        realLimitOn.setToolTipText("Shows only the modes whose real part is"
+                + " above this, the ones with the least damping. The analysis"
+                + " writes every mode, so this is a question about the display"
+                + " and is answered again every time the number changes.");
+        realLimit.setToolTipText("Re(lambda) in 1/s. Modes at or below this"
+                + " are hidden from the table, the s-plane and the mode shape.");
+        commitOn(realLimit, () -> {
+            realLimitValue = parseField(realLimit, realLimitValue);
+            // Typing a number is only a filter change when the box is on, but
+            // it should turn the box on rather than do nothing visible.
+            if (!realLimitOn.isSelected()) {
+                realLimitOn.setSelected(true);
+            }
+            refilter();
         });
 
+        pfThreshold.setToolTipText("Hides participation entries below this."
+                + " Entries below the run's own pf_floor were never written,"
+                + " so lowering this past it shows nothing more.");
+        commitOn(pfThreshold, () -> {
+            pfThresholdValue = parseField(pfThreshold, pfThresholdValue);
+            showSelected();
+        });
+
+        // The count is what makes the filters legible: one that empties the
+        // table looks like a broken load unless the window says how many
+        // modes it is holding back.
+        shownCount.setFont(shownCount.getFont().deriveFont(
+                shownCount.getFont().getSize2D() - 1.0f));
+        syncFields();
+
+        JPanel filters = new JPanel();
+        filters.setLayout(new javax.swing.BoxLayout(filters, javax.swing.BoxLayout.Y_AXIS));
+        filters.add(row(emOnly));
+        filters.add(row(realLimitOn, realLimit, new JLabel(" 1/s")));
+        filters.add(row(indent(), new JLabel("PF at least "), pfThreshold));
+        filters.add(row(indent(), shownCount));
+        filters.setBorder(BorderFactory.createEmptyBorder(2, 0, 4, 0));
+
         JPanel left = new JPanel(new BorderLayout());
-        left.add(emOnly, BorderLayout.NORTH);
+        left.add(filters, BorderLayout.NORTH);
         left.add(new JScrollPane(table), BorderLayout.CENTER);
 
         splane.setModes(model.rows());
         splane.addSelectionListener(mode -> selectInTable(mode));
 
+        // Disabled until there is a zoom to leave, so the button says whether
+        // the plot is showing everything rather than only offering to make it.
+        resetZoom.setToolTipText("Back to the window fitted around the modes"
+                + " on screen. Drag a rectangle on the plot to zoom in;"
+                + " double-clicking it does this too.");
+        resetZoom.addActionListener(event -> splane.resetZoom());
+        splane.setZoomListener(() -> resetZoom.setEnabled(splane.isZoomed()));
+        resetZoom.setEnabled(splane.isZoomed());
+
         JSplitPane top = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left,
                 withSaveButton(splane, "s-plane", () -> splane.toSvg(
                         Math.max(splane.getWidth(), 500),
-                        Math.max(splane.getHeight(), 400))));
+                        Math.max(splane.getHeight(), 400)), resetZoom));
         top.setResizeWeight(0.45);
 
         // A wrapped text area rather than a column of labels. The two sentences
@@ -139,6 +224,127 @@ public final class SsaResultsWindow extends JFrame {
         pack();
     }
 
+    /**
+     * The modes the filters leave on screen, in the order the table, the
+     * s-plane and the mode shape all read them from.
+     *
+     * <p>The order the two are composed in matters: {@link
+     * SsaResults#electromechanical} sorts by frequency and {@link
+     * SsaResults#aboveRealLimit} preserves the order it is given, so this way
+     * round the table comes out sorted whichever filters are on.
+     */
+    private List<Mode> visible() {
+        List<Mode> rows = results.modes().modes();
+        if (emOnly.isSelected()) {
+            rows = SsaResults.electromechanical(rows);
+        }
+        if (realLimitOn.isSelected()) {
+            rows = SsaResults.aboveRealLimit(rows, realLimitValue);
+        }
+        return rows;
+    }
+
+    /**
+     * Rebuilds everything downstream of the filters.
+     *
+     * <p>The selection goes first, because a row index into the old list means
+     * nothing against the new one. {@link SplanePanel#setModes} refits the
+     * axis window as it goes, which is the point of filtering the plot at all:
+     * dropping the far-left fast modes is what lets the plane close in around
+     * the ones that are left.
+     */
+    private void refilter() {
+        table.clearSelection();
+        model.setRows(visible());
+        splane.setModes(model.rows());
+        syncFields();
+        clearDetail();
+    }
+
+    /** Enables what the ticks make relevant, and restates the count. */
+    private void syncFields() {
+        realLimit.setEnabled(true);
+        realLimit.setText(trim(realLimitValue));
+        pfThreshold.setText(trim(pfThresholdValue));
+        int shown = model.rows().size();
+        int all = results.modes().modes().size();
+        shownCount.setText(shown == all
+                ? shown + " modes"
+                : "showing " + shown + " of " + all + " modes");
+    }
+
+    /**
+     * Runs {@code action} when the field commits, on Enter and on losing
+     * focus. Both, because a user who types a limit and then reaches for the
+     * table with the mouse has committed just as much as one who pressed
+     * Enter, and a field that quietly kept the old number in that case is the
+     * kind of thing that gets reported as the filter not working.
+     */
+    private static void commitOn(javax.swing.JTextField field, Runnable action) {
+        field.addActionListener(event -> action.run());
+        field.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusLost(java.awt.event.FocusEvent event) {
+                action.run();
+            }
+        });
+    }
+
+    /**
+     * The field's value, or {@code fallback} if it does not parse.
+     *
+     * <p>Reverting beats refusing here. This is a display control, so the
+     * worst a bad value can do is show the wrong modes; a modal complaint
+     * about a half-typed number, from a field that commits on focus loss,
+     * would fire whenever someone clicked away mid-edit.
+     */
+    private static double parseField(javax.swing.JTextField field, double fallback) {
+        try {
+            double v = Double.parseDouble(field.getText().trim());
+            if (!Double.isNaN(v) && !Double.isInfinite(v)) {
+                return v;
+            }
+        } catch (NumberFormatException ex) {
+            // fall through to the fallback
+        }
+        field.setText(trim(fallback));
+        return fallback;
+    }
+
+    /** The biggest participation in a mode, for reporting an over-tight threshold. */
+    private static double largest(List<Participation> rows) {
+        double best = 0.0;
+        for (Participation p : rows) {
+            best = Math.max(best, p.pf);
+        }
+        return best;
+    }
+
+    /** A threshold as a user would write it: no trailing zeros, no exponent. */
+    private static String trim(double value) {
+        String text = String.format(java.util.Locale.ROOT, "%.6f", value);
+        while (text.contains(".") && (text.endsWith("0") || text.endsWith("."))) {
+            text = text.substring(0, text.length() - 1);
+        }
+        return text.isEmpty() ? "0" : text;
+    }
+
+    /** One left-aligned line of the filter panel, tight against its neighbours. */
+    private static JPanel row(Component... parts) {
+        JPanel panel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 1));
+        for (Component part : parts) {
+            panel.add(part);
+        }
+        panel.setAlignmentX(LEFT_ALIGNMENT);
+        return panel;
+    }
+
+    /** Lines up a continuation row under the tick above it, past the box. */
+    private static Component indent() {
+        return javax.swing.Box.createHorizontalStrut(
+                new JCheckBox().getPreferredSize().width);
+    }
+
     private JPanel header() {
         SsaModes m = results.modes();
         JPanel panel = new JPanel(new GridLayout(2, 1));
@@ -146,10 +352,24 @@ public final class SsaResultsWindow extends JFrame {
         panel.add(new JLabel(results.directory().getAbsolutePath()
                 + "    basename " + results.basename()
                 + "    " + m.nstates() + " states, " + m.nalg() + " algebraic"));
-        panel.add(new JLabel("real_limit " + show(m.realLimit())
-                + "    pf_threshold " + show(m.pfThreshold())
-                + "    gap_tol " + show(m.gapTol())
-                + "    t = " + show(m.time())));
+        // What the run recorded, not what the window is filtering by: the
+        // thresholds beside the table are the reader's and change freely,
+        // while these describe the file and cannot. A v2 run has no
+        // real_limit at all, so naming one here would be an invention.
+        StringBuilder line = new StringBuilder();
+        if (m.realLimit() != null) {
+            line.append("real_limit ").append(show(m.realLimit())).append("    ");
+        }
+        if (m.pfThreshold() != null) {
+            line.append("pf_threshold ").append(show(m.pfThreshold())).append("    ");
+        }
+        if (m.pfFloor() != null) {
+            line.append("pf_floor ").append(show(m.pfFloor())).append("    ");
+        }
+        line.append("gap_tol ").append(show(m.gapTol()))
+                .append("    t = ").append(show(m.time()))
+                .append("    format v").append(m.formatVersion());
+        panel.add(new JLabel(line.toString()));
         return panel;
     }
 
@@ -159,12 +379,15 @@ public final class SsaResultsWindow extends JFrame {
     }
 
     private JPanel withSaveButton(Component plot, String what,
-            java.util.function.Supplier<String> svg) {
+            java.util.function.Supplier<String> svg, Component... extra) {
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(plot, BorderLayout.CENTER);
         JButton save = new JButton("Save plot...");
         save.addActionListener(event -> saveSvg(what, svg.get()));
         JPanel bar = new JPanel();
+        for (Component component : extra) {
+            bar.add(component);
+        }
         bar.add(save);
         panel.add(bar, BorderLayout.SOUTH);
         return panel;
@@ -225,29 +448,54 @@ public final class SsaResultsWindow extends JFrame {
                     .append(" factors are basis-dependent and would come out")
                     .append(" differently on another machine. Not shown.\n");
         } else {
-            List<Participation> rows = results.participation().forMode(mode.index);
-            if (rows.isEmpty() && mode.dominant) {
-                // The engine's dom flag says this mode passed real_limit, so
-                // real_limit is not why the rows are absent. _pf.dat is
-                // optional to SsaResults.load and the copy-out in StepssUI
-                // copies only files that exist, so the honest report is that
-                // the rows are missing, not a filter that did not fire.
+            List<Participation> inFile = results.participation().forMode(mode.index);
+            List<Participation> rows = new java.util.ArrayList<Participation>();
+            for (Participation p : inFile) {
+                if (p.pf >= pfThresholdValue) {
+                    rows.add(p);
+                }
+            }
+            if (inFile.isEmpty() && Boolean.FALSE.equals(mode.dominant)) {
+                // Only an archive from a v1 engine can reach this. That
+                // engine wrote participation for modes above real_limit
+                // alone, so the absence really is the filter, and this is the
+                // one place naming it is not inventing a cause.
                 text.append("Mode ").append(mode.index)
-                        .append(" was marked dominant by the engine, but no")
-                        .append(" participation rows were written for it.\n\n")
-                        .append("The participation file may be missing from this")
-                        .append(" directory.\n");
-            } else if (rows.isEmpty()) {
-                text.append("Mode ").append(mode.index)
-                        .append(" was filtered out by real_limit (")
+                        .append(" is below the real_limit of ")
                         .append(show(results.modes().realLimit()))
-                        .append("), so no participation factors were written.\n");
+                        .append(" that this run was analysed under, so the engine")
+                        .append(" wrote no participation factors for it.\n\n")
+                        .append("Re-running the analysis writes them for every")
+                        .append(" mode.\n");
+            } else if (inFile.isEmpty()) {
+                // Every mode gets participation now, and normalisation puts
+                // one entry at exactly 1 in each, so no mode can fall below
+                // pf_floor either. An empty mode is therefore a missing file
+                // and not a threshold. _pf.dat is optional to SsaResults.load
+                // and the copy-out in StepssUI copies only files that exist,
+                // so this state is reachable.
+                text.append("No participation rows were written for mode ")
+                        .append(mode.index).append(".\n\n")
+                        .append("Every mode should have some, so the")
+                        .append(" participation file is missing from this")
+                        .append(" directory or is incomplete.\n");
+            } else if (rows.isEmpty()) {
+                // A threshold the reader set, not one the file imposes, so
+                // this says which and leaves the fix one field away.
+                text.append("Mode ").append(mode.index).append(" has ")
+                        .append(inFile.size())
+                        .append(inFile.size() == 1 ? " entry" : " entries")
+                        .append(", none of them at or above the PF threshold of ")
+                        .append(trim(pfThresholdValue)).append(".\n\n")
+                        .append("Its largest is ")
+                        .append(String.format(java.util.Locale.ROOT, "%.4f", largest(inFile)))
+                        .append(". Lower the threshold beside the table to see it.\n");
             } else {
                 text.append(String.format(java.util.Locale.ROOT, "Mode %d, %.4f Hz%n%n",
                         mode.index, mode.freqHz));
                 // The columns are named because the last of them is not
                 // self-evident: PF is the abbreviation a reader meets here and
-                // in the Analysis tab's threshold field, and it is spelt out
+                // in the threshold field beside the table, and it is spelt out
                 // under the table rather than in the header, where it would
                 // not fit the width the rows set.
                 text.append(String.format(java.util.Locale.ROOT,
@@ -263,11 +511,28 @@ public final class SsaResultsWindow extends JFrame {
                             p.family, p.device, p.variable, p.pf));
                 }
                 text.append("\nPF is the participation factor, normalised so")
-                        .append(" the largest in each mode is 1.\n")
-                        .append("Entries below pf_threshold ")
-                        .append(show(results.modes().pfThreshold()))
-                        .append(" are not written, so an absent device is below")
-                        .append(" it, not zero.\n");
+                        .append(" the largest in each mode is 1.\n");
+                if (rows.size() < inFile.size()) {
+                    text.append(inFile.size() - rows.size())
+                            .append(" more entries are in the file below the PF")
+                            .append(" threshold of ").append(trim(pfThresholdValue))
+                            .append("; lower it beside the table to see them.\n");
+                }
+                // Two different absences, and conflating them is what makes a
+                // reader think a machine takes no part in a mode when the
+                // truth is that nobody asked the engine to write it down.
+                if (results.modes().pfFloor() != null) {
+                    text.append("Entries below the run's pf_floor of ")
+                            .append(show(results.modes().pfFloor()))
+                            .append(" were never written, so a device absent")
+                            .append(" from the file is below that, not zero.\n");
+                } else if (results.modes().pfThreshold() != null) {
+                    text.append("Entries below the pf_threshold of ")
+                            .append(show(results.modes().pfThreshold()))
+                            .append(" this run was analysed under were never")
+                            .append(" written, so a device absent from the file")
+                            .append(" is below that, not zero.\n");
+                }
             }
         }
         participation.setText(text.toString());

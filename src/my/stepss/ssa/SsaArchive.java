@@ -46,19 +46,22 @@ public final class SsaArchive {
 
     /**
      * Written by ssa.f90 under the run's basename. {@code _pf} and {@code _ms}
-     * are optional for the reason {@link SsaResults} gives: the engine writes
-     * them only when at least one mode passed {@code real_limit}. Only the
-     * modes file is required, and {@link #save} refuses without it.
+     * are optional for the reason {@link SsaResults} gives: a v1 engine wrote
+     * them only when at least one mode passed {@code real_limit}, so a run
+     * that filtered everything left neither. Only the modes file is required,
+     * and {@link #save} refuses without it.
      */
     public static final String[] RESULT_SUFFIXES = {
         "_modes.dat", "_pf.dat", "_ms.dat",
     };
 
     /**
-     * The members whose absence is a result rather than a fault. The engine
-     * writes these two only when at least one mode passed {@code real_limit},
-     * so a run that filtered everything leaves neither, and an archive without
-     * them is complete.
+     * The members whose absence is a result rather than a fault. A v1 engine
+     * wrote these two only when at least one mode passed {@code real_limit},
+     * so a run that filtered everything left neither, and an archive of one
+     * without them is complete. A v2 engine writes both for every run, so
+     * their absence there means an incomplete copy instead; that is still not
+     * a reason to refuse an archive of what does exist.
      */
     public static final String[] OPTIONAL_SUFFIXES = {"_pf.dat", "_ms.dat"};
 
@@ -101,12 +104,14 @@ public final class SsaArchive {
      * What the archive records about the run inside it.
      *
      * <p>Every field but the basename may be null, and null means "not
-     * recorded" rather than zero: an engine older than
-     * {@link EngineVersion#EIG_PARAMETERS_SINCE} never sees {@code real_limit}
-     * or {@code pf_threshold}, so writing the numbers the disabled fields
-     * happened to hold would claim thresholds the run never used. That is the
-     * same distinction {@link SsaModes} draws for the results header, and the
-     * results window already renders it as "not recorded".
+     * recorded" rather than zero. The two threshold fields are read but never
+     * written now: they carried the {@code real_limit} and {@code
+     * pf_threshold} of the EIG record, which no longer has either, and the
+     * one floor the engine still applies is written into the modes file
+     * itself as {@code pf_floor}. They stay on this class so that an archive
+     * saved by an older build still reports what it was analysed under. That
+     * is the same distinction {@link SsaModes} draws for the results header,
+     * and the results window already renders it as "not recorded".
      */
     public static final class Manifest {
 
@@ -524,10 +529,10 @@ public final class SsaArchive {
      * What to say once an archive is open.
      *
      * <p>The engine build is the whole reason this sentence exists. The
-     * results window header reports {@code t}, {@code real_limit} and
-     * {@code pf_threshold} out of the modes file itself, and says "not
-     * recorded" where the engine wrote none, but nothing in it knows which
-     * engine wrote the file. An archive analysed a year ago by a different
+     * results window header reports {@code t} and whichever thresholds the
+     * run recorded out of the modes file itself, and says "not recorded"
+     * where the engine wrote none, but nothing in it knows which engine wrote
+     * the file. An archive analysed a year ago by a different
      * build is otherwise indistinguishable from one this session produced.
      *
      * <p>Lives here rather than in the handler that shows it so that it can be

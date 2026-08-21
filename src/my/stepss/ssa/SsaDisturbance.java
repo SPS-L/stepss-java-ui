@@ -121,81 +121,6 @@ public final class SsaDisturbance {
     }
 
     /**
-     * The disturbance file contents, with explicit analysis parameters.
-     *
-     * <p>Only for engines at or past
-     * {@link EngineVersion#EIG_PARAMETERS_SINCE}. An older engine reads the
-     * {@code EIG} record list-directed, takes the first two items and ignores
-     * the rest without complaint, so calling this against one produces a full
-     * results set computed with the engine's own defaults while the window
-     * reports these values. {@link EngineVersion#supportsEigParameters} is
-     * what decides.
-     *
-     * <p>The pair is written together or not at all, which is the grammar the
-     * engine accepts: it refuses a record carrying one of the two rather than
-     * half applying it.
-     *
-     * @param basename names the three results files, and must satisfy
-     *     {@link #validBasename}
-     * @param t when to linearise, in seconds, at least {@link #MIN_TIME}
-     * @param realLimit dominance threshold on Re(lambda), in 1/s
-     * @param pfThreshold participation factor floor, dimensionless
-     * @return the file text, newline terminated
-     * @throws IllegalArgumentException if any argument is rejected
-     */
-    public static String text(String basename, double t,
-            double realLimit, double pfThreshold) {
-        if (!isFinite(realLimit)) {
-            throw new IllegalArgumentException(
-                    "Real part limit must be a finite number.");
-        }
-        if (!isFinite(pfThreshold)) {
-            throw new IllegalArgumentException(
-                    "Participation factor (PF) threshold must be a"
-                            + " finite number.");
-        }
-        String base = text(basename, t);
-        // Rebuild only the EIG line, so the JAC record, the solver record and
-        // the STOP margin stay in one place rather than being duplicated here
-        // and drifting from the two-argument form.
-        String eig = time(t) + " EIG '" + basename + "'\n";
-        String withParams = time(t) + " EIG '" + basename + "' "
-                + number(realLimit) + " " + number(pfThreshold) + "\n";
-        return base.replace(eig, withParams);
-    }
-
-    private static boolean isFinite(double v) {
-        return !Double.isNaN(v) && !Double.isInfinite(v);
-    }
-
-    /**
-     * Parses one of the two analysis parameters from user input.
-     *
-     * <p>Neither is range checked beyond being finite. The engine does not
-     * validate them either, and a threshold this side rejects but the engine
-     * would have accepted is a limit invented by the UI.
-     *
-     * @param text the field contents
-     * @param label how to name the field if it has to be rejected
-     * @return the parsed value
-     * @throws IllegalArgumentException if it is not a finite number
-     */
-    public static double parseParameter(String text, String label) {
-        String trimmed = text == null ? "" : text.trim();
-        double v;
-        try {
-            v = Double.parseDouble(trimmed);
-        } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(
-                    label + " must be a number, not \"" + trimmed + "\".");
-        }
-        if (!isFinite(v)) {
-            throw new IllegalArgumentException(label + " must be a finite number.");
-        }
-        return v;
-    }
-
-    /**
      * Fixed point rather than {@code Double.toString}, which emits scientific
      * notation for small values: the engine reads these records list-directed
      * and 1.0E-3 is accepted, but a plain decimal is what every other
@@ -206,18 +131,4 @@ public final class SsaDisturbance {
         return String.format(Locale.ROOT, "%.6f", t);
     }
 
-    /**
-     * Formats an analysis parameter for the record.
-     *
-     * <p>{@code Locale.ROOT} for the same reason {@link #time} uses it, and
-     * more sharply: under a comma-decimal locale {@code String.valueOf} would
-     * emit "-0,5", which the engine reads list-directed as two separate items
-     * and so becomes an overlong record it refuses. Plain decimal rather than
-     * {@code Double.toString}, which switches to scientific notation for small
-     * magnitudes; the engine accepts both, but every disturbance file in this
-     * project is written in plain decimal.
-     */
-    private static String number(double v) {
-        return String.format(Locale.ROOT, "%.6f", v);
-    }
 }

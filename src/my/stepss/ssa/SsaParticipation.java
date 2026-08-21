@@ -11,11 +11,18 @@ import java.util.Map;
 /**
  * <base>_pf.dat, indexed by mode.
  *
- * <p>Two absences are meaningful and are preserved rather than smoothed
- * over: ssa.f90 writes rows only for modes with dom == 1, so a mode present
- * in _modes.dat can be missing here entirely; and within a mode it writes
- * only entries above pf_threshold, so a missing device means "below the
- * threshold this run used", never "zero".
+ * <p>Absences here are meaningful and are preserved rather than smoothed
+ * over. ssa.f90 writes rows for every mode and every entry above the run's
+ * participation floor ($PF_THRES, recorded as pf_floor), so a missing device
+ * means "below the floor this run wrote at", never "zero". Normalisation puts
+ * one entry at exactly 1 in each mode, so no mode can be emptied by the floor:
+ * a mode missing from a v2 file means the file is incomplete.
+ *
+ * <p>On a v1 file a mode can legitimately be missing entirely, because that
+ * engine wrote rows only for modes above the real_limit it was given. {@link
+ * SsaModes#formatVersion} is what tells the two apart, and the results window
+ * says which of the two it is looking at rather than reporting one absence as
+ * the other.
  */
 public final class SsaParticipation {
 

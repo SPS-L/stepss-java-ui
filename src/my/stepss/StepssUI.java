@@ -470,8 +470,7 @@ public class StepssUI extends javax.swing.JFrame {
         content.add(heading(jLabel8, "small-signal stability analysis",
                 Docs.SMALL_SIGNAL_ANALYSIS), span(row++));
         content.add(pathRow(loadSSADir, ssaDirectory), stretch(row++));
-        content.add(leftRow(ssaBasenameLabel, ssaBasename, ssaTimeLabel, ssaTime,
-                ssaRealLimitLabel, ssaRealLimit, ssaPfThresholdLabel, ssaPfThreshold),
+        content.add(leftRow(ssaBasenameLabel, ssaBasename, ssaTimeLabel, ssaTime),
                 span(row++));
         content.add(ssaEngineNote, span(row++));
         content.add(ActionBar.create()
@@ -1225,10 +1224,6 @@ public class StepssUI extends javax.swing.JFrame {
         ssaBasename = new javax.swing.JTextField();
         ssaTimeLabel = new javax.swing.JLabel();
         ssaTime = new javax.swing.JTextField();
-        ssaRealLimitLabel = new javax.swing.JLabel();
-        ssaRealLimit = new javax.swing.JTextField();
-        ssaPfThresholdLabel = new javax.swing.JLabel();
-        ssaPfThreshold = new javax.swing.JTextField();
         ssaEngineNote = new javax.swing.JLabel();
         jPanel3 = new javax.swing.JPanel();
         jScrollPane2 = new javax.swing.JScrollPane();
@@ -2378,25 +2373,7 @@ public class StepssUI extends javax.swing.JFrame {
         ssaTime.setToolTipText("When to linearise. The default analyses the initial operating point; a later time runs an event-free simulation to that point first.");
         ssaTime.setName("ssaTime"); // NOI18N
 
-        ssaRealLimitLabel.setText("Real part limit");
-        ssaRealLimitLabel.setEnabled(false);
-        ssaRealLimitLabel.setName("ssaRealLimitLabel"); // NOI18N
-
-        ssaRealLimit.setText("-1.0");
-        ssaRealLimit.setToolTipText("Needs a RAMSES release whose EIG disturbance accepts these values. The running engine does not, and would ignore them silently, so they are disabled rather than misleading.");
-        ssaRealLimit.setEnabled(false);
-        ssaRealLimit.setName("ssaRealLimit"); // NOI18N
-
-        ssaPfThresholdLabel.setText("Participation factor (PF) threshold");
-        ssaPfThresholdLabel.setEnabled(false);
-        ssaPfThresholdLabel.setName("ssaPfThresholdLabel"); // NOI18N
-
-        ssaPfThreshold.setText("0.05");
-        ssaPfThreshold.setToolTipText("Needs a RAMSES release whose EIG disturbance accepts these values. The running engine does not, and would ignore them silently, so they are disabled rather than misleading.");
-        ssaPfThreshold.setEnabled(false);
-        ssaPfThreshold.setName("ssaPfThreshold"); // NOI18N
-
-        ssaEngineNote.setText("Real part limit and PF threshold need a newer RAMSES; the running engine ignores them.");
+        ssaEngineNote.setText("This engine writes the older results format; only its dominant modes get participation factors and mode shapes.");
         ssaEngineNote.setName("ssaEngineNote"); // NOI18N
 
         javax.swing.GroupLayout jPanel8Layout = new javax.swing.GroupLayout(jPanel8);
@@ -2433,15 +2410,7 @@ public class StepssUI extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(ssaTimeLabel)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(ssaTime, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(ssaRealLimitLabel)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(ssaRealLimit, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(ssaPfThresholdLabel)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(ssaPfThreshold, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addComponent(ssaTime, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE))
                             .addComponent(ssaEngineNote))
                         .addGap(0, 1492, Short.MAX_VALUE)))
                 .addContainerGap())
@@ -2471,11 +2440,7 @@ public class StepssUI extends javax.swing.JFrame {
                     .addComponent(ssaBasenameLabel)
                     .addComponent(ssaBasename, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(ssaTimeLabel)
-                    .addComponent(ssaTime, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(ssaRealLimitLabel)
-                    .addComponent(ssaRealLimit, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(ssaPfThresholdLabel)
-                    .addComponent(ssaPfThreshold, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(ssaTime, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(ssaEngineNote)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
@@ -4175,39 +4140,15 @@ public class StepssUI extends javax.swing.JFrame {
                 return;
             }
 
-            // The two analysis parameters, but only against an engine that
-            // accepts them. applyEngineCapabilities() decides that from the
-            // engine's own banner and enables the fields to match, so a
-            // disabled field means the record stays two-argument.
-            //
-            // The asymmetry is deliberate and is why the check exists at all:
-            // disturb.f90 reads this record list-directed, so an engine
-            // without the feature takes the first two items and ignores the
-            // rest without erroring. Writing the parameters anyway would give
-            // a full results set computed with the engine's defaults, under a
-            // window header claiming these values. Nothing downstream could
-            // detect it.
-            double realLimit = 0.0;
-            double pfThreshold = 0.0;
-            if (eigParametersSupported) {
-                try {
-                    realLimit = my.stepss.ssa.SsaDisturbance.parseParameter(
-                            ssaRealLimit.getText(), "Real part limit");
-                    pfThreshold = my.stepss.ssa.SsaDisturbance.parseParameter(
-                            ssaPfThreshold.getText(),
-                            "Participation factor (PF) threshold");
-                } catch (IllegalArgumentException ex) {
-                    banner.warn(ex.getMessage());
-                    return;
-                }
-            }
-
+            // The record carries a basename and a time and nothing else,
+            // which every engine reads: the current one because that is the
+            // whole grammar, and an older one because it is the two-argument
+            // form it always accepted. So there is no capability gate here
+            // any more, and no version of the engine that this can be wrong
+            // for.
             File dstFile = new File(myTempDir.getAbsolutePath()
                     + System.getProperty("file.separator") + base + "Eig.dst");
-            String dstText = eigParametersSupported
-                    ? my.stepss.ssa.SsaDisturbance.text(base, analysisTime,
-                            realLimit, pfThreshold)
-                    : my.stepss.ssa.SsaDisturbance.text(base, analysisTime);
+            String dstText = my.stepss.ssa.SsaDisturbance.text(base, analysisTime);
             FileUtils.writeStringToFile(dstFile, dstText, "UTF-8");
 
             // The analysis is refused under $SCHEME IN or $OMEGA_REF COI, and
@@ -4307,18 +4248,14 @@ public class StepssUI extends javax.swing.JFrame {
             // copied out automatically, because the Jacobian is large and most
             // runs never want it; the button below is the deliberate step.
             //
-            // Recorded here, not read off the fields when that button is
-            // pressed: the two parameters are recorded only when the engine
-            // actually accepted them, since an older one ignores the record
-            // silently and archiving the numbers anyway would put thresholds
-            // in the manifest that the run never used.
+            // No thresholds in the manifest. There are none on the record to
+            // record, and the one floor the engine does apply is $PF_THRES,
+            // which it writes into the modes file itself as pf_floor. Putting
+            // a copy here would be a second place for it to be wrong.
             lastRunDir = new File(myTempDir.getAbsolutePath());
             lastRunManifest = new my.stepss.ssa.SsaArchive.Manifest(base,
                     Double.isNaN(engineVersion) ? null : Double.valueOf(engineVersion),
-                    Double.valueOf(analysisTime),
-                    eigParametersSupported ? Double.valueOf(realLimit) : null,
-                    eigParametersSupported ? Double.valueOf(pfThreshold) : null,
-                    getVersion());
+                    Double.valueOf(analysisTime), null, null, getVersion());
             saveDynJac.setEnabled(true);
 
             showSsaResults(resultsDir, base);
@@ -7031,11 +6968,13 @@ public class StepssUI extends javax.swing.JFrame {
     // null outside the run because that method also serves File->Save command
     // file, where an override the user never asked for has no business.
     private String ssaSettings = null;
-    // Whether the engine in use accepts real_limit and pf_threshold on its EIG
-    // record. Set by applyEngineCapabilities() from the engine's own banner on
-    // every initRamses(), so an adopted Codegen build re-decides it. False
-    // until then, matching the fields' disabled state in the generated block.
-    private boolean eigParametersSupported = false;
+    // Whether the engine in use writes participation factors and mode shapes
+    // for every mode, rather than for its own dominant ones alone. Set by
+    // applyEngineCapabilities() from the engine's own banner on every
+    // initRamses(), so an adopted Codegen build re-decides it. False until
+    // then, which is the cautious direction: it shows a note that a current
+    // engine does not need rather than hiding one an old engine does.
+    private boolean resultsCarryEveryMode = false;
     // The engine's own banner version, NaN when it could not be read. Kept
     // beside the flag above because the archive records it: an archive opened
     // against a different engine build is otherwise silent about which one
@@ -7192,10 +7131,6 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton ssaButton1;
     private javax.swing.JTextField ssaDirectory;
     private javax.swing.JLabel ssaEngineNote;
-    private javax.swing.JTextField ssaPfThreshold;
-    private javax.swing.JLabel ssaPfThresholdLabel;
-    private javax.swing.JTextField ssaRealLimit;
-    private javax.swing.JLabel ssaRealLimitLabel;
     private javax.swing.JTextField ssaTime;
     private javax.swing.JLabel ssaTimeLabel;
     private javax.swing.JButton stopSimulationButton;
@@ -7302,8 +7237,8 @@ public class StepssUI extends javax.swing.JFrame {
     private void applyEngineCapabilities() {
         double version = my.stepss.ssa.EngineVersion.parseBanner(engineBanner());
         engineVersion = version;
-        eigParametersSupported =
-                my.stepss.ssa.EngineVersion.supportsEigParameters(version);
+        resultsCarryEveryMode =
+                my.stepss.ssa.EngineVersion.writesEveryMode(version);
 
         // Which engine is actually answering, in the status bar. It is not
         // always the bundled one: a compiled simulator is adopted when this
@@ -7314,19 +7249,21 @@ public class StepssUI extends javax.swing.JFrame {
                 + (version > 0
                 ? " " + String.format(java.util.Locale.ROOT, "%.2f", version) : ""));
 
-        ssaRealLimit.setEnabled(eigParametersSupported);
-        ssaRealLimitLabel.setEnabled(eigParametersSupported);
-        ssaPfThreshold.setEnabled(eigParametersSupported);
-        ssaPfThresholdLabel.setEnabled(eigParametersSupported);
-        ssaEngineNote.setVisible(!eigParametersSupported);
-
-        if (eigParametersSupported) {
-            String tip = "Passed to the EIG record and recorded in the results header.";
-            ssaRealLimit.setToolTipText(tip);
-            ssaRealLimitLabel.setToolTipText(tip);
-            ssaPfThreshold.setToolTipText(tip);
-            ssaPfThresholdLabel.setToolTipText(tip);
-        } else {
+        // Nothing on this tab is a threshold any more. EIG takes a basename
+        // and a time, and every threshold a reader turns lives in the results
+        // window, where turning one re-filters what is already on screen
+        // instead of requiring the case to be run again.
+        //
+        // What is left to say is the reverse of what this note used to say.
+        // An engine older than the format change still runs, and its record
+        // is accepted unchanged, but it writes v1 results: participation
+        // factors and mode shapes for its own dominant modes alone, under a
+        // real_limit fixed at its default. The window reads those correctly
+        // and explains each absence, so this is a note and not a refusal --
+        // but a reader who filters a v1 run and finds half of it empty
+        // deserves to have been told why before running it.
+        ssaEngineNote.setVisible(!resultsCarryEveryMode);
+        if (!resultsCarryEveryMode) {
             // Naming the version read, rather than repeating a fixed sentence,
             // is what distinguishes "the bundled engine is old" from "you
             // adopted an older build from the Codegen tab", which look
@@ -7334,17 +7271,14 @@ public class StepssUI extends javax.swing.JFrame {
             String seen = Double.isNaN(version)
                     ? "its version could not be read"
                     : "it reports version " + String.format(java.util.Locale.ROOT, "%.2f", version);
-            String tip = "Needs RAMSES "
+            ssaEngineNote.setToolTipText("RAMSES "
                     + String.format(java.util.Locale.ROOT, "%.2f",
-                            my.stepss.ssa.EngineVersion.EIG_PARAMETERS_SINCE)
-                    + " or newer. The engine in use is not: " + seen
-                    + ". It would ignore these values silently, so they are"
-                    + " disabled rather than misleading.";
-            ssaRealLimit.setToolTipText(tip);
-            ssaRealLimitLabel.setToolTipText(tip);
-            ssaPfThreshold.setToolTipText(tip);
-            ssaPfThresholdLabel.setToolTipText(tip);
-            ssaEngineNote.setToolTipText(tip);
+                            my.stepss.ssa.EngineVersion.EVERY_MODE_SINCE)
+                    + " and newer write participation factors and a mode shape"
+                    + " for every mode, and leave the filtering to this window."
+                    + " The engine in use does not: " + seen
+                    + ". Its results open and read correctly, but the modes it"
+                    + " filtered out have nothing behind them.");
         }
     }
 

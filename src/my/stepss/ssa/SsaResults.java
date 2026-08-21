@@ -13,9 +13,13 @@ import java.util.List;
  * One small-signal run: the three files ssa.f90 wrote under a shared
  * basename, plus where they came from.
  *
- * <p>_pf.dat and _ms.dat are optional. The engine writes them only when at
- * least one mode passed real_limit, so a run that filtered everything leaves
- * _modes.dat alone on disk. That is a legitimate result, not a broken load.
+ * <p>_pf.dat and _ms.dat are optional, and are treated as empty when absent
+ * rather than failing the load. A v1 engine wrote them only when at least one
+ * mode passed real_limit, so a run that filtered everything legitimately left
+ * _modes.dat alone on disk; a v2 engine writes both for every run, so their
+ * absence there means an incomplete copy instead. {@link SsaModes#formatVersion}
+ * is what tells the two apart, and neither is a reason to refuse the run that
+ * is present.
  */
 public final class SsaResults {
 
@@ -95,6 +99,36 @@ public final class SsaResults {
 
     private static String read(File file) throws IOException {
         return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * The modes whose real part is above {@code limit}, i.e. those a reader
+     * has asked to call dominant.
+     *
+     * <p>Computed here rather than read from the file. The engine used to
+     * decide this, from a real_limit fixed on the EIG record, and write
+     * participation factors and mode shapes for the survivors alone; a mode
+     * outside the limit was then visible in the modes table with nothing
+     * behind it, and widening the limit meant running the case again. All
+     * three files now carry every mode, so this is a question about the
+     * display and is answered every time the number changes.
+     *
+     * <p>Strictly greater than, matching the engine's old {@code
+     * Re(lambda) > real_limit} exactly, so the same limit selects the same
+     * modes as it did before and an archived v1 run reads the way it did when
+     * it was made.
+     *
+     * <p>Input order is preserved, so composing this after {@link
+     * #electromechanical} keeps that method's sort by frequency.
+     */
+    public static List<Mode> aboveRealLimit(List<Mode> all, double limit) {
+        List<Mode> kept = new ArrayList<Mode>();
+        for (Mode mode : all) {
+            if (mode.re > limit) {
+                kept.add(mode);
+            }
+        }
+        return kept;
     }
 
     /**

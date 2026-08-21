@@ -19,19 +19,52 @@ public final class SsaHarness {
     private static int failures;
 
     /**
-     * A modes fixture with, in order: a real mode; a conjugate pair at
+     * A v2 modes fixture with, in order: a real mode; a conjugate pair at
      * 0.6237 Hz; a mode with negative zeta; a degenerate mode (smp 0); and a
-     * mode at the origin, where ssa.f90:1369-1373 reports zeta as 0 rather
-     * than NaN. Column positions are exactly those ssa.f90 writes.
+     * mode at the origin, where ssa.f90 reports zeta as 0 rather than NaN.
+     * Column positions are exactly those ssa.f90 writes.
+     *
+     * <p>Mode 6 is the far-left fast mode: nothing an analyst reads, and
+     * exactly what stretches the s-plane's real axis until the modes worth
+     * looking at are squashed against the boundary. It is what the real part
+     * limit is for, and what the zoom checks measure against.
      */
     private static final String[] MODES_LINES = {
+        "# STEPSS SSA modes v2",
+        "# nstates 6 nalg 7 time    0.000000000000000E+00"
+            + " pf_floor    1.000000000000000E-03 gap_tol    1.000000000000000E-06",
+        "#   index                       re                       im"
+            + "                     zeta                  freq_hz smp",
+        "       1  -10.000000000000000E+00    0.000000000000000E+00"
+            + "    1.000000000000000E+00    0.000000000000000E+00  1",
+        "       2 -428.700000000000000E-03    3.919040000000000E+00"
+            + "  108.740000000000000E-03  623.700000000000000E-03  1",
+        "       3 -428.700000000000000E-03   -3.919040000000000E+00"
+            + "  108.740000000000000E-03  623.700000000000000E-03  1",
+        "       4   91.400000000000000E-03    3.924700000000000E+00"
+            + "  -23.300000000000000E-03  624.600000000000000E-03  1",
+        "       5    0.000000000000000E+00    0.000000000000000E+00"
+            + "    0.000000000000000E+00    0.000000000000000E+00  0",
+        "       6  -48.000000000000000E+00    7.000000000000000E+00"
+            + "  989.000000000000000E-03    1.114080000000000E+00  1",
+    };
+
+    /**
+     * The same spectrum in the v1 layout an archived run carries: a dom
+     * column between freq_hz and smp, and real_limit and pf_threshold in the
+     * header in place of pf_floor. The two flags are deliberately given
+     * OPPOSITE values on modes 5 and 6, so a reader that took this for a v2
+     * file, or a v2 file for this, would not merely be reading the wrong
+     * column but would report the wrong answer and could be caught doing it.
+     */
+    private static final String[] V1_MODES_LINES = {
         "# STEPSS SSA modes v1",
-        "# nstates 5 nalg 7 time    0.000000000000000E+00 real_limit   -1.000000000000000E+00"
+        "# nstates 6 nalg 7 time    0.000000000000000E+00 real_limit   -1.000000000000000E+00"
             + " pf_threshold   50.000000000000003E-03 gap_tol    1.000000000000000E-06",
         "#   index                       re                       im"
             + "                     zeta                  freq_hz dom smp",
         "       1  -10.000000000000000E+00    0.000000000000000E+00"
-            + "    1.000000000000000E+00    0.000000000000000E+00  1  1",
+            + "    1.000000000000000E+00    0.000000000000000E+00  0  1",
         "       2 -428.700000000000000E-03    3.919040000000000E+00"
             + "  108.740000000000000E-03  623.700000000000000E-03  1  1",
         "       3 -428.700000000000000E-03   -3.919040000000000E+00"
@@ -39,7 +72,9 @@ public final class SsaHarness {
         "       4   91.400000000000000E-03    3.924700000000000E+00"
             + "  -23.300000000000000E-03  624.600000000000000E-03  1  1",
         "       5    0.000000000000000E+00    0.000000000000000E+00"
-            + "    0.000000000000000E+00    0.000000000000000E+00  0  0",
+            + "    0.000000000000000E+00    0.000000000000000E+00  1  0",
+        "       6  -48.000000000000000E+00    7.000000000000000E+00"
+            + "  989.000000000000000E-03    1.114080000000000E+00  0  1",
     };
 
     /**
@@ -47,16 +82,16 @@ public final class SsaHarness {
      * test that absent keys parse as null rather than throwing.
      */
     private static final String[] PARTIAL_HEADER_LINES = {
-        "# STEPSS SSA modes v1",
+        "# STEPSS SSA modes v2",
         "# nstates 3 nalg 4",
         "#   index                       re                       im"
-            + "                     zeta                  freq_hz dom smp",
+            + "                     zeta                  freq_hz smp",
         "       1  -10.000000000000000E+00    0.000000000000000E+00"
-            + "    1.000000000000000E+00    0.000000000000000E+00  1  1",
+            + "    1.000000000000000E+00    0.000000000000000E+00  1",
         "       2 -428.700000000000000E-03    3.919040000000000E+00"
-            + "  108.740000000000000E-03  623.700000000000000E-03  1  1",
+            + "  108.740000000000000E-03  623.700000000000000E-03  1",
         "       3    0.000000000000000E+00    0.000000000000000E+00"
-            + "    0.000000000000000E+00    0.000000000000000E+00  0  0",
+            + "    0.000000000000000E+00    0.000000000000000E+00  0",
     };
 
     /**
@@ -85,6 +120,10 @@ public final class SsaHarness {
 
     static String modesFixture() {
         return join(MODES_LINES);
+    }
+
+    static String v1ModesFixture() {
+        return join(V1_MODES_LINES);
     }
 
     static String partialHeaderFixture() {
@@ -205,11 +244,14 @@ public final class SsaHarness {
                 svg.contains("dominant"));
     }
 
-    /** dom == 0 with no rows: real_limit really is the reason. */
+    /**
+     * A v1 archive's dom == 0 with no rows: real_limit really is the reason,
+     * and this is the only case where saying so is honest.
+     */
     private static void checkModeShapeReportsFilteredMode() {
         SvgSink sink = new SvgSink(360, 360);
         ModeShapePanel.render(sink, new java.util.ArrayList<ModeShapeEntry>(),
-                true, false, 360, 360);
+                true, Boolean.FALSE, 360, 360);
         String svg = sink.toSvg();
         expect("a filtered mode draws no arrows", 0, countOf(svg, "class=\"shape\""));
         expect("a filtered mode names real_limit", true,
@@ -217,23 +259,26 @@ public final class SsaHarness {
     }
 
     /**
-     * dom == 1 with no rows: the engine kept this mode, so real_limit did not
-     * filter it and saying so would invent a cause. _ms.dat is optional to
-     * SsaResults.load, which is how this state is reached.
+     * No rows on a file that should have some. Reached two ways: a v2 run,
+     * where the flag is null because the engine writes a mode shape for every
+     * mode, and a v1 run where the flag says the engine kept this one. Both
+     * mean the file is missing or incomplete, and neither may blame
+     * real_limit, which would state a cause that did not happen.
      */
-    private static void checkModeShapeReportsMissingRowsForDominantMode() {
-        SvgSink sink = new SvgSink(360, 360);
-        ModeShapePanel.render(sink, new java.util.ArrayList<ModeShapeEntry>(),
-                true, true, 360, 360);
-        String svg = sink.toSvg();
-        expect("a dominant mode with no rows draws no arrows", 0,
-                countOf(svg, "class=\"shape\""));
-        expect("a dominant mode with no rows does not blame real_limit", false,
-                svg.contains("real_limit"));
-        expect("a dominant mode with no rows says the engine kept it", true,
-                svg.contains("dominant"));
-        expect("and points at the missing file", true,
-                svg.contains("missing from this directory"));
+    private static void checkModeShapeReportsMissingRows() {
+        for (Boolean dominant : new Boolean[] {null, Boolean.TRUE}) {
+            String what = dominant == null ? "a v2 mode" : "a mode the engine kept";
+            SvgSink sink = new SvgSink(360, 360);
+            ModeShapePanel.render(sink, new java.util.ArrayList<ModeShapeEntry>(),
+                    true, dominant, 360, 360);
+            String svg = sink.toSvg();
+            expect(what + " with no rows draws no arrows", 0,
+                    countOf(svg, "class=\"shape\""));
+            expect(what + " with no rows does not blame real_limit", false,
+                    svg.contains("real_limit"));
+            expect(what + " with no rows points at the file", true,
+                    svg.contains("missing from this directory"));
+        }
     }
 
     /** Below 60 px the margin exceeds the half-extent, and r must not go negative. */
@@ -250,6 +295,8 @@ public final class SsaHarness {
         checkModesHeader();
         checkModesTime();
         checkModesPartialHeader();
+        checkModesV1Layout();
+        checkModesRejectsAnUnknownVersion();
         checkModesOriginZeta();
         checkModesRejectsAMangledNumber();
         checkModesRejectsEmptyInput();
@@ -259,6 +306,7 @@ public final class SsaHarness {
         checkParsedRowsAreUnmodifiable();
         checkModeShapes();
         checkElectromechanicalFilter();
+        checkRealLimitFilter();
         checkBasenameDiscoveryOnEmptyDir();
         checkSvgSinkEmitsEditableElements();
         checkSvgSinkEscapes();
@@ -271,10 +319,12 @@ public final class SsaHarness {
         checkSplaneMinimumExtentExpands();
         checkSplaneDownwardExpansion();
         checkSplaneMarksSelection();
+        checkSplaneRefitsWhenFiltered();
+        checkSplaneManualZoom();
         checkModeShapeRendersArrows();
         checkModeShapeRefusesDegenerate();
         checkModeShapeReportsFilteredMode();
-        checkModeShapeReportsMissingRowsForDominantMode();
+        checkModeShapeReportsMissingRows();
         checkModeShapeClampsTinyRadius();
         checkDisturbanceDefaultTime();
         checkJacobianSharesTheBasename();
@@ -283,8 +333,7 @@ public final class SsaHarness {
         checkDisturbanceRejectsEarlyOrUnreadableTime();
         checkEngineVersionParsesBanner();
         checkEngineVersionGuardsTheBoundary();
-        checkDisturbanceCarriesParameters();
-        checkDisturbanceRejectsUnreadableParameters();
+        checkDisturbanceCarriesNoParameters();
         checkSettingsCarryTheTwoRequiredRecords();
         checkSettingsOverrideNothingElse();
         checkSettingsFileNameCannotCollide();
@@ -323,7 +372,7 @@ public final class SsaHarness {
             fail("modes fixture parses");
             return;
         }
-        expect("mode count", 5, m.modes().size());
+        expect("mode count", 6, m.modes().size());
         expect("index of the second mode", 2, m.modes().get(1).index);
         expect("re of the second mode", -0.4287, round(m.modes().get(1).re, 4));
         expect("im of the second mode", 3.91904, round(m.modes().get(1).im, 5));
@@ -332,8 +381,67 @@ public final class SsaHarness {
         expect("a negative zeta survives the sign column", -0.0233,
                 round(m.modes().get(3).zeta, 4));
         expect("the degenerate mode is flagged", false, m.modes().get(4).simple);
-        expect("the degenerate mode is not dominant", false, m.modes().get(4).dominant);
-        expect("a dominant mode is flagged", true, m.modes().get(0).dominant);
+        // v2 carries no dominance column at all, and null is how that is
+        // said. A reader that unboxed this would throw; one that defaulted it
+        // to false would report every mode as filtered.
+        expect("the fixture is v2", 2, m.formatVersion());
+        expect("v2 carries no dominance flag", null, m.modes().get(0).dominant);
+        expect("nor on the degenerate mode", null, m.modes().get(4).dominant);
+    }
+
+    /**
+     * The v1 layout still reads, because saved archives carry it. The dom
+     * column sat exactly where smp sits now, so getting this wrong produces
+     * numbers rather than an error: the fixture gives modes 5 and 6 opposite
+     * flags precisely so a swap is visible.
+     */
+    private static void checkModesV1Layout() {
+        try {
+            SsaModes m = SsaModes.parse(v1ModesFixture());
+            expect("v1 is recognised", 1, m.formatVersion());
+            expect("v1 mode count", 6, m.modes().size());
+            expect("v1 records the real_limit it ran under", -1.0, m.realLimit());
+            expect("v1 records its pf_threshold", 0.05, round(m.pfThreshold(), 4));
+            expect("v1 carries no pf_floor", null, m.pfFloor());
+            // Mode 5 is dom 1, smp 0 and mode 6 is dom 0, smp 1. Reading the
+            // columns the v2 way would report both the other way round.
+            expect("v1 dom is read from its own column", Boolean.TRUE,
+                    m.modes().get(4).dominant);
+            expect("v1 smp is read from the column after it", false,
+                    m.modes().get(4).simple);
+            expect("and the reverse pair the other way", Boolean.FALSE,
+                    m.modes().get(5).dominant);
+            expect("v1 smp on the reverse pair", true, m.modes().get(5).simple);
+        } catch (java.io.IOException ex) {
+            fail("v1 modes fixture parses: threw " + ex);
+        }
+    }
+
+    /**
+     * A version this build does not know is refused rather than read as the
+     * nearest one it does. Both files are fixed-width with the same field
+     * widths, so a wrong guess parses cleanly and answers wrongly.
+     */
+    private static void checkModesRejectsAnUnknownVersion() {
+        String future = modesFixture().replace("# STEPSS SSA modes v2",
+                "# STEPSS SSA modes v9");
+        expect("the fixture was actually retagged", true, future.contains("v9"));
+        try {
+            SsaModes.parse(future);
+            fail("an unknown format version is refused");
+        } catch (java.io.IOException ex) {
+            expect("and the message names the version", true,
+                    ex.getMessage().contains("9"));
+        }
+
+        String unbannered = modesFixture().replace("# STEPSS SSA modes v2\n", "");
+        try {
+            SsaModes.parse(unbannered);
+            fail("a file with no banner is refused");
+        } catch (java.io.IOException ex) {
+            expect("and the message asks for the banner", true,
+                    ex.getMessage().contains("banner"));
+        }
     }
 
     private static void checkModesHeader() {
@@ -342,11 +450,15 @@ public final class SsaHarness {
             fail("modes header parses");
             return;
         }
-        expect("nstates", 5, m.nstates());
+        expect("nstates", 6, m.nstates());
         expect("nalg", 7, m.nalg());
-        expect("real_limit", -1.0, m.realLimit());
-        expect("pf_threshold", 0.05, round(m.pfThreshold(), 6));
+        expect("pf_floor", 1.0e-3, m.pfFloor());
         expect("gap_tol", 1.0e-6, m.gapTol());
+        // The two retired keys are absent, not zero. A reader that defaulted
+        // them would report a v2 run as having been analysed under thresholds
+        // nobody chose.
+        expect("v2 records no real_limit", null, m.realLimit());
+        expect("v2 records no pf_threshold", null, m.pfThreshold());
     }
 
     private static void checkModesTime() {
@@ -366,6 +478,7 @@ public final class SsaHarness {
             expect("partial header time is null", null, m.time());
             expect("partial header real_limit is null", null, m.realLimit());
             expect("partial header pf_threshold is null", null, m.pfThreshold());
+            expect("partial header pf_floor is null", null, m.pfFloor());
             expect("partial header gap_tol is null", null, m.gapTol());
         } catch (java.io.IOException ex) {
             fail("partial header parses: threw " + ex);
@@ -423,7 +536,7 @@ public final class SsaHarness {
     private static void checkModesCrlf() {
         try {
             SsaModes m = SsaModes.parse(modesFixture().replace("\n", "\r\n"));
-            expect("CRLF input parses to the same mode count", 5, m.modes().size());
+            expect("CRLF input parses to the same mode count", 6, m.modes().size());
             expect("CRLF does not corrupt the last column", true,
                     m.modes().get(0).simple);
         } catch (java.io.IOException ex) {
@@ -440,11 +553,61 @@ public final class SsaHarness {
         java.util.List<Mode> em = SsaResults.electromechanical(m.modes());
         // Of the fixture: mode 1 is real (im 0), modes 2 and 3 are a conjugate
         // pair at 0.6237 Hz of which only the im > 0 member survives, mode 4 is
-        // at 0.6246 Hz with im > 0, mode 5 sits at the origin.
-        expect("conjugate pairs collapse to one member", 2, em.size());
+        // at 0.6246 Hz with im > 0, mode 5 sits at the origin, and mode 6 is
+        // in the band at 1.1141 Hz despite being far out to the left. That
+        // last one is the point of having a second filter: a band filter
+        // cannot reach it, because there is nothing wrong with its frequency.
+        expect("conjugate pairs collapse to one member", 3, em.size());
         expect("the kept pair member has positive im", true, em.get(0).im > 0);
         expect("sorted by frequency", 0.6237, round(em.get(0).freqHz, 4));
         expect("the unstable mode is kept", -0.0233, round(em.get(1).zeta, 4));
+        expect("a well-damped fast mode is in the band too", -48.0, em.get(2).re);
+    }
+
+    /**
+     * The real part limit, which is a question about the display and is
+     * answered against every mode in the file rather than against a flag the
+     * engine baked in.
+     */
+    private static void checkRealLimitFilter() {
+        SsaModes m = parsedModes();
+        if (m == null) {
+            fail("real part filter");
+            return;
+        }
+        java.util.List<Mode> kept = SsaResults.aboveRealLimit(m.modes(), -1.0);
+        // Modes 2, 3, 4 and 5 sit above -1; modes 1 (-10) and 6 (-48) do not.
+        expect("modes above the limit are kept", 4, kept.size());
+        expect("the far-left fast mode is dropped", true,
+                indexOf(kept, 6) < 0);
+        expect("so is the real mode at -10", true, indexOf(kept, 1) < 0);
+
+        // Strictly greater than, matching the engine's old
+        // Re(lambda) > real_limit exactly, so an archived v1 run filters the
+        // way it did when it was made. Mode 5 sits at exactly 0.
+        expect("the comparison is strict", true,
+                indexOf(SsaResults.aboveRealLimit(m.modes(), 0.0), 5) < 0);
+        expect("and keeps what is above it", true,
+                indexOf(SsaResults.aboveRealLimit(m.modes(), -0.5), 5) >= 0);
+
+        // Composed the way the window composes them. electromechanical sorts
+        // by frequency and aboveRealLimit must not disturb that, or the table
+        // comes out ordered differently depending on which ticks are set.
+        java.util.List<Mode> both =
+                SsaResults.aboveRealLimit(SsaResults.electromechanical(m.modes()), -1.0);
+        expect("the two filters compose", 2, both.size());
+        expect("and the frequency sort survives", true,
+                both.get(0).freqHz < both.get(1).freqHz);
+    }
+
+    /** Position of a mode index in a list, or -1. */
+    private static int indexOf(java.util.List<Mode> modes, int index) {
+        for (int i = 0; i < modes.size(); i++) {
+            if (modes.get(i).index == index) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static void checkBasenameDiscoveryOnEmptyDir() throws java.io.IOException {
@@ -587,9 +750,9 @@ public final class SsaHarness {
         // holds one stable mode and one unstable one, so a second marker over
         // either of them would show up as a third element in this group.
         String poles = groupBody(svg, "poles");
-        expect("one circle per mode shown", 2, countOf(poles, "<circle"));
+        expect("one circle per mode shown", 3, countOf(poles, "<circle"));
         expect("nothing is overplotted on a pole", 0, countOf(poles, "<line"));
-        expect("the stable mode is drawn as a pole", 1,
+        expect("the stable modes are drawn as poles", 2,
                 countOf(poles, "class=\"pole\""));
         expect("the unstable mode is a crimson circle", 1,
                 countOf(poles, "class=\"unstable\""));
@@ -631,11 +794,102 @@ public final class SsaHarness {
         expect("tick labels use the existing label class",
                 SplanePanel.IM_TICKS + SplanePanel.RE_TICKS,
                 countOf(ticks, "class=\"label\""));
-        // The fixture keeps the notebook's window: Im 0 to 9, Re -3.0 to 0.5.
-        expect("the top Im grid line is labelled", true, ticks.contains(">9.00<"));
+        // The window is fitted to the fixture, whose real parts run from -48
+        // to +0.0914 and whose imaginary parts run from 3.919 to 7. Padded by
+        // 6%, or by 0.5 where that is larger, which is what widens the Im
+        // range here.
+        expect("the top Im grid line is labelled", true, ticks.contains(">7.50<"));
         expect("the Re axis is labelled at its left end", true,
-                ticks.contains(">-3.00<"));
-        expect("and at its right end", true, ticks.contains(">0.50<"));
+                ticks.contains(">-50.9<"));
+        expect("and at its right end", true, ticks.contains(">2.98<"));
+        // Re = 0 is inside the fitted window whatever the data does, because
+        // it is what the whole plot is read against.
+        expect("the stability boundary is in the fitted window", true,
+                svg.contains("class=\"bound\""));
+    }
+
+    /**
+     * Filtering the modes zooms the plane. This is the reason the filter is
+     * worth having on the plot at all: one far-left fast mode stretches the
+     * real axis by a factor of fifty and squashes everything an analyst reads
+     * into the last few pixels against the boundary.
+     */
+    private static void checkSplaneRefitsWhenFiltered() {
+        SsaModes m = parsedModes();
+        if (m == null) {
+            fail("s-plane refits when filtered");
+            return;
+        }
+        java.util.List<Mode> em = SsaResults.electromechanical(m.modes());
+        SvgSink wide = new SvgSink(500, 400);
+        SplanePanel.render(wide, em, null, 500, 400);
+        String wideTicks = groupBody(wide.toSvg(), "ticks");
+        expect("unfiltered, the axis reaches the far-left mode", true,
+                wideTicks.contains(">-50.9<"));
+
+        SvgSink close = new SvgSink(500, 400);
+        SplanePanel.render(close, SsaResults.aboveRealLimit(em, -1.0), null, 500, 400);
+        String closeSvg = close.toSvg();
+        String closeTicks = groupBody(closeSvg, "ticks");
+        expect("filtered, the axis closes in on what is left", true,
+                closeTicks.contains(">-0.93<"));
+        expect("and the far-left tick is gone with it", false,
+                closeTicks.contains(">-50.9<"));
+        expect("the modes left are still drawn", 2,
+                countOf(groupBody(closeSvg, "poles"), "<circle"));
+    }
+
+    /**
+     * A manual zoom window is honoured, and everything outside it is left
+     * out rather than painted over the axis labels.
+     */
+    private static void checkSplaneManualZoom() {
+        SsaModes m = parsedModes();
+        if (m == null) {
+            fail("s-plane manual zoom");
+            return;
+        }
+        java.util.List<Mode> em = SsaResults.electromechanical(m.modes());
+        // A window around the two modes near the boundary, excluding both
+        // the far-left mode at -48 and, deliberately, the origin.
+        SvgSink sink = new SvgSink(500, 400);
+        SplanePanel.render(sink, em, null, new double[] {-1.0, 0.5, 3.5, 4.5}, 500, 400);
+        String svg = sink.toSvg();
+        expect("only the modes inside the window are drawn", 2,
+                countOf(groupBody(svg, "poles"), "<circle"));
+        expect("the axis carries the window it was given", true,
+                groupBody(svg, "ticks").contains(">-1.00<"));
+        expect("the boundary is still in this one", true,
+                svg.contains("class=\"bound\""));
+
+        // A window entirely to the left of the boundary has no boundary in
+        // it, and drawing one anyway would put a crimson line down the edge
+        // of the plot exactly where a reader looks for the axis.
+        SvgSink offBoundary = new SvgSink(500, 400);
+        SplanePanel.render(offBoundary, em, null,
+                new double[] {-40.0, -10.0, 3.5, 8.0}, 500, 400);
+        String offSvg = offBoundary.toSvg();
+        expect("a window off the boundary draws no boundary", 0,
+                countOf(offSvg, "class=\"bound\""));
+        expect("nor a mode that is outside it", 0,
+                countOf(groupBody(offSvg, "poles"), "<circle"));
+
+        // Nothing the clipper emits may leave the plot rectangle; that is
+        // the whole job it was added for. Only the two clipped groups are
+        // measured: tick marks overhang the axis by TICK_LEN on purpose, and
+        // sweeping every <line> in the file would fail on them.
+        for (String group : new String[] {"boundary", "damping-rays"}) {
+            String body = groupBody(offSvg, group);
+            for (int i = 0; i < countOf(body, "<line"); i++) {
+                double x1 = extractAttribute(body, "line", i, "x1");
+                double x2 = extractAttribute(body, "line", i, "x2");
+                double y1 = extractAttribute(body, "line", i, "y1");
+                double y2 = extractAttribute(body, "line", i, "y2");
+                expect(group + " line " + i + " stays inside the axes", true,
+                        x1 >= 59.5 && x1 <= 480.5 && x2 >= 59.5 && x2 <= 480.5
+                        && y1 >= 19.5 && y1 <= 355.5 && y2 >= 19.5 && y2 <= 355.5);
+            }
+        }
     }
 
     /**
@@ -723,7 +977,7 @@ public final class SsaHarness {
         String poles = groupBody(svg, "poles");
         expect("the selected pole is filled", 1,
                 countOf(poles, "class=\"pole filled\""));
-        expect("selecting adds no marker", 2, countOf(poles, "<circle"));
+        expect("selecting adds no marker", 3, countOf(poles, "<circle"));
         expect("the fill is declared in the style block, not inline", true,
                 svg.contains(".pole.filled { fill:"));
         expect("no colour is written onto the element", false,
@@ -867,15 +1121,31 @@ public final class SsaHarness {
      */
     private static final String BANNER =
             "\nRApid Multithreaded Simulation of Electric power Systems\n"
+            + "Version:  3.79\n\n"
+            + "Part of the STEPSS simulation platform -- https://stepss.sps-lab.org\n";
+
+    /**
+     * The banner an engine older than 3.79 prints, which the GUI still reads:
+     * a Codegen build adopted mid-session can be any version. It carried an
+     * edition in parentheses on the version line, which the engine no longer
+     * claims because it was decided from a compile-time array bound and was
+     * therefore always "Full".
+     */
+    private static final String OLD_BANNER =
+            "\nRApid Multithreaded Simulation of Electric power Systems\n"
             + "Version:  3.74 (Full Version)\n\n"
             + "Part of the STEPSS simulation platform -- https://stepss.sps-lab.org\n";
 
     private static void checkEngineVersionParsesBanner() {
-        expect("banner version", 3.74,
+        expect("banner version", 3.79,
                 round(EngineVersion.parseBanner(BANNER), 2));
-        expect("banner version, limited edition", 3.74,
-                round(EngineVersion.parseBanner(
-                        "Version:  3.74 (Limited Version)"), 2));
+        // An older engine's banner still parses, parenthetical and all. The
+        // GUI reads whatever engine is in use, and a Codegen build adopted
+        // mid-session can predate the line losing its edition.
+        expect("an older banner still parses", 3.74,
+                round(EngineVersion.parseBanner(OLD_BANNER), 2));
+        expect("and is not mistaken for a current one", false,
+                EngineVersion.writesEveryMode(EngineVersion.parseBanner(OLD_BANNER)));
         expect("banner with no version line", true,
                 Double.isNaN(EngineVersion.parseBanner("no banner here")));
         expect("null banner", true,
@@ -888,71 +1158,46 @@ public final class SsaHarness {
      * an exact {@code >=} against the parsed text is what has to hold.
      */
     private static void checkEngineVersionGuardsTheBoundary() {
-        expect("3.73 unsupported", false,
-                EngineVersion.supportsEigParameters(3.73));
-        expect("3.74 supported", true,
-                EngineVersion.supportsEigParameters(3.74));
-        expect("3.74 parsed from a banner is supported", true,
-                EngineVersion.supportsEigParameters(
+        expect("3.78 writes the old format", false,
+                EngineVersion.writesEveryMode(3.78));
+        expect("3.79 writes every mode", true,
+                EngineVersion.writesEveryMode(3.79));
+        expect("3.79 parsed from a banner writes every mode", true,
+                EngineVersion.writesEveryMode(
                         EngineVersion.parseBanner(BANNER)));
-        expect("3.80 supported", true,
-                EngineVersion.supportsEigParameters(3.80));
-        expect("4.00 supported", true,
-                EngineVersion.supportsEigParameters(4.00));
-        // An engine that could not be read must not be treated as new enough.
-        expect("unknown version unsupported", false,
-                EngineVersion.supportsEigParameters(Double.NaN));
+        expect("3.80 writes every mode", true,
+                EngineVersion.writesEveryMode(3.80));
+        expect("4.00 writes every mode", true,
+                EngineVersion.writesEveryMode(4.00));
+        // An engine that could not be read must not be treated as new enough:
+        // the note it then shows is harmless, and the one it would otherwise
+        // hide is not.
+        expect("unknown version treated as old", false,
+                EngineVersion.writesEveryMode(Double.NaN));
     }
 
     /**
-     * The parameters ride on the EIG record only, leaving JAC, the solver
-     * record and the STOP margin exactly as the two-argument form writes them.
+     * The record is a basename and a time and nothing else. Anything more is
+     * refused by the engine now, so a UI that wrote it would produce a run
+     * that exits 78 with no results and no explanation the window could give.
      */
-    private static void checkDisturbanceCarriesParameters() {
-        String text = SsaDisturbance.text("ssa", 0.001, -0.5, 0.10);
-        expect("EIG carries both parameters", true,
-                text.contains("0.001000 EIG 'ssa' -0.500000 0.100000"));
-        expect("JAC is untouched by the parameters", true,
+    private static void checkDisturbanceCarriesNoParameters() {
+        String text = SsaDisturbance.text("ssa", 0.001);
+        expect("EIG carries the basename alone", true,
+                text.contains("0.001000 EIG 'ssa'\n"));
+        expect("JAC shares the basename", true,
                 text.contains("0.001000 JAC 'ssa'\n"));
-        // Same record set otherwise: only the EIG line differs from the
-        // two-argument form, which is what lets one form be built from the
-        // other rather than duplicated.
-        String plain = SsaDisturbance.text("ssa", 0.001);
-        expect("only the EIG line differs", plain.replace(
-                "0.001000 EIG 'ssa'\n",
-                "0.001000 EIG 'ssa' -0.500000 0.100000\n"), text);
-        // A comma-decimal locale would emit "-0,5", which the engine reads as
-        // two items and refuses as an overlong record.
+        for (String line : text.split("\n")) {
+            if (line.contains(" EIG ")) {
+                expect("the EIG record has exactly three fields", 3,
+                        line.trim().split("\\s+").length);
+            }
+        }
+        // A comma-decimal locale would emit "0,001000" for the time, which
+        // the engine reads list-directed as two items.
         expect("no comma decimals", false, text.contains(","));
     }
 
-    private static void checkDisturbanceRejectsUnreadableParameters() {
-        rejectsParameter("parameter that is not a number", "abc");
-        rejectsParameter("empty parameter", "");
-        rejectsParameter("infinite parameter", "Infinity");
-        rejectsParameter("NaN parameter", "NaN");
-        try {
-            SsaDisturbance.text("ssa", 0.001, Double.NaN, 0.10);
-            fail("NaN real limit reaches the record: no exception");
-        } catch (IllegalArgumentException expected) {
-            pass("NaN real limit reaches the record");
-        }
-    }
-
-    private static void rejectsParameter(String what, String text) {
-        try {
-            SsaDisturbance.parseParameter(text, "Real part limit");
-            fail(what + ": no exception");
-        } catch (IllegalArgumentException expected) {
-            pass(what);
-        }
-    }
-
-    /**
-     * The two records the engine refuses the analysis without, spelled as
-     * {@code get_settings.f90} reads them: one field each, terminated by a
-     * semicolon, one record per line.
-     */
     private static void checkSettingsCarryTheTwoRequiredRecords() {
         String dat = SsaSettings.text();
         expect("the decomposed scheme is set", true,
@@ -1224,10 +1469,12 @@ public final class SsaHarness {
                     loaded.results().basename());
             expect(label + ": the manifest comes back", Double.valueOf(3.74),
                     loaded.manifest().engineVersion());
-            expect(label + ": every mode comes back", 5,
+            expect(label + ": every mode comes back", 6,
                     loaded.results().modes().modes().size());
-            expect(label + ": the header parameters come back",
-                    Double.valueOf(-1.0), loaded.results().modes().realLimit());
+            expect(label + ": the header comes back", Double.valueOf(1.0e-3),
+                    loaded.results().modes().pfFloor());
+            expect(label + ": and the format version with it", 2,
+                    loaded.results().modes().formatVersion());
             expect(label + ": participation comes back", 3,
                     loaded.results().participation().forMode(2).size());
             expect(label + ": a leading blank in a device name survives the archive",
@@ -1422,7 +1669,7 @@ public final class SsaHarness {
             SsaArchive.Loaded loaded = SsaArchive.load(zip, elsewhere);
             expect("an archive that names its own root still opens", "run",
                     loaded.manifest().basename());
-            expect("and its results are read", 5,
+            expect("and its results are read", 6,
                     loaded.results().modes().modes().size());
         } catch (java.io.IOException ex) {
             fail("archive naming its own root: threw " + ex);
