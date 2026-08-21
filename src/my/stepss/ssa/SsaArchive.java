@@ -337,6 +337,60 @@ public final class SsaArchive {
     }
 
     /**
+     * Deletes what a previous run of {@code basename} left in {@code directory},
+     * and reports whatever would not go.
+     *
+     * <p>Why a run has to start by doing this. The engine writes its results
+     * itself and says nothing on the way out about whether it managed to, so
+     * the only evidence the interface has is whether
+     * {@code <basename>_modes.dat} is on disk once the process has exited. A
+     * run whose initialisation failed writes nothing at all - and in a
+     * directory that already holds an earlier run under the same basename,
+     * that test passes on the earlier run's file. The results window then
+     * opens on another case's spectrum, headed with this case's directory and
+     * basename, and there is nothing in it to say so. Clearing first is what
+     * makes "the modes file is there" mean "this run wrote it". The
+     * power-flow path has done the same since helios started exiting 0 on an
+     * aborted export; see {@code deletePFCResultFiles}.
+     *
+     * <p>The set cleared is exactly {@link #members}, because the files a run
+     * writes and the files an archive of it carries are the same files: three
+     * results from {@code EIG} and four Jacobian tables from {@code JAC}.
+     * Nothing else in the directory is touched, and that matters - the
+     * basename field exists so several runs can share one directory, and the
+     * case's own data files usually live there too.
+     *
+     * <p>A name that would not delete is collected and the rest are still
+     * attempted, so one stuck file cannot leave five others behind to be
+     * mistaken for the next run's. The caller is expected to refuse the run
+     * when the returned list is not empty rather than proceed and read
+     * whatever survived.
+     *
+     * @param directory where the run will write, which need not exist
+     * @param basename  the run's basename
+     * @return the names that are still there, in {@link #members} order;
+     *     empty when the directory is clear
+     */
+    public static List<String> clearPreviousRun(File directory, String basename) {
+        List<String> stuck = new ArrayList<String>();
+        for (String name : members(basename)) {
+            File leftover = new File(directory, name);
+            // exists() rather than a bare delete so that "was never there" and
+            // "is there and will not go" stay distinguishable: only the second
+            // is a reason to refuse the run.
+            if (!leftover.exists()) {
+                continue;
+            }
+            try {
+                Files.delete(leftover.toPath());
+            } catch (IOException | RuntimeException ex) {
+                stuck.add(name);
+            }
+        }
+        return stuck;
+    }
+
+    /**
      * Whether a member the run did not write is one it was never obliged to.
      *
      * <p>What this is for: the four Jacobian files are written together by one

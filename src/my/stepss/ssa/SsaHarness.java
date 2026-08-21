@@ -341,6 +341,9 @@ public final class SsaHarness {
         checkManifestOmitsWhatWasNotRecorded();
         checkManifestRefusals();
         checkArchiveMembers();
+        checkClearPreviousRunRemovesEveryOutput();
+        checkClearPreviousRunOnAnEmptyDirectory();
+        checkClearPreviousRunReportsWhatItCouldNotDelete();
         checkArchiveNaming();
         checkArchiveRoundTrip(SsaArchive.Format.ZIP);
         checkArchiveRoundTrip(SsaArchive.Format.TAR_GZ);
@@ -1416,6 +1419,86 @@ public final class SsaHarness {
             expect("the Jacobian's " + suffix + " is a member", true,
                     unique.contains("run" + suffix));
         }
+    }
+
+    /**
+     * The three results and four Jacobian files of a previous run go, and
+     * nothing else in the directory does.
+     *
+     * <p>What this is guarding: the run's own success test is whether
+     * {@code <basename>_modes.dat} exists once the engine has exited, so a
+     * leftover from an earlier run in the same directory makes every
+     * subsequent run "succeed" and shows the earlier run's spectrum under the
+     * current case's name. Clearing first is what makes that test mean this
+     * run.
+     */
+    private static void checkClearPreviousRunRemovesEveryOutput() throws java.io.IOException {
+        java.io.File dir = scratch();
+        for (String name : SsaArchive.members("run")) {
+            touch(dir, name);
+        }
+        // Another run's results, and one of the case's own data files. Both
+        // sit in the same directory as a matter of course - the basename
+        // field exists so that several runs can share one - and neither is
+        // this run's to delete.
+        touch(dir, "other_modes.dat");
+        touch(dir, "dyn.dat");
+
+        java.util.List<String> stuck = SsaArchive.clearPreviousRun(dir, "run");
+        expect("nothing was left behind to report", 0, stuck.size());
+        for (String name : SsaArchive.members("run")) {
+            expect(name + " is gone", false, new java.io.File(dir, name).exists());
+        }
+        expect("another basename's run is untouched", true,
+                new java.io.File(dir, "other_modes.dat").exists());
+        expect("a data file that merely shares the directory is untouched", true,
+                new java.io.File(dir, "dyn.dat").exists());
+    }
+
+    /** A first run in a fresh directory has nothing to clear and is not an error. */
+    private static void checkClearPreviousRunOnAnEmptyDirectory() throws java.io.IOException {
+        expect("an empty directory clears cleanly", 0,
+                SsaArchive.clearPreviousRun(scratch(), "run").size());
+        // The working directory is chosen by the user and can be gone by the
+        // time Run is pressed. There is nothing to clear there either.
+        expect("a directory that does not exist clears cleanly", 0,
+                SsaArchive.clearPreviousRun(
+                        new java.io.File(scratch(), "absent"), "run").size());
+    }
+
+    /**
+     * A file that will not delete is named rather than passed over, and does
+     * not stop the other six going.
+     *
+     * <p>Reported so the caller can refuse the run: a modes file that
+     * survived clearing is exactly the leftover that would then be read as
+     * this run's result. The fixture makes one undeletable by making it a
+     * non-empty directory, which fails portably where a permission bit does
+     * not - a run as root deletes a read-only file quite happily.
+     */
+    private static void checkClearPreviousRunReportsWhatItCouldNotDelete()
+            throws java.io.IOException {
+        java.io.File dir = scratch();
+        for (String name : SsaArchive.members("run")) {
+            touch(dir, name);
+        }
+        java.io.File blocked = new java.io.File(dir, "run_modes.dat");
+        expect("the fixture's modes file was really there", true, blocked.delete());
+        expect("the fixture replaced it with a directory", true, blocked.mkdir());
+        touch(blocked, "occupied");
+
+        java.util.List<String> stuck = SsaArchive.clearPreviousRun(dir, "run");
+        expect("the one that would not go is reported", 1, stuck.size());
+        expect("and it is named", "run_modes.dat", stuck.get(0));
+        expect("a failure does not stop the rest going", false,
+                new java.io.File(dir, "run_pf.dat").exists());
+        expect("including the ones after it in the list", false,
+                new java.io.File(dir, "run_struc.dat").exists());
+    }
+
+    private static void touch(java.io.File dir, String name) throws java.io.IOException {
+        java.nio.file.Files.write(new java.io.File(dir, name).toPath(),
+                "leftover\n".getBytes("UTF-8"));
     }
 
     private static void checkArchiveNaming() {

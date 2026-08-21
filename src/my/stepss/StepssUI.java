@@ -199,10 +199,6 @@ public class StepssUI extends javax.swing.JFrame {
         this_version = getVersion();
         versionLabel.setText("<html><b>Version:</b> " + this_version + "</html>");
         prefs = preferences();
-        // Before initRamses(), which is what reads it: the session's working
-        // directory is restored only if it is still a directory, so a case on
-        // a disconnected drive comes up as no directory rather than an error.
-        selWorkDir = lastWorkingDirectory();
         if (prefs.getBoolean(FIRST_RUN, true)) {
             // Nothing is shown here. main() shows the licence before this
             // constructor runs and exits if it is declined, so reaching this
@@ -294,7 +290,6 @@ public class StepssUI extends javax.swing.JFrame {
         layoutTabs();
         addStatusBar();
         expireTheBannerOnEveryAction();
-        restoreSession();
     }
 
     /**
@@ -840,89 +835,21 @@ public class StepssUI extends javax.swing.JFrame {
         return c;
     }
 
-    /**
-     * Writes the session down: where the window was, and which working
-     * directory was in use.
-     *
-     * <p>Both were thrown away at exit. The Preferences node was already
-     * open and holding a single first-run flag, so this is the cheapest thing
-     * in the whole plan and the one a user notices every single launch.
-     */
-    private void rememberSession() {
-        Preferences saved = preferences();
-        // The maximised state, not the bounds it would report while maximised:
-        // restoring those gives a window that looks maximised, is not, and
-        // cannot be un-maximised back to anything sensible.
-        boolean maximised = (getExtendedState() & JFrame.MAXIMIZED_BOTH) == JFrame.MAXIMIZED_BOTH;
-        saved.putBoolean(SESSION_MAXIMISED, maximised);
-        if (!maximised) {
-            Rectangle bounds = getBounds();
-            saved.putInt(SESSION_X, bounds.x);
-            saved.putInt(SESSION_Y, bounds.y);
-            saved.putInt(SESSION_W, bounds.width);
-            saved.putInt(SESSION_H, bounds.height);
-        }
-        saved.put(SESSION_DIR, selWorkDir == null ? "" : selWorkDir.getAbsolutePath());
-        try {
-            saved.flush();
-        } catch (java.util.prefs.BackingStoreException ex) {
-            Logger.getLogger(StepssUI.class.getName()).log(Level.WARNING,
-                    "Session could not be saved", ex);
-        }
-    }
-
-    /**
-     * Puts the window back where it was, on the tab work starts on.
-     *
-     * <p>Bounds are accepted only if they still land on a screen that exists.
-     * A window restored onto a monitor that has since been unplugged is a
-     * window the user cannot reach, and the fix for it is not obvious from
-     * inside the application.
-     */
-    private void restoreSession() {
-        Preferences saved = preferences();
-        if (!saved.getBoolean(SESSION_MAXIMISED, true)) {
-            Rectangle bounds = new Rectangle(
-                    saved.getInt(SESSION_X, getX()), saved.getInt(SESSION_Y, getY()),
-                    saved.getInt(SESSION_W, getWidth()), saved.getInt(SESSION_H, getHeight()));
-            if (bounds.width > 200 && bounds.height > 150 && onAScreen(bounds)) {
-                setBounds(bounds);
-            }
-        }
-        // The tab is deliberately not restored. The six tabs are in the
-        // order a study is actually run in, so System Data is not merely the
-        // first of them, it is where the work starts: load the network, then
-        // the disturbance, then observables, then run. Reopening on whichever
-        // tab the last session happened to end on drops the user into the
-        // middle of that sequence, which is the opposite of what remembering
-        // the session is for.
-    }
-
-    /** Whether enough of these bounds is on a connected screen to grab. */
-    private static boolean onAScreen(Rectangle bounds) {
-        for (java.awt.GraphicsDevice screen : java.awt.GraphicsEnvironment
-                .getLocalGraphicsEnvironment().getScreenDevices()) {
-            if (screen.getDefaultConfiguration().getBounds().intersects(bounds)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Whether the frame should come up maximised, as it always used to. */
-    private static boolean startMaximised() {
-        return preferences().getBoolean(SESSION_MAXIMISED, true);
-    }
-
-    /** The working directory the last session ended in, if it is still there. */
-    private static File lastWorkingDirectory() {
-        String path = preferences().get(SESSION_DIR, "");
-        if (path.isEmpty()) {
-            return null;
-        }
-        File directory = new File(path);
-        return directory.isDirectory() ? directory : null;
-    }
+    // Nothing is remembered from one launch to the next except the licence
+    // flag and the three settings the user ticked a box for; see
+    // PreferenceMigration.forgetSession.
+    //
+    // A rememberSession() used to sit here, writing the window geometry and
+    // the working directory down at exit and reading them back in the
+    // constructor. It is gone, and it should not come back as a convenience: a
+    // fresh window that has silently reopened on the last case's directory
+    // reads as a case that is loaded. The title bar and the status bar both
+    // name that directory, no data file row does, and every run then reads and
+    // writes inside a folder full of another study's output. That is how an
+    // analysis of one network came to be presented under the name of another;
+    // SsaArchive.clearPreviousRun is the half of it that happened after the
+    // engine had exited. A plain comment and not a doc comment, deliberately:
+    // there is no member here for it to document.
 
     /**
      * Points the window icon and the About drawing at the variant that matches
@@ -3237,14 +3164,12 @@ public class StepssUI extends javax.swing.JFrame {
             "Cancel"};
         int confirmed = JOptionPane.showOptionDialog(this, "Are you sure you want to exit? All simulation data will be lost!", "Exit Confirmation", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[2]);
         if (confirmed == JOptionPane.YES_OPTION) {
-            rememberSession();
             if (toolDir == null) {
             } else {
                 fileOps.deleteDirectory(toolDir);
             }
             System.exit(0);
         } else if (confirmed == JOptionPane.NO_OPTION) {
-            rememberSession();
             if (toolDir == null) {
             } else {
                 closeCurveWindowsButtonActionPerformed(null);
@@ -3588,10 +3513,12 @@ public class StepssUI extends javax.swing.JFrame {
             saveOutputTrajButton.setSelected(true);
         }
 
-        // Remembered so the next example lands beside this one rather than
-        // inside it. Stored before the working directory moves, because that is
-        // what the root would otherwise be derived from next time.
-        preferences().put(EXAMPLES_DIR, root.getAbsolutePath());
+        // Held so the next example in this session lands beside this one
+        // rather than inside it. Noted before the working directory moves,
+        // because that is what the root would otherwise be derived from next
+        // time. A field and not a preference: it is where this session put
+        // things, and the next launch asks again.
+        examplesDir = root;
 
         File previous = selWorkDir;
         selWorkDir = dir;
@@ -3603,12 +3530,6 @@ public class StepssUI extends javax.swing.JFrame {
             // example. initRamses has already explained itself in a dialog.
             selWorkDir = previous;
             return;
-        }
-        try {
-            preferences().flush();
-        } catch (java.util.prefs.BackingStoreException ex) {
-            Logger.getLogger(StepssUI.class.getName()).log(Level.WARNING,
-                    "Examples directory could not be saved", ex);
         }
         banner.notice(example.name() + " opened in " + dir.getAbsolutePath(),
                 "Open folder", () -> {
@@ -3629,17 +3550,16 @@ public class StepssUI extends javax.swing.JFrame {
     /**
      * The directory examples are kept in, asking for one if there is none yet.
      *
-     * <p>Three sources, in order: the remembered root, the current working
-     * directory, and the user. The middle one is what makes the first open on
-     * an established installation land somewhere the user already chose, and the
-     * last is for a fresh install, which has neither.
+     * <p>Three sources, in order: this session's root, the current working
+     * directory, and the user. The middle one is what makes the first open of
+     * a session land somewhere the user has already chosen, and the last is
+     * for the launch that has neither yet.
      *
      * @return the root, or null if the user cancelled
      */
     private File examplesRoot() {
-        String saved = preferences().get(EXAMPLES_DIR, "");
-        if (!saved.isEmpty() && new File(saved).isDirectory()) {
-            return new File(saved);
+        if (examplesDir != null && examplesDir.isDirectory()) {
+            return examplesDir;
         }
         if (selWorkDir != null && selWorkDir.isDirectory()) {
             return selWorkDir;
@@ -4106,6 +4026,15 @@ public class StepssUI extends javax.swing.JFrame {
         // names all three output files, so a per-run basename is what lets
         // several runs share one directory.
         try {
+            // First, before anything is written or deleted. createCommandFile
+            // refuses this too, but it does so from inside the run, which is
+            // past the point where the previous results under this basename
+            // have already been cleared; see below for why they have to be.
+            if (noSystemDataLoaded()) {
+                banner.warn("No system data files are loaded."
+                        + " Add at least one on the System Data tab.");
+                return;
+            }
             String base = ssaBasename.getText().trim();
             if (base.isEmpty()) {
                 base = "ssa";
@@ -4179,6 +4108,30 @@ public class StepssUI extends javax.swing.JFrame {
             FileUtils.writeStringToFile(settingsFile,
                     my.stepss.ssa.SsaSettings.text(), "UTF-8");
 
+            // Last, after every refusal above, because it destroys the
+            // previous run under this basename: a run that never starts must
+            // leave that run intact. From here on the directory holds no
+            // small-signal results, which is what lets the modes-file test
+            // below mean this run rather than any earlier one. See
+            // SsaArchive.clearPreviousRun for what that test was reporting
+            // before.
+            java.util.List<String> stuck =
+                    my.stepss.ssa.SsaArchive.clearPreviousRun(myTempDir, base);
+            if (!stuck.isEmpty()) {
+                banner.warn("A previous \"" + base + "\" run's results are still in\n"
+                        + myTempDir.getAbsolutePath() + " and could not be removed:\n\n"
+                        + String.join(", ", stuck) + "\n\n"
+                        + "They would be read as this run's, so the analysis was not"
+                        + " started. Delete them, or choose another results basename.");
+                return;
+            }
+            // Whatever that button would have archived has just been deleted,
+            // and "the last run" is now this one, however it turns out. A
+            // successful run switches it back on below.
+            saveDynJac.setEnabled(false);
+            lastRunDir = null;
+            lastRunManifest = null;
+
             String tmpString = fileDist.getText();
             fileDist.setText(dstFile.getName());
             ssaSettings = settingsFile.getName();
@@ -4228,16 +4181,38 @@ public class StepssUI extends javax.swing.JFrame {
             String[] produced = {base + "_modes.dat", base + "_pf.dat", base + "_ms.dat"};
             File resultsDir = new File(myTempDir.getAbsolutePath());
             if (!"".equals(ssaDirectory.getText())) {
+                java.util.List<String> notReplaced = new ArrayList<>();
                 for (String name : produced) {
                     File srcFile = new File(myTempDir.getAbsolutePath()
                             + System.getProperty("file.separator") + name);
                     File dstCopy = new File(ssaDirectory.getText()
                             + System.getProperty("file.separator") + name);
+                    // Cleared whether or not there is one to put in its place.
+                    // A _pf.dat this run did not write is some earlier run's,
+                    // and leaving it beside the new modes file is the same
+                    // substitution SsaArchive.clearPreviousRun exists to stop,
+                    // one directory further out: a v1 engine writes _pf and _ms
+                    // only when a mode passed its filter, so "the run produced
+                    // none" and "the copy skipped it" look identical here.
+                    if (dstCopy.exists() && !dstCopy.delete()) {
+                        notReplaced.add(name);
+                        continue;
+                    }
                     if (srcFile.exists()) {
                         fileOps.copyFiletoFile(srcFile, dstCopy);
                     }
                 }
-                resultsDir = new File(ssaDirectory.getText());
+                if (notReplaced.isEmpty()) {
+                    resultsDir = new File(ssaDirectory.getText());
+                } else {
+                    // Shown from where the engine wrote it instead, which is
+                    // the one copy known to be all of one run.
+                    banner.warn("An earlier run's results are still in "
+                            + ssaDirectory.getText() + "\nand could not be replaced: "
+                            + String.join(", ", notReplaced) + "\n\n"
+                            + "This run was left in " + myTempDir.getAbsolutePath()
+                            + " and is what the results window below shows.");
+                }
             }
 
             // Opened from wherever the files actually are. With no results
@@ -6643,13 +6618,10 @@ public class StepssUI extends javax.swing.JFrame {
                             // StepssUI built by anything other than this main
                             // still gets one.
                             frame.setVisible(true);
-                            // Maximised is still the default, and stays what
-                            // happens on a first run; a window sized and placed
-                            // by hand now comes back that way instead of being
-                            // flattened to the screen again.
-                            if (startMaximised()) {
-                                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
-                            }
+                            // Always, on every launch. The window used to come
+                            // back wherever the last session left it, which is
+                            // part of the memory this build no longer keeps.
+                            frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
                         } finally {
                             shown.countDown();
                         }
@@ -6682,22 +6654,6 @@ public class StepssUI extends javax.swing.JFrame {
     /** Preferences key holding the theme choice, read at startup. */
     static final String DARK_THEME_KEY = "darkTheme";
 
-    /** What is remembered between sessions, all in the one STEPSS node. */
-    static final String SESSION_MAXIMISED = "windowMaximised";
-    static final String SESSION_X = "windowX";
-    static final String SESSION_Y = "windowY";
-    static final String SESSION_W = "windowWidth";
-    static final String SESSION_H = "windowHeight";
-    static final String SESSION_DIR = "workingDirectory";
-
-    /**
-     * Where extracted examples are kept, so a second one lands beside the first
-     * rather than inside it. Separate from {@link #SESSION_DIR} because opening
-     * an example moves the working directory into the example, which would
-     * otherwise make every subsequent example a child of the last one.
-     */
-    static final String EXAMPLES_DIR = "examplesDirectory";
-
     /**
      * Whether the examples panel opens at startup. Default true, and the key
      * stays absent until the user unticks the box, so "has never opened the
@@ -6712,9 +6668,17 @@ public class StepssUI extends javax.swing.JFrame {
     static final String SHOW_EXAMPLES_KEY = "showExamplesAtStartup";
 
     /**
-     * Where the saved preferences live: the theme, the window, the working
-     * directory and the first-run flag, in one node rather than several that
+     * Where the saved preferences live: the licence flag and the three
+     * settings with a tick box behind them - the theme, the startup update
+     * check and the examples panel - in one node rather than several that
      * drift.
+     *
+     * <p>That is the whole list, and it is meant to stay the whole list.
+     * Nothing about a session belongs here: not the window, not the working
+     * directory, not the files that were loaded. A launch starts with an
+     * empty window and no working directory, and
+     * {@link PreferenceMigration#forgetSession} is what makes that true of
+     * installations that predate the rule.
      *
      * <p>The name is a literal, not {@code getClass().getName()}, which is
      * what it used to be. That tied the node to the class name, so renaming
@@ -6748,6 +6712,11 @@ public class StepssUI extends javax.swing.JFrame {
             // not skip converting the first-run flag on whichever node startup
             // ends up using, on either path above.
             PreferenceMigration.firstRunKey(cachedNode);
+            // Here, and not in the constructor, so that it has happened before
+            // the first read on every path: Splash.open reads the theme before
+            // any frame exists, and a check or a harness can call this without
+            // building one at all.
+            PreferenceMigration.forgetSession(cachedNode);
         }
         return cachedNode;
     }
@@ -6883,6 +6852,17 @@ public class StepssUI extends javax.swing.JFrame {
      * changed the parameter fields, or adopted a different engine, and an
      * archive recording those would be describing a run that never happened.
      */
+    /**
+     * Where this session has been putting extracted examples, so a second one
+     * lands beside the first rather than inside it: opening an example moves
+     * the working directory into that example, which would otherwise make
+     * every subsequent example a child of the last one.
+     *
+     * <p>A field rather than a preference, like everything else about a
+     * session in this build. The next launch asks again.
+     */
+    private File examplesDir = null;
+
     private File lastRunDir = null;
     private my.stepss.ssa.SsaArchive.Manifest lastRunManifest = null;
     private File selWorkDir = null;

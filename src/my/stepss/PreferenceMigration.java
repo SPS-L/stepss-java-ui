@@ -8,16 +8,17 @@ import java.util.prefs.Preferences;
  *
  * <p>A preferences node name is not a package reference, whatever it looks
  * like. It is a location in the user's preference store - the Windows
- * registry, {@code ~/.java/.userPrefs} on Linux - and it holds the theme, the
- * window geometry, the working directory and whether the licence has been
- * accepted. Renaming the literal alone does not move any of that, it abandons
- * it, and the user opens a window in the wrong theme, in the wrong place,
- * pointed at the wrong directory, being asked to accept a licence they
- * accepted years ago.
+ * registry, {@code ~/.java/.userPrefs} on Linux - and it holds the theme,
+ * whether to check for updates, whether to open the examples panel, and
+ * whether the licence has been accepted. Renaming the literal alone does not
+ * move any of that, it abandons it, and the user opens a window in the wrong
+ * theme being asked to accept a licence they accepted years ago.
  *
- * <p>So the names get corrected and this carries the contents across. Both
- * migrations are idempotent and run on every launch: the second launch finds
- * the work already done and returns immediately.
+ * <p>So the names get corrected and this carries the contents across. It also
+ * drops the keys this build deliberately no longer keeps; see
+ * {@link #forgetSession}. All three passes are idempotent and run on every
+ * launch: the second launch finds the work already done and returns
+ * immediately.
  */
 final class PreferenceMigration {
 
@@ -101,6 +102,43 @@ final class PreferenceMigration {
         node.putBoolean(StepssUI.FIRST_RUN, Boolean.parseBoolean(legacy));
         node.remove(LEGACY_FIRST_RUN);
     }
+
+    /**
+     * Drops every key that used to carry a session from one launch to the next.
+     *
+     * <p>What survives a launch is now the licence flag and the three settings
+     * a user ticked a box for: the theme, the startup update check and the
+     * examples panel. The window geometry, the working directory and the
+     * examples root do not, and this is what makes that true of an
+     * installation that already has them - not reading a key is not the same
+     * as forgetting it, and a stored working directory left lying in the node
+     * comes back the moment anything reads it again.
+     *
+     * <p>Runs on every launch rather than once behind a flag, because
+     * {@link #node} copies <em>every</em> key out of the legacy node, so a
+     * legacy installation can reintroduce all seven at any time.
+     *
+     * @param node the node in use, after any legacy contents have been copied in
+     */
+    static void forgetSession(Preferences node) {
+        for (String key : FORGOTTEN) {
+            node.remove(key);
+        }
+    }
+
+    /**
+     * The keys {@link #forgetSession} removes: the window geometry, the
+     * working directory and the examples root.
+     *
+     * <p>Spelled out here rather than referenced from StepssUI because the
+     * constants there are gone - these names exist only on disk now, in the
+     * stores of installations that predate the change, and this is the last
+     * place in the source that knows them.
+     */
+    private static final String[] FORGOTTEN = {
+        "windowMaximised", "windowX", "windowY", "windowWidth", "windowHeight",
+        "workingDirectory", "examplesDirectory",
+    };
 
     /** The empty-string key the first-run flag used to live under. */
     private static final String LEGACY_FIRST_RUN = "";
