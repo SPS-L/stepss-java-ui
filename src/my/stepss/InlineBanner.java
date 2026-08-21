@@ -123,11 +123,35 @@ final class InlineBanner extends JPanel {
         });
     }
 
+    /**
+     * The message as one line, with every run of whitespace as a single space.
+     *
+     * <p>Why this is needed. A {@code JLabel} given plain text draws one line
+     * and simply drops a {@code \n}, joining the words either side of it: the
+     * small-signal refusal came out as "given $SCHEME DE and$OMEGA_REF SYN, so
+     * the reason is elsewhere: usually a systemwith more states". The messages
+     * carry newlines because they are wrapped for a dialog, and several are
+     * shared with one, so the wrapping is not the thing to remove.
+     *
+     * <p>Replaced with a space rather than deleted, which is the whole point,
+     * and runs collapsed so a blank line between paragraphs does not become a
+     * gap. The alternative - wrapping the text in {@code <html>} and turning
+     * newlines into {@code <br>} - would let the banner grow to any height
+     * above the tabs, and would hand every message's punctuation to an HTML
+     * parser.
+     */
+    static String oneLine(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replaceAll("\\s+", " ").trim();
+    }
+
     private void show(final String text, final Color accent, final boolean fades,
                       final String actionLabel, final Runnable action) {
         onSwing(() -> {
             expiry.stop();
-            message.setText(text);
+            message.setText(oneLine(text));
             message.setFont(message.getFont().deriveFont(Font.PLAIN));
             // Unconditionally, before anything is added: every message decides
             // its own action, and a button left over from the previous one
