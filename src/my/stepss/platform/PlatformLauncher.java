@@ -304,24 +304,6 @@ public final class PlatformLauncher {
         return false;
     }
 
-    public static void openTerminal(File dir) throws IOException {
-        Platform p = platformOrThrow();
-        CommandLine cmd;
-        if (p == Platform.WINDOWS_X86_64) {
-            cmd = new CommandLine("cmd.exe");
-            cmd.addArgument("/c");
-            cmd.addArgument("start");
-        } else if (p == Platform.MACOS_ARM64) {
-            cmd = new CommandLine("open");
-            cmd.addArgument("-a");
-            cmd.addArgument("Terminal");
-            cmd.addArgument(dir.getAbsolutePath(), false);
-        } else {
-            cmd = terminalOnLinux();
-        }
-        run(cmd, dir, "open a terminal");
-    }
-
     public static void openFileManager(File dir) throws IOException {
         Platform p = platformOrThrow();
         CommandLine cmd;
@@ -336,93 +318,6 @@ public final class PlatformLauncher {
             cmd.addArgument(dir.getAbsolutePath(), false);
         }
         run(cmd, dir, "open a file manager");
-    }
-
-    /** Runs an interactive console program inside a terminal window. */
-    public static void runInTerminal(Platform p, List<String> argv, File dir)
-            throws IOException {
-        CommandLine cmd;
-        if (p == Platform.WINDOWS_X86_64) {
-            // Launched through `cmd /c start`, which gives a console
-            // subsystem program its own console window. Running the
-            // executable directly was right only while Windows shipped the
-            // Intel dialog build of dyngraph: that one drew its own GUI and
-            // needed no console. The release build is console on every
-            // platform, and a console program started from a GUI process
-            // inherits no console at all - its prompts would go nowhere and
-            // the user would see an apparently dead button.
-            //
-            // The empty "" is the window title `start` expects; without it
-            // start treats a quoted program path as the title and never runs
-            // it.
-            cmd = new CommandLine("cmd.exe");
-            cmd.addArgument("/c", false);
-            cmd.addArgument("start", false);
-            cmd.addArgument("\"\"", false);
-            for (String a : argv) {
-                cmd.addArgument(a, false);
-            }
-        } else if (p == Platform.MACOS_ARM64) {
-            cmd = new CommandLine("osascript");
-            cmd.addArgument("-e", false);
-            cmd.addArgument(appleScriptRunInTerminal(argv, dir), false);
-        } else {
-            cmd = terminalOnLinux();
-            cmd.addArgument("-e");
-            for (String a : argv) {
-                cmd.addArgument(a, false);
-            }
-        }
-        run(cmd, dir, "run " + argv.get(0) + " in a terminal");
-    }
-
-    /**
-     * Builds the AppleScript source for
-     * {@code tell application "Terminal" to do script "<shell command>"}.
-     *
-     * <p>Two layers of quoting are stacked here: the shell command line that
-     * Terminal.app will actually run, and the double-quoted AppleScript string
-     * literal that carries it. Each layer is escaped independently and in the
-     * right order so that a working directory containing spaces, single
-     * quotes, double quotes or backslashes still round-trips correctly:
-     * <ol>
-     *   <li>every token (the {@code cd} target and each argv element) is
-     *       wrapped in single quotes for the shell, per POSIX shell quoting
-     *       rules (a literal {@code '} becomes {@code '\''});</li>
-     *   <li>the resulting shell command line is then escaped for embedding in
-     *       an AppleScript double-quoted string, where {@code \} and {@code "}
-     *       are the only special characters.</li>
-     * </ol>
-     */
-    private static String appleScriptRunInTerminal(List<String> argv, File dir) {
-        StringBuilder shell = new StringBuilder();
-        shell.append("cd ").append(shellQuote(dir.getAbsolutePath())).append(" && ");
-        for (String a : argv) {
-            shell.append(shellQuote(a)).append(' ');
-        }
-        String shellCommand = shell.toString().trim();
-        return "tell application \"Terminal\" to do script \""
-                + appleScriptQuote(shellCommand) + "\"";
-    }
-
-    /** Wraps {@code s} in single quotes, safe for a POSIX shell command line. */
-    private static String shellQuote(String s) {
-        return "'" + s.replace("'", "'\\''") + "'";
-    }
-
-    /** Escapes {@code s} for embedding inside an AppleScript double-quoted string literal. */
-    private static String appleScriptQuote(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
-    }
-
-    private static CommandLine terminalOnLinux() {
-        String[] candidates = {"x-terminal-emulator", "xterm", "gnome-terminal", "konsole"};
-        for (String c : candidates) {
-            if (findOnPath(c) != null) {
-                return new CommandLine(c);
-            }
-        }
-        return new CommandLine("xterm");
     }
 
     /**

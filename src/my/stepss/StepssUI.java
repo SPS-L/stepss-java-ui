@@ -491,7 +491,7 @@ public class StepssUI extends javax.swing.JFrame {
         // reads as a third section of this tab and lines up with the two
         // above it; the console tabs need no heading because their pane is
         // the whole tab.
-        content.add(heading(ssaOutputHeading, "what the engine said",
+        content.add(heading(ssaOutputHeading, "what the tools on this tab said",
                 Docs.SMALL_SIGNAL_ANALYSIS), span(row++));
 
         jPanel8.removeAll();
@@ -503,6 +503,39 @@ public class StepssUI extends javax.swing.JFrame {
                 .add(saveSsaOutput)
                 .add(clearSsaOutput)
                 .build(), BorderLayout.SOUTH);
+    }
+
+    /**
+     * Writes one block to this tab's console, if it is up.
+     *
+     * <p>Everything on the Analysis tab reports through here, so a reader has
+     * one place to look and the blocks arrive in the order they happened. The
+     * sink marshals its appends onto the EDT, so callers may be on it or off
+     * it; DYNGRAPH's plot listener is off it, the rest are on it.
+     *
+     * <p>Trailing whitespace is trimmed because a captured stderr usually
+     * ends in a newline and {@link TextareaOutputStream#message} adds one of
+     * its own, which would leave a blank line between every block and its
+     * successor. Empty text writes nothing at all: a quiet run should not
+     * produce an empty paragraph.
+     */
+    private void analysisMessage(String text) {
+        if (outputstreamSSA == null || text == null) {
+            return;
+        }
+        String trimmed = stripTrailing(text);
+        if (!trimmed.isEmpty()) {
+            outputstreamSSA.message(trimmed);
+        }
+    }
+
+    /** String.stripTrailing(), which needs Java 11 and this targets 11. */
+    private static String stripTrailing(String text) {
+        int end = text.length();
+        while (end > 0 && Character.isWhitespace(text.charAt(end - 1))) {
+            end--;
+        }
+        return text.substring(0, end);
     }
 
     /**
@@ -1223,13 +1256,8 @@ public class StepssUI extends javax.swing.JFrame {
         openExamplesMenuItem = new javax.swing.JMenuItem();
         exitMenuItem = new javax.swing.JMenuItem();
         toolsMenu = new javax.swing.JMenu();
-        saveCommandFileMenuItem = new javax.swing.JMenuItem();
-        saveObsFileMenuItem = new javax.swing.JMenuItem();
         openNppButton = new javax.swing.JMenuItem();
         loadExtSimButton = new javax.swing.JMenuItem();
-        selWorkDirButton = new javax.swing.JMenuItem();
-        openExplButton = new javax.swing.JMenuItem();
-        openTermButton = new javax.swing.JMenuItem();
         closeCurveWindowsMenuItem = new javax.swing.JMenuItem();
         helpMenu = new javax.swing.JMenu();
         showChangeLogButton = new javax.swing.JMenuItem();
@@ -2604,24 +2632,6 @@ public class StepssUI extends javax.swing.JFrame {
         toolsMenu.setText("Tools");
         toolsMenu.setName("toolsMenu"); // NOI18N
 
-        saveCommandFileMenuItem.setText("Save command file");
-        saveCommandFileMenuItem.setName("saveCommandFileMenuItem"); // NOI18N
-        saveCommandFileMenuItem.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                saveCommandFileMenuItemActionPerformed(evt);
-            }
-        });
-        toolsMenu.add(saveCommandFileMenuItem);
-
-        saveObsFileMenuItem.setText("Save observables file");
-        saveObsFileMenuItem.setName("saveObsFileMenuItem"); // NOI18N
-        saveObsFileMenuItem.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                saveObsFileMenuItemActionPerformed(evt);
-            }
-        });
-        toolsMenu.add(saveObsFileMenuItem);
-
         openNppButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         openNppButton.setText("Open in editor");
         openNppButton.setName("openNppButton"); // NOI18N
@@ -2641,37 +2651,6 @@ public class StepssUI extends javax.swing.JFrame {
             }
         });
         toolsMenu.add(loadExtSimButton);
-
-        selWorkDirButton.setText("Select working directory");
-        selWorkDirButton.setName("selWorkDirButton"); // NOI18N
-        selWorkDirButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                selWorkDirButtonActionPerformed(evt);
-            }
-        });
-        toolsMenu.add(selWorkDirButton);
-
-        openExplButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_E, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        openExplButton.setText("Open working folder");
-        openExplButton.setEnabled(false);
-        openExplButton.setName("openExplButton"); // NOI18N
-        openExplButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                openExplButtonActionPerformed(evt);
-            }
-        });
-        toolsMenu.add(openExplButton);
-
-        openTermButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_T, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        openTermButton.setText("Open terminal in working folder");
-        openTermButton.setEnabled(false);
-        openTermButton.setName("openTermButton"); // NOI18N
-        openTermButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                openTermButtonActionPerformed(evt);
-            }
-        });
-        toolsMenu.add(openTermButton);
 
         closeCurveWindowsMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_G, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         closeCurveWindowsMenuItem.setText("Close all curve windows");
@@ -3637,121 +3616,6 @@ public class StepssUI extends javax.swing.JFrame {
         return chosen;
     }
 
-    private void saveCommandFileMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveCommandFileMenuItemActionPerformed
-        try {
-            String problem = createCommandFile();
-            if (problem != null) {
-                banner.warn(problem);
-                return;
-            }
-            fileChooser.setSelectedFile(new File(""));
-            fileChooser.setDialogTitle("Choose File");
-            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-            int returnVal = fileChooser.showSaveDialog(this);
-            if (returnVal == JFileChooser.APPROVE_OPTION) {
-                File dstFile = fileChooser.getSelectedFile();
-                if (dstFile.exists()) {
-                    int response = JOptionPane.showConfirmDialog(null, "Overwrite existing file?", "Confirm Overwrite", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-                    if (response == JOptionPane.CANCEL_OPTION) {
-                        return;
-                    }
-                }
-                File srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "cmd.txt");
-                String content = IOUtils.toString(new FileInputStream(srcFile), "UTF-8");
-                // Pattern.quote, not Matcher.quoteReplacement. replaceAll
-                // takes a regex first and a replacement second, and these had
-                // them the other way round: quoteReplacement escapes only \
-                // and $, so myTempDir went in as a pattern. myTempDir is the
-                // working directory the user chose, so a case kept in
-                // "Nordic32 (v2)" or "case+1" stripped nothing at all and the
-                // saved file kept absolute paths into a directory that does
-                // not survive the session. It failed silently, and unbalanced
-                // brackets would have thrown PatternSyntaxException past the
-                // IOException catch below.
-                String file_str = myTempDir.getAbsolutePath() + System.getProperty("file.separator");
-                content = content.replaceAll(Pattern.quote(file_str), "");
-                IOUtils.write(content, new FileOutputStream(dstFile), "UTF-8");
-
-                srcFile = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "customObs.txt");
-                if (srcFile.exists()) {
-                    content = IOUtils.toString(new FileInputStream(srcFile), "UTF-8");
-                    content = content.replaceAll(Pattern.quote(file_str), "");
-                    IOUtils.write(content, new FileOutputStream(srcFile), "UTF-8");
-                    fileOps.copyFiletoDir(srcFile, dstFile.getAbsoluteFile());
-                }
-            }
-        } catch (IOException ex) {
-            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-    }//GEN-LAST:event_saveCommandFileMenuItemActionPerformed
-
-    private void saveObsFileMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveObsFileMenuItemActionPerformed
-        try {
-            fileChooser.setSelectedFile(new File(""));
-            fileChooser.setDialogTitle("Choose File");
-            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-            int returnVal = fileChooser.showSaveDialog(this);
-            if (returnVal == JFileChooser.APPROVE_OPTION) {
-                File dstFile = fileChooser.getSelectedFile();
-                if (dstFile.exists()) {
-                    int response = JOptionPane.showConfirmDialog(null, "Overwrite existing file?", "Confirm Overwrite", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-                    if (response == JOptionPane.CANCEL_OPTION) {
-                        return;
-                    }
-                }
-
-                if (!fileObs.getText().equals("") && !observFileWizButton.isSelected()) {
-                    fileOps.copyFiletoFile(new File(fileObs.getText()), dstFile);
-                } else if (fileObs.getText().equals("") && observFileWizButton.isSelected()) {
-                    boolean customObsFileCreated = createCustomObsFile();
-                    if (customObsFileCreated) {
-                        fileOps.copyFiletoFile(new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "customObs.txt"), dstFile);
-                    } else {
-                        JOptionPane.showMessageDialog(this, "Could not create the Observables file!", "Observables file!", JOptionPane.ERROR_MESSAGE);
-                    }
-                } else if (!fileObs.getText().equals("") && observFileWizButton.isSelected()) {
-                    boolean customObsFileCreated = createCustomObsFile();
-                    if (customObsFileCreated) {
-                        FileReader obsFile = new FileReader(fileObs.getText());
-                        StringBuilder fileData = new StringBuilder(1000);
-                        BufferedReader bufreader = new BufferedReader(obsFile);
-                        String line;
-                        while ((line = bufreader.readLine()) != null) {
-                            if (line.trim().length() != 0) {
-                                fileData.append(line).append("\n");
-                            }
-                        }
-                        bufreader.close();
-                        obsFile = new FileReader(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "customObs.txt");
-                        bufreader = new BufferedReader(obsFile);
-                        while ((line = bufreader.readLine()) != null) {
-                            if (line.trim().length() != 0) {
-                                fileData.append(line).append("\n");
-                            }
-                        }
-                        FileWriter tmpFileWriter = new FileWriter(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "customObs.txt");
-                        tmpFileWriter.write(fileData.toString());
-                        tmpFileWriter.close();
-                        fileOps.copyFiletoFile(new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "customObs.txt"), dstFile);
-                    } else {
-                        JOptionPane.showMessageDialog(this, "Could not create the Observables file!", "Observables file!", JOptionPane.ERROR_MESSAGE);
-                    }
-                }
-            }
-        } catch (IOException ex) {
-            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }//GEN-LAST:event_saveObsFileMenuItemActionPerformed
-
-    private void openTermButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openTermButtonActionPerformed
-        try {
-            PlatformLauncher.openTerminal(myTempDir);
-        } catch (IOException ex) {
-            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }//GEN-LAST:event_openTermButtonActionPerformed
-
     private void openNppButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openNppButtonActionPerformed
         nppOpen(evt, "");
     }//GEN-LAST:event_openNppButtonActionPerformed
@@ -3769,14 +3633,6 @@ public class StepssUI extends javax.swing.JFrame {
                     + "\n\n" + ex.getMessage());
         }
     }
-
-    private void openExplButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openExplButtonActionPerformed
-        try {
-            PlatformLauncher.openFileManager(myTempDir);
-        } catch (IOException ex) {
-            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }//GEN-LAST:event_openExplButtonActionPerformed
 
     private void loadExtSimButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadExtSimButtonActionPerformed
         fileChooser.setSelectedFile(new File(""));
@@ -3882,29 +3738,6 @@ public class StepssUI extends javax.swing.JFrame {
     private void showUserGuideButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showUserGuideButtonActionPerformed
         PlatformLauncher.openUrl(Docs.SITE);
     }//GEN-LAST:event_showUserGuideButtonActionPerformed
-
-    private void selWorkDirButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_selWorkDirButtonActionPerformed
-        fileChooser.setSelectedFile(new File(""));
-        fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        fileChooser.setDialogTitle("Choose Working Directory");
-        int returnVal = fileChooser.showOpenDialog(this);
-        fileChooser.resetChoosableFileFilters();
-        if (returnVal == JFileChooser.APPROVE_OPTION) {
-            selWorkDir = fileChooser.getSelectedFile();
-            if (!selWorkDir.exists()) {
-                selWorkDir.mkdir();
-            }
-            if (!selWorkDir.isDirectory()) {
-                selWorkDir.getParentFile();
-            }
-            if (!initRamses()) {
-                // initRamses() already showed a dialog naming the specific
-                // tool and path that failed; a second, generic dialog here
-                // would just repeat the failure without adding information.
-                System.exit(1);
-            }
-        }
-    }//GEN-LAST:event_selWorkDirButtonActionPerformed
 
     private void checkUpdateButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkUpdateButtonActionPerformed
         try {
@@ -4600,6 +4433,7 @@ public class StepssUI extends javax.swing.JFrame {
             return;
         }
         final DyngraphRunner runner = new DyngraphRunner(dyngraphExec, myTempDir);
+        analysisMessage("--- extract curves: " + trajectory.getName() + " ---");
 
         // get_observ_name rewinds the trajectory several times, so --list
         // scales with file size and must not run on the EDT: a SwingWorker
@@ -4649,7 +4483,15 @@ public class StepssUI extends javax.swing.JFrame {
      */
     private void openPickerFromListing(DyngraphRunner runner, File trajectory,
             DyngraphRunner.ListResult listing) {
+        // stderr only, never stdout: --list puts the observable index on
+        // stdout for ObservableIndex.parse below, and echoing a few thousand
+        // index lines into the console would bury the counts DYNGRAPH prints
+        // on stderr, which are the part a reader wants. The exit status is
+        // added only when it is not 0, so a clean run reads as its own output
+        // rather than as a status line.
+        analysisMessage(listing.stderr);
         if (listing.exitCode != 0) {
+            analysisMessage("dyngraph --list exited " + listing.exitCode);
             String reason;
             if (listing.stdout.trim().isEmpty()) {
                 reason = "The bundled DYNGRAPH does not support <B>--list</B>."
@@ -4742,11 +4584,16 @@ public class StepssUI extends javax.swing.JFrame {
                     SwingUtilities.invokeLater(new Runnable() {
                         public void run() {
                             runDyngraphButton.setEnabled(true);
+                            // Reported before either branch, so the console
+                            // carries what DYNGRAPH said whichever way the run
+                            // went. Success used to be silent everywhere; it
+                            // still opens the window without a dialog, but it
+                            // no longer leaves nothing behind.
+                            analysisMessage(stderr);
                             if (exitCode == 0) {
-                                // Success is silent, exactly as today: the
-                                // result button lights up and that is all.
                                 openCurveWindow(outputBase, selections);
                             } else {
+                                analysisMessage("dyngraph exited " + exitCode);
                                 JOptionPane.showMessageDialog(StepssUI.this,
                                         "<html>Curve extraction failed (exit " + exitCode
                                         + "):<br>" + escapeHtml(stderr) + "</html>",
@@ -7053,13 +6900,20 @@ public class StepssUI extends javax.swing.JFrame {
      * unrelated run's tail, and the "no results" dialog had to send them to
      * another tab to read the reason. The engine is the same, so the plumbing
      * is the same as the other three consoles; only the destination differs.
+     *
+     * <p>It carries both tools on this tab, which is why it is headed "Output"
+     * and not after either of them. DYNGRAPH said even less than the engine
+     * did: its two runs captured stdout and stderr to buffers and showed the
+     * stderr only in a dialog, and only when the run failed, so a successful
+     * extraction reported nothing anywhere and a failed one left nothing
+     * behind once the dialog was dismissed. See {@link #analysisMessage}.
      */
     private final javax.swing.JTextArea ssaPane = new javax.swing.JTextArea();
     private final javax.swing.JScrollPane ssaScrollPane =
             new javax.swing.JScrollPane(ssaPane);
     private final JButton clearSsaOutput = new JButton("Clear output");
     private final JButton saveSsaOutput = new JButton("Save output...");
-    private final JLabel ssaOutputHeading = new JLabel("Engine output");
+    private final JLabel ssaOutputHeading = new JLabel("Output");
     private File[] codeGenFiles = null;
     private JFileChooser mfileChooser = new JFileChooser();
     // Variables declaration - do not modify//GEN-BEGIN:variables
@@ -7154,9 +7008,7 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton nppObsButton;
     private javax.swing.JCheckBox observFileWizButton;
     private javax.swing.JMenuItem openExamplesMenuItem;
-    private javax.swing.JMenuItem openExplButton;
     private javax.swing.JMenuItem openNppButton;
-    private javax.swing.JMenuItem openTermButton;
     private javax.swing.JTextArea pfcPane;
     private javax.swing.JButton runDyngraphButton;
     private javax.swing.JButton runPF;
@@ -7168,12 +7020,10 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JComboBox runtimeObsType1;
     private javax.swing.JComboBox runtimeObsType2;
     private javax.swing.JButton saveCGFiles;
-    private javax.swing.JMenuItem saveCommandFileMenuItem;
     private javax.swing.JMenuItem saveConfigMenuItem;
     private javax.swing.JCheckBox saveContTrace;
     private javax.swing.JCheckBox saveDiscTrace;
     private javax.swing.JCheckBox saveDumpButton;
-    private javax.swing.JMenuItem saveObsFileMenuItem;
     private javax.swing.JCheckBox saveOutputTrajButton;
     private javax.swing.JButton saveDynJac;
     private javax.swing.JButton savePFSolution;
@@ -7181,7 +7031,6 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton saveTrajToFileButton;
     private javax.swing.JButton savedynsim;
     private javax.swing.JTextField searchTextField;
-    private javax.swing.JMenuItem selWorkDirButton;
     private javax.swing.JMenuItem showAboutBox;
     private javax.swing.JButton showApacheLicenseButton;
     private javax.swing.JButton showCODEGENLicenseButton;
@@ -7374,8 +7223,6 @@ public class StepssUI extends javax.swing.JFrame {
             updateWindowTitle();
             statusBar.setWorkingDirectory(selWorkDir);
 
-            openExplButton.setEnabled(true);
-            openTermButton.setEnabled(true);
 
             ramsesExec = adoptedSimulator();
             heliosExec = toolchain.helios();
