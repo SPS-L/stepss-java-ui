@@ -214,13 +214,22 @@ public final class SsaResultsWindow extends JFrame {
                         Math.max(splane.getHeight(), 400)), resetZoom));
         top.setResizeWeight(0.45);
 
-        // A wrapped text area rather than a column of labels. The two sentences
-        // a reader most needs here, the degenerate refusal and the note that an
-        // absent device is below pf_threshold rather than zero, are long, and
-        // in non-wrapping labels they ran off the panel edge and were clipped.
-        // Monospaced so the family, device and variable columns line up, and
-        // read-only rather than disabled so the numbers stay selectable.
+        // A wrapped text area rather than a column of labels. The sentence a
+        // reader most needs here, the refusal to show a degenerate mode's
+        // participation, is long, and in a non-wrapping label it ran off the
+        // panel edge and was clipped. Monospaced so the family, device and
+        // variable columns line up, and read-only rather than disabled so the
+        // numbers stay selectable.
+        //
+        // Sized in columns, because wrapping is right for the prose and wrong
+        // for the table above it: a JTextArea with no column count asks for
+        // whatever its content happens to need, the divider starts there, and
+        // the fixed-width rows then wrapped one field onto a line of their
+        // own. 66 is the widest line the panel emits, the header naming its
+        // last column in full, plus a little margin. The divider is still the
+        // reader's to drag; this only decides where it starts.
         participation.setEditable(false);
+        participation.setColumns(66);
         participation.setLineWrap(true);
         participation.setWrapStyleWord(true);
         participation.setFont(new java.awt.Font(java.awt.Font.MONOSPACED,
@@ -564,21 +573,18 @@ public final class SsaResultsWindow extends JFrame {
                             .append(trim(pfThresholdValue))
                             .append("; lower it beside the table to see them.\n");
                 }
-                // Two different absences, and conflating them is what makes a
-                // reader think a machine takes no part in a mode when the
-                // truth is that nobody asked the engine to write it down.
-                if (results.modes().pfFloor() != null) {
-                    text.append("Entries below the run's pf_floor of ")
-                            .append(show(results.modes().pfFloor()))
-                            .append(" were never written, so a device absent")
-                            .append(" from the file is below that, not zero.\n");
-                } else if (results.modes().pfThreshold() != null) {
-                    text.append("Entries below the pf_threshold of ")
-                            .append(show(results.modes().pfThreshold()))
-                            .append(" this run was analysed under were never")
-                            .append(" written, so a device absent from the file")
-                            .append(" is below that, not zero.\n");
-                }
+                // The engine's own floor is deliberately NOT mentioned here.
+                // It used to be, as two sentences naming pf_floor or the v1
+                // pf_threshold, on the reasoning that a device missing because
+                // the engine never wrote it is a different absence from one
+                // missing because this panel trimmed it. True, but it is not
+                // an absence a reader can normally meet: the field beside the
+                // table starts at 0.05 and the engine's floor defaults to
+                // 0.001, so what is on screen is decided by the field in every
+                // ordinary case, and a note about a boundary two decades below
+                // it explained a distinction that was never visible. The field
+                // is the filter; it says what it is doing, and it is one
+                // control away.
             }
         }
         participation.setText(text.toString());
