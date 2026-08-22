@@ -1256,7 +1256,6 @@ public class StepssUI extends javax.swing.JFrame {
         openExamplesMenuItem = new javax.swing.JMenuItem();
         exitMenuItem = new javax.swing.JMenuItem();
         toolsMenu = new javax.swing.JMenu();
-        openNppButton = new javax.swing.JMenuItem();
         loadExtSimButton = new javax.swing.JMenuItem();
         closeCurveWindowsMenuItem = new javax.swing.JMenuItem();
         helpMenu = new javax.swing.JMenu();
@@ -2632,16 +2631,6 @@ public class StepssUI extends javax.swing.JFrame {
         toolsMenu.setText("Tools");
         toolsMenu.setName("toolsMenu"); // NOI18N
 
-        openNppButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, java.awt.event.InputEvent.CTRL_DOWN_MASK));
-        openNppButton.setText("Open in editor");
-        openNppButton.setName("openNppButton"); // NOI18N
-        openNppButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                openNppButtonActionPerformed(evt);
-            }
-        });
-        toolsMenu.add(openNppButton);
-
         loadExtSimButton.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         loadExtSimButton.setText("Select external simulator");
         loadExtSimButton.setName("loadExtSimButton"); // NOI18N
@@ -3615,10 +3604,6 @@ public class StepssUI extends javax.swing.JFrame {
         }
         return chosen;
     }
-
-    private void openNppButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openNppButtonActionPerformed
-        nppOpen(evt, "");
-    }//GEN-LAST:event_openNppButtonActionPerformed
 
     private void nppOpen(java.awt.event.ActionEvent evt, String filename) {
         File target = filename.isEmpty() ? myTempDir : new File(filename);
@@ -7008,7 +6993,6 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton nppObsButton;
     private javax.swing.JCheckBox observFileWizButton;
     private javax.swing.JMenuItem openExamplesMenuItem;
-    private javax.swing.JMenuItem openNppButton;
     private javax.swing.JTextArea pfcPane;
     private javax.swing.JButton runDyngraphButton;
     private javax.swing.JButton runPF;
