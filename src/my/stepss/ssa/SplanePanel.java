@@ -16,8 +16,17 @@ import javax.swing.JPanel;
 
 /**
  * The s-plane, following the python-ui notebook's cell 20: a crimson
- * stability boundary at Re = 0, dashed constant-damping rays, and one circle
- * per mode labelled with its frequency.
+ * stability boundary at Re = 0, one dashed constant-damping ray, and one
+ * circle per mode labelled with its frequency.
+ *
+ * <p>The notebook draws two rays, at zeta 0.05 and 0.10. This draws one,
+ * because two rays three degrees apart are indistinguishable on any window
+ * wide enough to hold a real spectrum: a ray of constant zeta leaves the
+ * origin at asin(zeta) from the imaginary axis, so 0.05 and 0.10 sit 2.87 and
+ * 5.74 degrees off vertical and arrive on screen as a single smudge beside
+ * the stability boundary. The one that remains is adjustable instead, through
+ * {@link #setDampingZeta}, which is the more useful of the two answers: a
+ * reader comparing against a criterion other than 0.05 can type it.
  *
  * <p>It parts from the notebook in two places. The axis window is fitted to
  * the modes on screen rather than fixed, so this works on systems other than
@@ -216,6 +225,49 @@ public final class SplanePanel extends JPanel {
         setBackground(ground != null ? ground : java.awt.Color.WHITE);
     }
 
+    /**
+     * The damping ratio the dashed ray is drawn at when nobody says
+     * otherwise. 0.05 because that is the usual planning criterion, and the
+     * value the python-ui notebook names when it draws the same line.
+     */
+    public static final double DEFAULT_DAMPING_ZETA = 0.05;
+
+    /** Damping ratio of the dashed ray now drawn. */
+    private double dampingZeta = DEFAULT_DAMPING_ZETA;
+
+    /**
+     * Is this a damping ratio a ray can be drawn at?
+     *
+     * <p>The one rule, so the panel and the field that feeds it cannot come to
+     * different conclusions about the same number. The upper bound is not
+     * taste: the ray runs to {@code r = reach / sqrt(1 - zeta*zeta)}, so
+     * zeta = 1 is a division by zero and anything past it is a square root of
+     * a negative, and either reaches the sink as a NaN coordinate. zeta = 0 is
+     * allowed and draws a vertical ray over the stability boundary, which is
+     * a fair thing to ask for and costs nothing to permit.
+     */
+    public static boolean isDrawableZeta(double zeta) {
+        return !Double.isNaN(zeta) && zeta >= 0.0 && zeta < 1.0;
+    }
+
+    /**
+     * Moves the dashed constant-damping ray to another damping ratio.
+     * Ignores a value {@link #isDrawableZeta} rejects, rather than drawing a
+     * NaN line or throwing at a caller who is only setting a display option.
+     */
+    public void setDampingZeta(double zeta) {
+        if (!isDrawableZeta(zeta)) {
+            return;
+        }
+        this.dampingZeta = zeta;
+        repaint();
+    }
+
+    /** The damping ratio the dashed ray is currently drawn at. */
+    public double dampingZeta() {
+        return dampingZeta;
+    }
+
     public void addSelectionListener(Listener listener) {
         listeners.add(listener);
     }
@@ -248,7 +300,7 @@ public final class SplanePanel extends JPanel {
      */
     public String toSvg(int width, int height) {
         SvgSink sink = new SvgSink(width, height);
-        render(sink, shown, selected, zoom, width, height);
+        render(sink, shown, selected, zoom, width, height, dampingZeta);
         return sink.toSvg();
     }
 
@@ -259,7 +311,7 @@ public final class SplanePanel extends JPanel {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
         render(new SwingSink(g, PlotStyle.isDark(getBackground())), shown, selected,
-                zoom, getWidth(), getHeight());
+                zoom, getWidth(), getHeight(), dampingZeta);
         // The rubber band is screen furniture, not part of the figure, so it
         // is drawn here and never reaches the SVG sink.
         if (dragFrom != null && dragTo != null) {
@@ -307,7 +359,7 @@ public final class SplanePanel extends JPanel {
      *
      * @param zoom {reLo, reHi, imLo, imHi} in data units, or null to fit
      */
-    private static Bounds bounds(List<Mode> shown, double[] zoom, int width, int height) {
+    static Bounds bounds(List<Mode> shown, double[] zoom, int width, int height) {
         if (zoom != null) {
             return new Bounds(zoom[0], zoom[1], zoom[2], zoom[3], width, height);
         }
@@ -315,14 +367,24 @@ public final class SplanePanel extends JPanel {
             return new Bounds(EMPTY_MIN_RE, EMPTY_MAX_RE, EMPTY_MIN_IM, EMPTY_MAX_IM,
                     width, height);
         }
-        // Re starts at 0 on both sides so the stability boundary is always in
-        // the fitted window: it is what every reading of this plot is made
-        // against. Im is fitted to the data alone, since nothing is measured
-        // from the real axis.
+        // Both axes start at 0, so the fitted window always contains the
+        // ORIGIN and not merely the stability boundary. Re has always done
+        // this, because Re = 0 is what every reading of this plot is made
+        // against. Im now does it too, and the reason is the damping ray: it
+        // radiates from the origin, so a window fitted to the modes alone cut
+        // the apex off and left a near-vertical stub floating beside the
+        // boundary, at an angle a reader had no vertex to judge it from. The
+        // origin is also the only fixed point the two axes share, which is
+        // what makes two runs of different systems comparable by eye.
+        //
+        // Min/max against 0 rather than assignment, so a mode on the far side
+        // of either axis still widens the window rather than falling outside
+        // it. Negative Im is ordinary: the engine reports both members of a
+        // conjugate pair.
         double lo = 0.0;
         double hi = 0.0;
-        double bot = Double.POSITIVE_INFINITY;
-        double top = Double.NEGATIVE_INFINITY;
+        double bot = 0.0;
+        double top = 0.0;
         for (Mode mode : shown) {
             lo = Math.min(lo, mode.re);
             hi = Math.max(hi, mode.re);
@@ -338,11 +400,17 @@ public final class SplanePanel extends JPanel {
     /** Renders at the fitted window; the harness and any caller without a zoom. */
     static void render(PlotSink sink, List<Mode> shown, Mode selected,
             int width, int height) {
-        render(sink, shown, selected, null, width, height);
+        render(sink, shown, selected, null, width, height, DEFAULT_DAMPING_ZETA);
+    }
+
+    /** Renders at a given zoom, with the ray at the default damping ratio. */
+    static void render(PlotSink sink, List<Mode> shown, Mode selected,
+            double[] zoom, int width, int height) {
+        render(sink, shown, selected, zoom, width, height, DEFAULT_DAMPING_ZETA);
     }
 
     static void render(PlotSink sink, List<Mode> shown, Mode selected,
-            double[] zoom, int width, int height) {
+            double[] zoom, int width, int height, double zeta) {
         Bounds b = bounds(shown, zoom, width, height);
 
         sink.group("axes");
@@ -388,19 +456,24 @@ public final class SplanePanel extends JPanel {
         clippedLine(sink, b, 0.0, b.imLo, 0.0, b.imHi, "bound", false);
         sink.endGroup();
 
-        // Constant-damping rays, as in the notebook: from the origin along
+        // The constant-damping ray, as in the notebook: from the origin along
         // Re = -zeta*r, Im = r*sqrt(1 - zeta^2). Drawn from the origin
         // outward past the top of the window and then clipped, so a window
-        // that excludes the origin still shows the part of each ray crossing
+        // that excludes the origin still shows the part of the ray crossing
         // it, at the right angle.
-        sink.group("damping-rays");
-        for (double zeta : new double[] {0.05, 0.10}) {
+        //
+        // Guarded rather than trusted. Every route in sets the value through
+        // setDampingZeta, which rejects the undrawable ones, but this is the
+        // only place the square root is taken and a NaN here would reach the
+        // sink as a NaN coordinate and take the whole plot with it.
+        if (isDrawableZeta(zeta)) {
+            sink.group("damping-rays");
             double reach = Math.max(Math.abs(b.imLo), Math.abs(b.imHi));
             double r = reach / Math.sqrt(1.0 - zeta * zeta);
             clippedLine(sink, b, 0.0, 0.0, -zeta * r,
                     r * Math.sqrt(1.0 - zeta * zeta), "ray", true);
+            sink.endGroup();
         }
-        sink.endGroup();
 
         // One circle per mode and nothing over it: crimson says unstable, a
         // filled disc says this is the one the table and the panels below are
@@ -513,12 +586,12 @@ public final class SplanePanel extends JPanel {
     }
 
     /** Data-to-device mapping for one render. */
-    private static final class Bounds {
+    static final class Bounds {
 
-        private final double reLo;
-        private final double reHi;
-        private final double imLo;
-        private final double imHi;
+        final double reLo;
+        final double reHi;
+        final double imLo;
+        final double imHi;
         private final int width;
         private final int height;
 

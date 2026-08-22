@@ -314,6 +314,7 @@ public final class SsaHarness {
         checkTextFontSizesDiffer();
         checkUnclosedGroupsAutoClose();
         checkSplaneRendersExpectedElements();
+        checkFittedWindowContainsOrigin();
         checkSplaneLabelsItsScale();
         checkSplaneLegendFollowsTheData();
         checkSplaneMinimumExtentExpands();
@@ -704,6 +705,48 @@ public final class SsaHarness {
         expect("unclosed groups are auto-closed", openCount, closeCount);
     }
 
+    /**
+     * The fitted window always contains the origin, whatever the modes do.
+     *
+     * <p>Asserted on the bounds rather than on the rendered SVG because that
+     * is where the rule lives, and because reading an axis range back out of
+     * drawn tick labels would test the label formatter as much as the fit.
+     *
+     * <p>The fixture is deliberately nowhere near the origin on either axis:
+     * these are the numbers the Cyprus grid-forming case actually produces,
+     * whose window used to start at Im = 1.70 and cut the apex off the damping
+     * ray. Every mode must still be inside, so this cannot be satisfied by a
+     * window that simply centres on the origin and forgets the data.
+     */
+    private static void checkFittedWindowContainsOrigin() {
+        java.util.List<Mode> far = new java.util.ArrayList<Mode>();
+        far.add(new Mode(195, -1.7412, 2.2194, 0.6172, 0.3532, null, true));
+        far.add(new Mode(191, -0.6703, 4.7440, 0.1399, 0.7550, null, true));
+        far.add(new Mode(171, -97.7880, 10.8712, 0.9939, 1.7302, null, true));
+
+        SplanePanel.Bounds b = SplanePanel.bounds(far, null, 500, 400);
+        expect("the fitted window reaches Re = 0", true, b.reLo <= 0.0 && b.reHi >= 0.0);
+        expect("the fitted window reaches Im = 0", true, b.imLo <= 0.0 && b.imHi >= 0.0);
+        for (Mode mode : far) {
+            expect("mode " + mode.index + " is inside the fitted window", true,
+                    mode.re >= b.reLo && mode.re <= b.reHi
+                            && mode.im >= b.imLo && mode.im <= b.imHi);
+        }
+
+        // Padding, not a window that merely touches the origin: a pole or a
+        // ray apex exactly on the frame is half a glyph of ink on the edge.
+        expect("there is margin below Im = 0", true, b.imLo < 0.0);
+        expect("there is margin right of Re = 0", true, b.reHi > 0.0);
+
+        // A manual zoom is the reader's window and is not widened to the
+        // origin. Zooming into a cluster of well-damped modes is a thing
+        // people do on purpose, and snapping back to Re = 0 would undo it.
+        SplanePanel.Bounds z = SplanePanel.bounds(far,
+                new double[] {-100.0, -50.0, 5.0, 11.0}, 500, 400);
+        expect("a zoom is left alone", true,
+                z.reLo == -100.0 && z.reHi == -50.0 && z.imLo == 5.0 && z.imHi == 11.0);
+    }
+
     private static java.util.List<Mode> emFixture() {
         SsaModes m = parsedModes();
         return SsaResults.electromechanical(m.modes());
@@ -747,7 +790,51 @@ public final class SsaHarness {
         expect("the stability boundary is drawn", true, svg.contains("class=\"bound\""));
         expect("constant-damping rays are dashed", true,
                 svg.contains("stroke-dasharray"));
-        expect("both rays are drawn", 2, countOf(svg, "class=\"ray\""));
+        expect("one damping ray is drawn", 1, countOf(svg, "class=\"ray\""));
+
+        // The ray leaves the origin at asin(zeta) from the imaginary axis, so
+        // its angle IS the setting: a ray drawn at the wrong zeta is a wrong
+        // answer rather than a cosmetic slip, and a count of lines cannot tell
+        // 0.05 from 0.30.
+        //
+        // Asserted as the RATIO between two renders of the same fixture, which
+        // is what makes it independent of the axis scales. The window is
+        // fitted to the modes and does not depend on zeta, so both renders
+        // share one data-to-pixel transform and it cancels; clipping cannot
+        // disturb it either, because clipping a segment keeps its direction.
+        // Comparing two renders also holds that the parameter reaches the
+        // drawing at all, which a single render cannot: one that ignored its
+        // argument would still produce a plausible angle.
+        SvgSink steep = new SvgSink(500, 400);
+        SplanePanel.render(steep, emFixture(), null, null, 500, 400, 0.30);
+        //
+        // Relative, at 1e-2, and the floor is the SVG rather than the drawing:
+        // coordinates are written "%.2f", and at zeta 0.05 the ray's run is
+        // about 3.7 px against a rise of 400, so half a hundredth of rounding
+        // on the run is already 8.6e-4 of it. That is the whole of the
+        // measured error. 1e-2 leaves an order over it while still being 200
+        // times tighter than the factor of 2 that separates zeta 0.05 from
+        // 0.10, which is the smallest mistake worth catching here.
+        double ratio = rayPixelSlope(steep.toSvg()) / rayPixelSlope(svg);
+        double wanted = tanAsin(0.30) / tanAsin(SplanePanel.DEFAULT_DAMPING_ZETA);
+        expect("the ray angle follows the damping ratio it is given", true,
+                closeTo(ratio, wanted, 1.0e-2 * wanted));
+
+        // Out of range is refused rather than drawn: zeta = 1 divides by zero
+        // building the ray and anything past it roots a negative, and either
+        // one reaches the sink as a NaN coordinate.
+        SvgSink bad = new SvgSink(500, 400);
+        SplanePanel.render(bad, emFixture(), null, null, 500, 400, 1.0);
+        expect("an undrawable damping ratio draws no ray",
+                0, countOf(bad.toSvg(), "class=\"ray\""));
+        expect("an undrawable damping ratio leaves no NaN in the plot",
+                false, bad.toSvg().contains("NaN"));
+
+        expect("zeta 0 is drawable", true, SplanePanel.isDrawableZeta(0.0));
+        expect("zeta 0.999 is drawable", true, SplanePanel.isDrawableZeta(0.999));
+        expect("zeta 1 is not drawable", false, SplanePanel.isDrawableZeta(1.0));
+        expect("a negative zeta is not drawable", false, SplanePanel.isDrawableZeta(-0.05));
+        expect("NaN is not drawable", false, SplanePanel.isDrawableZeta(Double.NaN));
 
         // One glyph per mode, its class carrying the stability. The fixture
         // holds one stable mode and one unstable one, so a second marker over
@@ -1015,6 +1102,29 @@ public final class SsaHarness {
         }
         int end = svg.indexOf("</g>", at);
         return end < 0 ? svg.substring(at) : svg.substring(at, end);
+    }
+
+    /** tan(asin(zeta)): the ray's run per unit rise, in data coordinates. */
+    private static double tanAsin(double zeta) {
+        return zeta / Math.sqrt(1.0 - zeta * zeta);
+    }
+
+    /**
+     * |dx|/|dy| of the damping ray, in pixels. Meaningful only against another
+     * render of the same fixture: on its own it still carries the axis scales,
+     * which is why nothing here reads it as a damping ratio.
+     */
+    private static double rayPixelSlope(String svg) {
+        String rays = groupBody(svg, "damping-rays");
+        double dx = extractAttribute(rays, "line", 0, "x2")
+                - extractAttribute(rays, "line", 0, "x1");
+        double dy = extractAttribute(rays, "line", 0, "y2")
+                - extractAttribute(rays, "line", 0, "y1");
+        return Math.abs(dx) / Math.abs(dy);
+    }
+
+    private static boolean closeTo(double a, double b, double tol) {
+        return Math.abs(a - b) <= tol;
     }
 
     private static int countOf(String haystack, String needle) {

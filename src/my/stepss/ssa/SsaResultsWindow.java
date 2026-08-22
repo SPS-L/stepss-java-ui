@@ -47,6 +47,7 @@ public final class SsaResultsWindow extends JFrame {
     private final JCheckBox realLimitOn = new JCheckBox("real part above");
     private final javax.swing.JTextField realLimit = new javax.swing.JTextField(6);
     private final javax.swing.JTextField pfThreshold = new javax.swing.JTextField(6);
+    private final javax.swing.JTextField dampingZeta = new javax.swing.JTextField(5);
     private final JLabel shownCount = new JLabel();
     private final JButton resetZoom = new JButton("Reset zoom");
 
@@ -59,6 +60,14 @@ public final class SsaResultsWindow extends JFrame {
      */
     private double realLimitValue = DEFAULT_REAL_LIMIT;
     private double pfThresholdValue = DEFAULT_PF_THRESHOLD;
+
+    /**
+     * Damping ratio of the s-plane's dashed ray. A display option rather than
+     * a filter: it moves a line on the plot and hides nothing, which is why it
+     * has no tick beside it and why changing it never touches the table or the
+     * shown count.
+     */
+    private double dampingZetaValue = SplanePanel.DEFAULT_DAMPING_ZETA;
 
     /**
      * The limit offered when the run does not name one, which is every run a
@@ -148,6 +157,15 @@ public final class SsaResultsWindow extends JFrame {
             refilter();
         });
 
+        dampingZeta.setToolTipText("Damping ratio of the dashed ray on the"
+                + " s-plane. Modes to the left of it are better damped than"
+                + " this; 0.05 is the usual planning criterion. A display"
+                + " option: it hides nothing. Between 0 and 1.");
+        commitOn(dampingZeta, () -> {
+            dampingZetaValue = parseZeta(dampingZeta, dampingZetaValue);
+            splane.setDampingZeta(dampingZetaValue);
+        });
+
         pfThreshold.setToolTipText("Hides participation entries below this."
                 + " Entries below the run's own pf_floor were never written,"
                 + " so lowering this past it shows nothing more.");
@@ -166,8 +184,11 @@ public final class SsaResultsWindow extends JFrame {
         JPanel filters = new JPanel();
         filters.setLayout(new javax.swing.BoxLayout(filters, javax.swing.BoxLayout.Y_AXIS));
         filters.add(row(emOnly));
-        filters.add(row(realLimitOn, realLimit, new JLabel(" 1/s")));
-        filters.add(row(indent(), new JLabel("PF at least "), pfThreshold));
+        filters.add(row(realLimitOn, realLimit, new JLabel(" 1/s"),
+                javax.swing.Box.createHorizontalStrut(12),
+                new JLabel("damping ray \u03b6 "), dampingZeta));
+        filters.add(row(indent(),
+                new JLabel("participation factor at least "), pfThreshold));
         filters.add(row(indent(), shownCount));
         filters.setBorder(BorderFactory.createEmptyBorder(2, 0, 4, 0));
 
@@ -266,6 +287,7 @@ public final class SsaResultsWindow extends JFrame {
         realLimit.setEnabled(true);
         realLimit.setText(trim(realLimitValue));
         pfThreshold.setText(trim(pfThresholdValue));
+        dampingZeta.setText(trim(dampingZetaValue));
         int shown = model.rows().size();
         int all = results.modes().modes().size();
         shownCount.setText(shown == all
@@ -298,6 +320,26 @@ public final class SsaResultsWindow extends JFrame {
      * about a half-typed number, from a field that commits on focus loss,
      * would fire whenever someone clicked away mid-edit.
      */
+    /**
+     * Reads the damping-ray field, keeping the old value when what is in the
+     * box cannot be drawn. Defers to {@link SplanePanel#isDrawableZeta} rather
+     * than repeating its bounds, so the field and the plot cannot disagree
+     * about which numbers are allowed: a rejected value would otherwise sit in
+     * the box looking accepted while the ray stayed where it was.
+     */
+    private static double parseZeta(javax.swing.JTextField field, double fallback) {
+        try {
+            double v = Double.parseDouble(field.getText().trim());
+            if (SplanePanel.isDrawableZeta(v)) {
+                return v;
+            }
+        } catch (NumberFormatException ex) {
+            // fall through to the fallback
+        }
+        field.setText(trim(fallback));
+        return fallback;
+    }
+
     private static double parseField(javax.swing.JTextField field, double fallback) {
         try {
             double v = Double.parseDouble(field.getText().trim());
@@ -485,7 +527,8 @@ public final class SsaResultsWindow extends JFrame {
                 text.append("Mode ").append(mode.index).append(" has ")
                         .append(inFile.size())
                         .append(inFile.size() == 1 ? " entry" : " entries")
-                        .append(", none of them at or above the PF threshold of ")
+                        .append(", none of them at or above the participation factor")
+                        .append(" threshold of ")
                         .append(trim(pfThresholdValue)).append(".\n\n")
                         .append("Its largest is ")
                         .append(String.format(java.util.Locale.ROOT, "%.4f", largest(inFile)))
@@ -494,13 +537,15 @@ public final class SsaResultsWindow extends JFrame {
                 text.append(String.format(java.util.Locale.ROOT, "Mode %d, %.4f Hz%n%n",
                         mode.index, mode.freqHz));
                 // The columns are named because the last of them is not
-                // self-evident: PF is the abbreviation a reader meets here and
-                // in the threshold field beside the table, and it is spelt out
-                // under the table rather than in the header, where it would
-                // not fit the width the rows set.
+                // self-evident. It is named in full, which it can afford to be
+                // only because it is last: the header is the widest cell in
+                // its column and every row under it is a five-character
+                // number, so nothing else shifts to accommodate it. The three
+                // columns before it are padded to the width the rows set and
+                // could not take the same treatment.
                 text.append(String.format(java.util.Locale.ROOT,
                         "  %-8s %-20s %-10s %s%n", "family", "device",
-                        "variable", "PF"));
+                        "variable", "participation factor"));
                 for (Participation p : rows) {
                     // p.device is written as parsed. Columns.slice already
                     // removed the a20 padding, and a LEADING blank is part of
@@ -510,12 +555,13 @@ public final class SsaResultsWindow extends JFrame {
                             "  %-8s %-20s %-10s %.3f%n",
                             p.family, p.device, p.variable, p.pf));
                 }
-                text.append("\nPF is the participation factor, normalised so")
-                        .append(" the largest in each mode is 1.\n");
+                text.append("\nParticipation factors are normalised so the")
+                        .append(" largest in each mode is 1.\n");
                 if (rows.size() < inFile.size()) {
                     text.append(inFile.size() - rows.size())
-                            .append(" more entries are in the file below the PF")
-                            .append(" threshold of ").append(trim(pfThresholdValue))
+                            .append(" more entries are in the file below the")
+                            .append(" participation factor threshold of ")
+                            .append(trim(pfThresholdValue))
                             .append("; lower it beside the table to see them.\n");
                 }
                 // Two different absences, and conflating them is what makes a
