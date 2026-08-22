@@ -212,6 +212,10 @@ public class StepssUI extends javax.swing.JFrame {
         ToolTipManager.sharedInstance().setEnabled(false);
         DefaultCaret caret = (DefaultCaret) simulationOutput.getCaret();
         caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+        ssaPane.setEditable(false);
+        ssaPane.setName("ssaPane"); // NOI18N
+        ((DefaultCaret) ssaPane.getCaret())
+                .setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
         dataFileList.add(fileData1);
         dataFileList.add(fileData2);
         dataFileList.add(fileData3);
@@ -235,6 +239,8 @@ public class StepssUI extends javax.swing.JFrame {
             outputstreamErr = new TextareaOutputStream(simulationOutput);
             outputstreamCGErr = new TextareaOutputStream(codegenPane);
             outputstreamPFCErr = new TextareaOutputStream(pfcPane);
+            outputstreamSSA = new TextareaOutputStream(ssaPane);
+            outputstreamSSAErr = new TextareaOutputStream(ssaPane);
         } catch (IOException ex) {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -447,6 +453,10 @@ public class StepssUI extends javax.swing.JFrame {
     private void layoutAnalysisTab() {
         ActionBar.markPrimary(runDyngraphButton);
         ActionBar.markPrimary(ssaButton1);
+        clearSsaOutput.setToolTipText("Empties the output above.");
+        clearSsaOutput.addActionListener(evt -> clearSsaOutputActionPerformed(evt));
+        saveSsaOutput.setToolTipText("Writes the output above to a file.");
+        saveSsaOutput.addActionListener(evt -> saveSsaOutputActionPerformed(evt));
 
         JPanel content = new JPanel(new GridBagLayout());
         content.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
@@ -475,9 +485,53 @@ public class StepssUI extends javax.swing.JFrame {
                 .add(loadDynJac)
                 .build(), stretch(row++));
 
+        // The engine's console, in the shape the other three tabs use: the
+        // output takes the middle and its bar sits under it. The heading is
+        // the last row of `content` rather than part of the console, so it
+        // reads as a third section of this tab and lines up with the two
+        // above it; the console tabs need no heading because their pane is
+        // the whole tab.
+        content.add(heading(ssaOutputHeading, "what the engine said",
+                Docs.SMALL_SIGNAL_ANALYSIS), span(row++));
+
         jPanel8.removeAll();
         jPanel8.setLayout(new BorderLayout());
         jPanel8.add(content, BorderLayout.NORTH);
+        jPanel8.add(ssaScrollPane, BorderLayout.CENTER);
+        jPanel8.add(ActionBar.create()
+                .toTheEnd()
+                .add(saveSsaOutput)
+                .add(clearSsaOutput)
+                .build(), BorderLayout.SOUTH);
+    }
+
+    /**
+     * Empties the small-signal console.
+     *
+     * <p>Unlike the Dynamic Simulation tab's clear, this disables nothing:
+     * that one also greys out the trace buttons, because the traces it loads
+     * are the run whose output it just discarded. Nothing on this tab reads
+     * back from this pane, and the results window holds the run itself.
+     */
+    private void clearSsaOutputActionPerformed(java.awt.event.ActionEvent evt) {
+        ssaPane.setText("");
+    }
+
+    /** Writes the small-signal console to a file the user picks. */
+    private void saveSsaOutputActionPerformed(java.awt.event.ActionEvent evt) {
+        JFileChooser chooser = new JFileChooser(myTempDir);
+        chooser.setSelectedFile(new File(ssaBasename.getText().trim().isEmpty()
+                ? "ssa_output.txt" : ssaBasename.getText().trim() + "_output.txt"));
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        try (FileWriter out = new FileWriter(chooser.getSelectedFile())) {
+            out.write(ssaPane.getText());
+        } catch (IOException ex) {
+            banner.warn("The output could not be written to "
+                    + chooser.getSelectedFile().getAbsolutePath() + ":\n\n"
+                    + ex.getMessage());
+        }
     }
 
     /** A chooser and the path it fills, the path taking the width. */
@@ -927,6 +981,7 @@ public class StepssUI extends javax.swing.JFrame {
         simulationOutput.setFont(mono);
         pfcPane.setFont(mono);
         codegenPane.setFont(mono);
+        ssaPane.setFont(mono);
     }
 
     /**
@@ -4136,12 +4191,11 @@ public class StepssUI extends javax.swing.JFrame {
             fileDist.setText(dstFile.getName());
             ssaSettings = settingsFile.getName();
             ssa = true;
-            // The engine's output goes to the simulation output pane, which
-            // keeps what earlier runs wrote, so the analysis says where it
-            // starts. Without this an SSA run that produced nothing leaves a
-            // reason that reads as part of the previous run's tail.
-            if (outputstream != null) {
-                outputstream.message("--- small-signal stability analysis: "
+            // The console keeps what earlier analyses wrote, so each run says
+            // where it starts. Without this a run that produced nothing leaves
+            // a reason that reads as part of the previous run's tail.
+            if (outputstreamSSA != null) {
+                outputstreamSSA.message("--- small-signal stability analysis: "
                         + base + " ---");
             }
             try {
@@ -4174,7 +4228,7 @@ public class StepssUI extends javax.swing.JFrame {
                         + "$OMEGA_REF SYN, so the reason is elsewhere: usually a system\n"
                         + "with more states than $EIG_MAX_STATES allows, or one with no\n"
                         + "differential states at all. The engine says which, at the end\n"
-                        + "of the simulation output on the Dynamic Simulation tab.");
+                        + "of the output below.");
                 return;
             }
 
@@ -5059,7 +5113,13 @@ public class StepssUI extends javax.swing.JFrame {
         // until the engine exits: the sink marshals its appends with
         // invokeLater, so the pump threads never wait on the blocked thread,
         // and the queued text lands as soon as the handler returns.
-        PumpStreamHandler streamHandler = new PumpStreamHandler(outputstream, outputstreamErr);
+        // The same engine, on whichever tab asked for it. An analysis is
+        // launched through this method too, so the destination is chosen here
+        // rather than duplicating the launch: with `ssa` set the output
+        // belongs beside the button that started it, on the Analysis tab.
+        PumpStreamHandler streamHandler = ssa
+                ? new PumpStreamHandler(outputstreamSSA, outputstreamSSAErr)
+                : new PumpStreamHandler(outputstream, outputstreamErr);
         simulExecutor.setStreamHandler(streamHandler);
         simulExecutor.setWorkingDirectory(myTempDir);
         simulExecutor.setProcessDestroyer(processDestroyer);
@@ -6975,6 +7035,31 @@ public class StepssUI extends javax.swing.JFrame {
     private TextareaOutputStream outputstreamErr;
     private TextareaOutputStream outputstreamCGErr;
     private TextareaOutputStream outputstreamPFCErr;
+    private TextareaOutputStream outputstreamSSA;
+    private TextareaOutputStream outputstreamSSAErr;
+
+    /**
+     * The small-signal console, and the three controls around it.
+     *
+     * <p>Declared and built here rather than in the form, because the form is
+     * generated and these are not: the Analysis tab is laid out by
+     * {@link #layoutAnalysisTab()} by hand, so a component only that method
+     * uses has nothing to gain from being in the generated block and would be
+     * one more thing for a regeneration to drop.
+     *
+     * <p>Why the tab needs a console of its own. The analysis runs the engine,
+     * and the engine's output was going to the Dynamic Simulation pane: a
+     * refusal therefore appeared on a tab the user was not on, underneath an
+     * unrelated run's tail, and the "no results" dialog had to send them to
+     * another tab to read the reason. The engine is the same, so the plumbing
+     * is the same as the other three consoles; only the destination differs.
+     */
+    private final javax.swing.JTextArea ssaPane = new javax.swing.JTextArea();
+    private final javax.swing.JScrollPane ssaScrollPane =
+            new javax.swing.JScrollPane(ssaPane);
+    private final JButton clearSsaOutput = new JButton("Clear output");
+    private final JButton saveSsaOutput = new JButton("Save output...");
+    private final JLabel ssaOutputHeading = new JLabel("Engine output");
     private File[] codeGenFiles = null;
     private JFileChooser mfileChooser = new JFileChooser();
     // Variables declaration - do not modify//GEN-BEGIN:variables
