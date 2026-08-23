@@ -33,34 +33,32 @@ public final class ScenarioBinding {
     private final JTextField disturbanceField;
     private final JTextField observablesField;
     private final JTextField diagramField;
-    private final JCheckBox wizardBox;
     private final JComboBox<?>[] runtimeTypes;
     private final JTextField[] runtimeNames;
     private final JCheckBox trajectoryBox;
     private final JCheckBox continuousBox;
     private final JCheckBox discreteBox;
-    private final JCheckBox dumpBox;
+    private final JCheckBox initBox;
 
     /**
      * @param dataFields       the ten system data rows, in tab order
      * @param disturbanceField the disturbance path
      * @param observablesField the observables file path
      * @param diagramField     the one-line diagram template path
-     * @param wizardBox        Show observable dialog
      * @param runtimeTypes     the three runtime observable dropdowns
      * @param runtimeNames     the three runtime observable name fields
-     * @param trajectoryBox    Save initialization data / output.trj
+     * @param trajectoryBox    Save output trajectory
      * @param continuousBox    Save Continuous trace
      * @param discreteBox      Save Discrete trace
-     * @param dumpBox          Save dump trace
+     * @param initBox          Save initialization data
      * @throws IllegalArgumentException if an array is the wrong length or any
      *                                  control is null
      */
     public ScenarioBinding(JTextField[] dataFields, JTextField disturbanceField,
-            JTextField observablesField, JTextField diagramField, JCheckBox wizardBox,
+            JTextField observablesField, JTextField diagramField,
             JComboBox<?>[] runtimeTypes, JTextField[] runtimeNames,
             JCheckBox trajectoryBox, JCheckBox continuousBox,
-            JCheckBox discreteBox, JCheckBox dumpBox) {
+            JCheckBox discreteBox, JCheckBox initBox) {
         // Checked here rather than at the first save. A binding wired up short
         // by one field is a scenario that silently stops carrying a row, which
         // is the exact class of fault this replaces; failing at construction
@@ -71,22 +69,20 @@ public final class ScenarioBinding {
         requireNotNull(disturbanceField, "disturbance field");
         requireNotNull(observablesField, "observables field");
         requireNotNull(diagramField, "diagram field");
-        requireNotNull(wizardBox, "observable dialog checkbox");
         requireNotNull(trajectoryBox, "trajectory checkbox");
         requireNotNull(continuousBox, "continuous trace checkbox");
         requireNotNull(discreteBox, "discrete trace checkbox");
-        requireNotNull(dumpBox, "dump trace checkbox");
+        requireNotNull(initBox, "initialization trace checkbox");
         this.dataFields = dataFields.clone();
         this.disturbanceField = disturbanceField;
         this.observablesField = observablesField;
         this.diagramField = diagramField;
-        this.wizardBox = wizardBox;
         this.runtimeTypes = runtimeTypes.clone();
         this.runtimeNames = runtimeNames.clone();
         this.trajectoryBox = trajectoryBox;
         this.continuousBox = continuousBox;
         this.discreteBox = discreteBox;
-        this.dumpBox = dumpBox;
+        this.initBox = initBox;
     }
 
     /** What the form currently holds. */
@@ -98,7 +94,6 @@ public final class ScenarioBinding {
         scenario.setDisturbance(disturbanceField.getText());
         scenario.setObservablesFile(observablesField.getText());
         scenario.setDiagram(diagramField.getText());
-        scenario.setObservableWizard(wizardBox.isSelected());
         for (int row = 0; row < Scenario.RUNTIME_ROWS; row++) {
             Object selected = runtimeTypes[row].getSelectedItem();
             scenario.setRuntimeType(row, selected == null ? "" : String.valueOf(selected));
@@ -107,7 +102,7 @@ public final class ScenarioBinding {
         scenario.setSaveTrajectory(trajectoryBox.isSelected());
         scenario.setSaveContinuousTrace(continuousBox.isSelected());
         scenario.setSaveDiscreteTrace(discreteBox.isSelected());
-        scenario.setSaveDump(dumpBox.isSelected());
+        scenario.setSaveInit(initBox.isSelected());
         return scenario;
     }
 
@@ -125,7 +120,6 @@ public final class ScenarioBinding {
         disturbanceField.setText(scenario.disturbance());
         observablesField.setText(scenario.observablesFile());
         diagramField.setText(scenario.diagram());
-        wizardBox.setSelected(scenario.observableWizard());
         for (int row = 0; row < Scenario.RUNTIME_ROWS; row++) {
             selectType(row, scenario.runtimeType(row), problems);
             runtimeNames[row].setText(scenario.runtimeName(row));
@@ -133,7 +127,7 @@ public final class ScenarioBinding {
         trajectoryBox.setSelected(scenario.saveTrajectory());
         continuousBox.setSelected(scenario.saveContinuousTrace());
         discreteBox.setSelected(scenario.saveDiscreteTrace());
-        dumpBox.setSelected(scenario.saveDump());
+        initBox.setSelected(scenario.saveInit());
         return problems;
     }
 

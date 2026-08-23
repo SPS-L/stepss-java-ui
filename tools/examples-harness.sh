@@ -10,6 +10,12 @@
 #
 # dist/lib is NOT on the classpath: the examples package depends on nothing that
 # launches a process or references commons-exec types.
+#
+# java.io.tmpdir follows TMPDIR for the reason tools/scenario-harness.sh does it:
+# these checks extract each payload into a temporary directory, and a sandboxed
+# or containerised run can have /tmp read-only while TMPDIR points somewhere
+# writable. Without it they fail on their fixtures rather than on anything they
+# test.
 set -eu
 cd "$(dirname "$0")/.."
 if [ ! -d build/classes ]; then
@@ -20,4 +26,5 @@ if [ ! -d src/my/stepss/payload ]; then
     echo "src/my/stepss/payload not found - run 'ant stage-payloads' first." >&2
     exit 1
 fi
-exec java -cp "build/classes:src" my.stepss.examples.ExamplesHarness
+exec java -Djava.io.tmpdir="${TMPDIR:-/tmp}" -cp "build/classes:src" \
+    my.stepss.examples.ExamplesHarness

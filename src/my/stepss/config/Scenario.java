@@ -39,13 +39,12 @@ public final class Scenario {
     private String disturbance = "";
     private String observablesFile = "";
     private String diagram = "";
-    private boolean observableWizard;
     private final String[] runtimeType = blanks(RUNTIME_ROWS);
     private final String[] runtimeName = blanks(RUNTIME_ROWS);
     private boolean saveTrajectory;
     private boolean saveContinuousTrace;
     private boolean saveDiscreteTrace;
-    private boolean saveDump;
+    private boolean saveInit;
 
     private static String[] blanks(int length) {
         String[] values = new String[length];
@@ -106,16 +105,6 @@ public final class Scenario {
     /** @param value the diagram template path, null read as "" */
     public void setDiagram(String value) {
         this.diagram = text(value);
-    }
-
-    /** Whether the observable dialog builds the observables list. */
-    public boolean observableWizard() {
-        return observableWizard;
-    }
-
-    /** @param value whether the observable dialog is in use */
-    public void setObservableWizard(boolean value) {
-        this.observableWizard = value;
     }
 
     /**
@@ -191,14 +180,14 @@ public final class Scenario {
         this.saveDiscreteTrace = value;
     }
 
-    /** Whether the run writes dump.trace. */
-    public boolean saveDump() {
-        return saveDump;
+    /** Whether the run writes init.trace. */
+    public boolean saveInit() {
+        return saveInit;
     }
 
-    /** @param value whether the run writes dump.trace */
-    public void setSaveDump(boolean value) {
-        this.saveDump = value;
+    /** @param value whether the run writes init.trace */
+    public void setSaveInit(boolean value) {
+        this.saveInit = value;
     }
 
     /**

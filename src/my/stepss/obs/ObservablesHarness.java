@@ -270,7 +270,7 @@ public final class ObservablesHarness {
         wizard.trajectoryBox().setSelected(true);
         wizard.continuousBox().setSelected(true);
         wizard.discreteBox().setSelected(true);
-        wizard.dumpBox().setSelected(true);
+        wizard.initBox().setSelected(true);
 
         wizard.reset();
 
@@ -291,7 +291,7 @@ public final class ObservablesHarness {
         expect("trajectory box", false, wizard.trajectoryBox().isSelected());
         expect("continuous box", false, wizard.continuousBox().isSelected());
         expect("discrete box", false, wizard.discreteBox().isSelected());
-        expect("dump box", false, wizard.dumpBox().isSelected());
+        expect("initialization data box", false, wizard.initBox().isSelected());
         expect("empty after reset", true, wizard.isEmpty());
     }
 

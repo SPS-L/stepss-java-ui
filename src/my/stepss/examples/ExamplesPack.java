@@ -6,6 +6,9 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -16,6 +19,7 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
+import my.stepss.config.ScenarioFile;
 
 /**
  * Build-time step that turns one example repository's source archive into the
@@ -39,6 +43,14 @@ import java.util.zip.ZipOutputStream;
  * the build here, naming the file. That is the whole guard behind
  * refreshed-on-release: without it a bad upstream release becomes a menu entry
  * that opens onto missing slots on a user's machine.
+ *
+ * <p>Since the descriptor names a scenario file rather than a slot per file,
+ * there is a second half to that guard: the {@code .cfg} is read out of the
+ * archive and every path it names is checked against the retained set. Without
+ * it an entry could ship a scenario naming a data file that {@code .extra}
+ * forgot, and the example would open onto a slot pointing at nothing. The
+ * completeness check above cannot see that, because it only looks at names the
+ * descriptor already knows.
  */
 public final class ExamplesPack {
 
@@ -88,6 +100,19 @@ public final class ExamplesPack {
                 return;
             }
 
+            String unpacked = scenarioNamesOutside(zip, present, example);
+            if (unpacked != null) {
+                System.err.println("example '" + id + "' scenario check FAILED");
+                System.err.println("  " + example.cfg() + " names " + unpacked
+                        + ", which this example does not ship.");
+                System.err.println("Opening the example would fill a slot with a path"
+                        + " to a file that is not there. Add it to " + id + ".extra in"
+                        + " src/my/stepss/examples/examples.properties, or take it out"
+                        + " of the scenario file upstream and re-pin.");
+                System.exit(1);
+                return;
+            }
+
             String manifest = manifestOf(zip, present, sorted(retained));
             String digest = hex(sha256(manifest.getBytes("UTF-8")));
 
@@ -116,6 +141,33 @@ public final class ExamplesPack {
         } finally {
             zip.close();
         }
+    }
+
+    /**
+     * The first path the example's scenario file names that the payload will
+     * not carry, or null when every one of them is retained.
+     *
+     * <p>Compared against {@code retained()} rather than against the archive:
+     * a file can be present upstream and still not be packed, and it is being
+     * packed that decides whether the slot resolves on a user's machine.
+     */
+    private static String scenarioNamesOutside(ZipFile zip, Map<String, ZipEntry> present,
+            Example example) throws IOException {
+        List<String> retained = example.retained();
+        Reader in = new InputStreamReader(
+                zip.getInputStream(present.get(example.cfg())), StandardCharsets.UTF_8);
+        List<String> named;
+        try {
+            named = ScenarioFile.storedPaths(in);
+        } finally {
+            in.close();
+        }
+        for (String path : named) {
+            if (!retained.contains(path)) {
+                return path;
+            }
+        }
+        return null;
     }
 
     private static Example read(File descriptor, String id) throws IOException {

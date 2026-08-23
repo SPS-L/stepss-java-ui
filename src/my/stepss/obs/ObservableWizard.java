@@ -42,23 +42,23 @@ public final class ObservableWizard {
     private final JCheckBox trajectoryBox;
     private final JCheckBox continuousBox;
     private final JCheckBox discreteBox;
-    private final JCheckBox dumpBox;
+    private final JCheckBox initBox;
 
     /**
      * @param observablesFile the observables file path
      * @param runtimeTypes    the three runtime observable dropdowns
      * @param runtimeNames    the three runtime observable name fields
      * @param wizardBox       Show observable dialog
-     * @param trajectoryBox   Save initialization data
+     * @param trajectoryBox   Save output trajectory
      * @param continuousBox   Save Continuous trace
      * @param discreteBox     Save Discrete trace
-     * @param dumpBox         Save dump trace
+     * @param initBox         Save initialization data
      * @throws IllegalArgumentException if an array is the wrong length or any
      *                                  control is null
      */
     public ObservableWizard(JTextField observablesFile, JComboBox<?>[] runtimeTypes,
             JTextField[] runtimeNames, JCheckBox wizardBox, JCheckBox trajectoryBox,
-            JCheckBox continuousBox, JCheckBox discreteBox, JCheckBox dumpBox) {
+            JCheckBox continuousBox, JCheckBox discreteBox, JCheckBox initBox) {
         // Checked here rather than at the first reset, on the same reasoning as
         // ScenarioBinding: a wiring short by one control is a tab that quietly
         // stops clearing something, which is the exact fault this replaces.
@@ -77,7 +77,7 @@ public final class ObservableWizard {
         this.trajectoryBox = require(trajectoryBox, "trajectory checkbox");
         this.continuousBox = require(continuousBox, "continuous trace checkbox");
         this.discreteBox = require(discreteBox, "discrete trace checkbox");
-        this.dumpBox = require(dumpBox, "dump trace checkbox");
+        this.initBox = require(initBox, "initialization trace checkbox");
         for (int row = 0; row < RUNTIME_ROWS; row++) {
             require(this.runtimeTypes[row], "runtime observable type " + row);
             require(this.runtimeNames[row], "runtime observable name " + row);
@@ -154,8 +154,8 @@ public final class ObservableWizard {
         return discreteBox;
     }
 
-    public JCheckBox dumpBox() {
-        return dumpBox;
+    public JCheckBox initBox() {
+        return initBox;
     }
 
     /**
@@ -184,7 +184,7 @@ public final class ObservableWizard {
         trajectoryBox.setSelected(false);
         continuousBox.setSelected(false);
         discreteBox.setSelected(false);
-        dumpBox.setSelected(false);
+        initBox.setSelected(false);
     }
 
     /**

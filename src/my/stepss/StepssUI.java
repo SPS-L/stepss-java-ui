@@ -419,7 +419,7 @@ public class StepssUI extends javax.swing.JFrame {
         settings.add(heading(new JLabel("Recording to file"),
                 "what a run writes to disk", Docs.RECORDING_TO_FILE), span(row++));
         settings.add(leftRow(saveContTrace, saveDiscTrace, saveOutputTrajButton,
-                saveDumpButton), span(row++));
+                saveInitButton), span(row++));
 
         settings.add(heading(jLabel10, "the observables file",
                 Docs.OBSERVABLES_FILE_ROW), span(row++));
@@ -665,6 +665,12 @@ public class StepssUI extends javax.swing.JFrame {
      * without adding it here is how a scenario silently stops describing the
      * run it came from, and this call is the only thing to keep in step.
      *
+     * <p>{@code observFileWizButton} is the one control both writers read that
+     * is deliberately absent. It selects between the observables file and the
+     * list built in the picker, and the picked list itself is session state no
+     * {@code .cfg} carries, so saving the tick alone restored a choice whose
+     * other half was gone. Do not add it back without the eight picker lists.
+     *
      * <p>Runs before {@code applyModernChrome()} and would work just as well
      * after it. That is the point.
      */
@@ -672,10 +678,10 @@ public class StepssUI extends javax.swing.JFrame {
         return new ScenarioBinding(
                 new JTextField[]{fileData1, fileData2, fileData3, fileData4, fileData5,
                     fileData6, fileData7, fileData8, fileData9, fileData10},
-                fileDist, fileObs, fileDiagram, observFileWizButton,
+                fileDist, fileObs, fileDiagram,
                 new JComboBox<?>[]{runtimeObsType, runtimeObsType1, runtimeObsType2},
                 new JTextField[]{runtimeObsName, runtimeObsName1, runtimeObsName2},
-                saveOutputTrajButton, saveContTrace, saveDiscTrace, saveDumpButton);
+                saveOutputTrajButton, saveContTrace, saveDiscTrace, saveInitButton);
     }
 
     /**
@@ -688,7 +694,7 @@ public class StepssUI extends javax.swing.JFrame {
                 new JComboBox<?>[]{runtimeObsType, runtimeObsType1, runtimeObsType2},
                 new JTextField[]{runtimeObsName, runtimeObsName1, runtimeObsName2},
                 observFileWizButton, saveOutputTrajButton, saveContTrace,
-                saveDiscTrace, saveDumpButton);
+                saveDiscTrace, saveInitButton);
         for (ObservableCategory category : wizard.categories()) {
             category.install(banner::warn);
         }
@@ -774,7 +780,7 @@ public class StepssUI extends javax.swing.JFrame {
                 .add(loadOutput)
                 .add(loadContTrace)
                 .add(loadDiscTrace)
-                .add(loadDumpTraceButton)
+                .add(loadInitTraceButton)
                 .add(saveSimulOutput)
                 .toTheEnd()
                 .add(searchTextField)
@@ -1186,7 +1192,7 @@ public class StepssUI extends javax.swing.JFrame {
         loadObsButton = new javax.swing.JButton();
         fileObs = new javax.swing.JTextField();
         jLabel10 = new javax.swing.JLabel();
-        saveDumpButton = new javax.swing.JCheckBox();
+        saveInitButton = new javax.swing.JCheckBox();
         observFileWizButton = new javax.swing.JCheckBox();
         jPanel7 = new javax.swing.JPanel();
         runtimeObsType = new javax.swing.JComboBox();
@@ -1220,7 +1226,7 @@ public class StepssUI extends javax.swing.JFrame {
         loadContTrace = new javax.swing.JButton();
         loadDiscTrace = new javax.swing.JButton();
         clearSimulOutput = new javax.swing.JButton();
-        loadDumpTraceButton = new javax.swing.JButton();
+        loadInitTraceButton = new javax.swing.JButton();
         stopSimulationButton = new javax.swing.JButton();
         searchTextField = new javax.swing.JTextField();
         jPanel8 = new javax.swing.JPanel();
@@ -1827,9 +1833,9 @@ public class StepssUI extends javax.swing.JFrame {
         jLabel10.setText("<html><b>Observables file</b> (required when a trajectory is saved)</html>");
         jLabel10.setName("jLabel10"); // NOI18N
 
-        saveDumpButton.setText("Save initialization data");
-        saveDumpButton.setToolTipText("<html>Activate to write the settings, the comments and the initialization data to dump.trace. <br>\nUseful for debugging reasons.</html>");
-        saveDumpButton.setName("saveDumpButton"); // NOI18N
+        saveInitButton.setText("Save initialization data");
+        saveInitButton.setToolTipText("<html>Activate to write the settings, the comments and the initialization data to init.trace. <br>\nUseful for debugging reasons.</html>");
+        saveInitButton.setName("saveInitButton"); // NOI18N
 
         observFileWizButton.setText("Show observable dialog");
         observFileWizButton.setToolTipText("Builds an observables file by picking equipment from the case, instead of writing one by hand.");
@@ -1923,7 +1929,7 @@ public class StepssUI extends javax.swing.JFrame {
                             .addGroup(jPanel4Layout.createSequentialGroup()
                                 .addComponent(saveOutputTrajButton)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(saveDumpButton))
+                                .addComponent(saveInitButton))
                             .addComponent(observFileWizButton)
                             .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, 988, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addComponent(clearObsFileButton))
@@ -1952,7 +1958,7 @@ public class StepssUI extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(saveOutputTrajButton)
-                    .addComponent(saveDumpButton))
+                    .addComponent(saveInitButton))
                 .addGap(9, 9, 9)
                 .addComponent(jLabel10, javax.swing.GroupLayout.PREFERRED_SIZE, 23, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(2, 2, 2)
@@ -2188,13 +2194,13 @@ public class StepssUI extends javax.swing.JFrame {
             }
         });
 
-        loadDumpTraceButton.setText("Load initialization");
-        loadDumpTraceButton.setToolTipText("<html>Click to see the initialization data of the simulation.<br>\nThis involves a detailed view of the initial state of the simulation.</html>");
-        loadDumpTraceButton.setEnabled(false);
-        loadDumpTraceButton.setName("loadDumpTraceButton"); // NOI18N
-        loadDumpTraceButton.addActionListener(new java.awt.event.ActionListener() {
+        loadInitTraceButton.setText("Load initialization");
+        loadInitTraceButton.setToolTipText("<html>Click to see the initialization data of the simulation.<br>\nThis involves a detailed view of the initial state of the simulation.</html>");
+        loadInitTraceButton.setEnabled(false);
+        loadInitTraceButton.setName("loadInitTraceButton"); // NOI18N
+        loadInitTraceButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                loadDumpTraceButtonActionPerformed(evt);
+                loadInitTraceButtonActionPerformed(evt);
             }
         });
 
@@ -2244,7 +2250,7 @@ public class StepssUI extends javax.swing.JFrame {
                     .addGroup(jPanel5Layout.createSequentialGroup()
                         .addComponent(loadDiscTrace)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(loadDumpTraceButton)))
+                        .addComponent(loadInitTraceButton)))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                     .addComponent(searchTextField)
@@ -2274,7 +2280,7 @@ public class StepssUI extends javax.swing.JFrame {
                         .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(loadContTrace)
                             .addComponent(loadDiscTrace)
-                            .addComponent(loadDumpTraceButton))))
+                            .addComponent(loadInitTraceButton))))
                 .addContainerGap())
         );
 
@@ -2790,8 +2796,8 @@ public class StepssUI extends javax.swing.JFrame {
 
             out.newLine();
 
-            if (saveDumpButton.isSelected() && !ssa) {
-                out.append("dump.trace");
+            if (saveInitButton.isSelected() && !ssa) {
+                out.append("init.trace");
                 out.newLine();
             } else {
                 out.newLine();
@@ -3300,18 +3306,14 @@ public class StepssUI extends javax.swing.JFrame {
         }
         java.util.List<String> problems = new ArrayList<>(loaded.problems());
         problems.addAll(scenarioBinding.apply(loaded.scenario()));
-        // Set directly rather than through observFileWizButtonActionPerformed,
-        // which also flips saveOutputTrajButton and would overwrite the value
-        // just restored from the file.
-        jPanel7.setVisible(observFileWizButton.isSelected());
-        // The observable dialog's eight picker lists are session state, not part
-        // of the scenario, so a case saved with the dialog in use comes back
-        // with it ticked over eight empty lists. Left unsaid, the next run would
-        // write a customObs.txt of blank lines and plot nothing.
-        if (observFileWizButton.isSelected() && noObservablesPicked()) {
-            problems.add("Show observable dialog is on, but no observables are"
-                    + " selected. Add them on the Observables tab before running.");
-        }
+        // Show observable dialog is deliberately not touched here, because it is
+        // no longer in the file. It used to be, and restoring it was never worth
+        // what it cost: the dialog's eight picker lists are session state that
+        // no .cfg has ever carried, so a case saved with the dialog in use came
+        // back ticked over eight empty lists, and the load had to add a warning
+        // saying so or the next run would write a customObs.txt of blank lines
+        // and plot nothing. A tick the user set themselves, over lists they can
+        // see, is the honest state to leave the tab in.
         if (problems.isEmpty()) {
             banner.confirm(file.getName() + " loaded.");
             return;
@@ -3340,11 +3342,6 @@ public class StepssUI extends javax.swing.JFrame {
             text += "\n\nand " + (problems.size() - shown) + " more.";
         }
         return text;
-    }
-
-    /** True when the observable dialog would contribute nothing to a run. */
-    private boolean noObservablesPicked() {
-        return observables.isEmpty();
     }
 
     private void openExamplesMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openExamplesMenuItemActionPerformed
@@ -3495,45 +3492,53 @@ public class StepssUI extends javax.swing.JFrame {
     }
 
     /**
-     * Fills the case from where the example's files actually landed, and makes
-     * its directory the working directory.
+     * Loads the example's own scenario file and makes its directory the
+     * working directory.
      *
-     * <p>The configuration is GENERATED here, never read from the {@code
-     * sim.cfg} each example repository ships. Those are pre-rewrite files of
-     * absolute paths from whoever last saved them
-     * ({@code fileData1=C:\Users\tvanc\...}), so loading one would fill this
-     * form with someone else's paths on every platform. The descriptor records
-     * which filename belongs in which slot, and the path comes from the
-     * extraction.
+     * <p>Through {@link my.stepss.config.ScenarioFile}, exactly as File &gt;
+     * Load configuration reads any other {@code .cfg}. This method used to
+     * GENERATE the configuration instead, filling each slot from a filename in
+     * the descriptor, because the {@code sim.cfg} the example repositories
+     * shipped were pre-rewrite files of absolute paths from whoever last saved
+     * them ({@code fileData1=C:\Users\tvanc\...}) and named nothing on a
+     * user's machine.
      *
-     * <p>{@link my.stepss.config.ScenarioFile} now refuses those files outright
-     * rather than leaving it to this method to know better, so the reasoning
-     * above is enforced on the Load configuration path too. Regenerating them
-     * in the current format would not change anything here: the paths would
-     * still be whoever's machine packed the example, and the descriptor would
-     * still be the better source.
+     * <p>What changed is upstream, not here: each example now ships a scenario
+     * file in the current format, whose paths are stored relative to its own
+     * folder and resolved against wherever that folder was extracted. That is
+     * the property {@link my.stepss.config.ScenarioPaths} exists for, and it
+     * makes generating a second answer to a question the shipped file already
+     * answers. One consequence is worth stating: an example that opens wrong is
+     * now a scenario file that is wrong, in the repository that owns the case,
+     * where it can be fixed once for the Python interface and the GUI alike.
+     *
+     * <p>Problems are reported rather than fatal, the same way a hand-loaded
+     * configuration reports them. A payload cannot normally produce any -
+     * {@code ExamplesPack} refuses at build time to ship a scenario naming a
+     * file the payload does not carry - but a Reuse-my-copy open reads whatever
+     * the user has since done to their own copy.
      */
     private void applyExample(Example example, File dir, File root) {
-        JTextField[] slots = {fileData1, fileData2, fileData3, fileData4, fileData5,
-            fileData6, fileData7, fileData8, fileData9, fileData10};
-        for (int i = 0; i < slots.length; i++) {
-            slots[i].setText(i < example.data().size()
-                    ? new File(dir, example.data().get(i)).getAbsolutePath()
-                    : "");
+        File cfg = new File(dir, example.cfg());
+        ScenarioFile.Loaded loaded;
+        try {
+            loaded = ScenarioFile.load(cfg);
+        } catch (IOException ex) {
+            Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this,
+                    "Could not read the scenario file for " + example.name() + ":\n\n"
+                    + ex.getMessage(),
+                    "Example not opened", JOptionPane.ERROR_MESSAGE);
+            return;
         }
-        // An empty slot is left empty rather than resolved. new File(dir, "")
-        // is the example DIRECTORY, so the unconditional form put a directory
-        // path into the disturbance field of a power-flow-only case and made it
-        // look like a file had been loaded.
-        fileDist.setText(slotPath(dir, example.dist()));
-        fileObs.setText(slotPath(dir, example.obs()));
-        fileDiagram.setText(slotPath(dir, example.diagram()));
-        // What loadObsButton does once a file is chosen: an observables file
-        // with the trajectory output switched off produces nothing to plot.
-        // Only when there is one: ticking it for a case with nothing to observe
-        // sets a switch that cannot do anything.
-        if (!example.obs().isEmpty()) {
-            saveOutputTrajButton.setSelected(true);
+        java.util.List<String> problems = new ArrayList<>(loaded.problems());
+        problems.addAll(scenarioBinding.apply(loaded.scenario()));
+        if (!problems.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    example.name() + " was opened, with " + problems.size()
+                    + (problems.size() == 1 ? " problem:\n\n" : " problems:\n\n")
+                    + listed(problems),
+                    "Example opened", JOptionPane.WARNING_MESSAGE);
         }
 
         // Held so the next example in this session lands beside this one
@@ -3563,11 +3568,6 @@ public class StepssUI extends javax.swing.JFrame {
                                 .log(Level.SEVERE, null, ex);
                     }
                 });
-    }
-
-    /** An example's file, resolved against its directory, or "" for an unfilled slot. */
-    private static String slotPath(File dir, String name) {
-        return name.isEmpty() ? "" : new File(dir, name).getAbsolutePath();
     }
 
     /**
@@ -4748,7 +4748,7 @@ public class StepssUI extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_stopSimulationButtonActionPerformed
 
-    private void loadDumpTraceButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadDumpTraceButtonActionPerformed
+    private void loadInitTraceButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadInitTraceButtonActionPerformed
         try {
             if (!savedOutputBool) {
                 FileWriter outwriter;
@@ -4758,25 +4758,25 @@ public class StepssUI extends javax.swing.JFrame {
                 savedOutputBool = true;
             }
             simulationOutput.setText("");
-            BufferedReader dumpTraceFileBufReader;
-            dumpTraceFileBufReader = new BufferedReader(new FileReader(new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "dump.trace")));
+            BufferedReader initTraceFileBufReader;
+            initTraceFileBufReader = new BufferedReader(new FileReader(new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + "init.trace")));
             String line;
-            while ((line = dumpTraceFileBufReader.readLine()) != null) {
+            while ((line = initTraceFileBufReader.readLine()) != null) {
                 simulationOutput.append(line);
                 simulationOutput.append("\n");
             }
-            dumpTraceFileBufReader.close();
+            initTraceFileBufReader.close();
         } catch (IOException ex) {
             Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
         }
-    }//GEN-LAST:event_loadDumpTraceButtonActionPerformed
+    }//GEN-LAST:event_loadInitTraceButtonActionPerformed
 
     private void clearSimulOutputActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearSimulOutputActionPerformed
         simulationOutput.setText("");
         loadContTrace.setEnabled(false);
         loadDiscTrace.setEnabled(false);
         loadOutput.setEnabled(false);
-        loadDumpTraceButton.setEnabled(false);
+        loadInitTraceButton.setEnabled(false);
         clearSimulOutput.setEnabled(false);
         saveSimulOutput.setEnabled(false);
         stopSimulationButton.setEnabled(false);
@@ -4786,7 +4786,7 @@ public class StepssUI extends javax.swing.JFrame {
         filesToDelete.add("cont.trace");
         filesToDelete.add("disc.trace");
         filesToDelete.add("output.trace");
-        filesToDelete.add("dump.trace");
+        filesToDelete.add("init.trace");
         filesToDelete.add(".lock_RAMSES");
         File toDelete;
         for (String fileName : filesToDelete) {
@@ -4997,10 +4997,10 @@ public class StepssUI extends javax.swing.JFrame {
         saveSimulOutput.setEnabled(true);
         stopSimulationButton.setEnabled(true);
         savedOutputBool = false;
-        if (saveDumpButton.isSelected()) {
-            loadDumpTraceButton.setEnabled(true);
+        if (saveInitButton.isSelected()) {
+            loadInitTraceButton.setEnabled(true);
         } else {
-            loadDumpTraceButton.setEnabled(false);
+            loadInitTraceButton.setEnabled(false);
         }
         my.stepss.curves.LiveCurveWindow opened = null;
         // One window per run. Opened whenever the engine was asked for
@@ -6965,7 +6965,7 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JButton loadData9;
     private javax.swing.JButton loadDiscTrace;
     private javax.swing.JButton loadDist;
-    private javax.swing.JButton loadDumpTraceButton;
+    private javax.swing.JButton loadInitTraceButton;
     private javax.swing.JButton loadDynJac;
     private javax.swing.JMenuItem loadExtSimButton;
     private javax.swing.JButton loadFlows;
@@ -7007,7 +7007,7 @@ public class StepssUI extends javax.swing.JFrame {
     private javax.swing.JMenuItem saveConfigMenuItem;
     private javax.swing.JCheckBox saveContTrace;
     private javax.swing.JCheckBox saveDiscTrace;
-    private javax.swing.JCheckBox saveDumpButton;
+    private javax.swing.JCheckBox saveInitButton;
     private javax.swing.JCheckBox saveOutputTrajButton;
     private javax.swing.JButton saveDynJac;
     private javax.swing.JButton savePFSolution;

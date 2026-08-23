@@ -92,6 +92,7 @@ public final class ScenarioHarness {
         checkJunkBooleanIsReported();
         checkUnknownObservableTypeIsReported();
         checkUnknownKeyIsReported();
+        checkRetiredKeysAreReported();
         checkMissingFilesAreReported();
         checkIsEmpty();
         checkBindingRejectsAShortWiring();
@@ -113,7 +114,6 @@ public final class ScenarioHarness {
         }
         form.disturbance.setText(touch(dir, "disturb.dst"));
         form.observables.setText(touch(dir, "obs.dat"));
-        form.wizard.setSelected(true);
         form.types[0].setSelectedItem("Machine Speed");
         form.types[1].setSelectedItem("Wall Time");
         form.types[2].setSelectedItem("Injector Observable");
@@ -123,7 +123,7 @@ public final class ScenarioHarness {
         form.trajectory.setSelected(true);
         form.continuous.setSelected(false);
         form.discrete.setSelected(true);
-        form.dump.setSelected(true);
+        form.init.setSelected(true);
 
         Scenario saved = form.binding.read();
         File cfg = temp(dir, "case.cfg");
@@ -148,7 +148,6 @@ public final class ScenarioHarness {
                 new File(dir, "disturb.dst").getAbsolutePath(), form.disturbance.getText());
         expect("the observables file came back",
                 new File(dir, "obs.dat").getAbsolutePath(), form.observables.getText());
-        expect("the observable dialog came back", true, form.wizard.isSelected());
         expect("runtime type 1 came back", "Machine Speed", form.types[0].getSelectedItem());
         expect("runtime type 2 came back", "Wall Time", form.types[1].getSelectedItem());
         expect("runtime type 3 came back", "Injector Observable", form.types[2].getSelectedItem());
@@ -158,7 +157,7 @@ public final class ScenarioHarness {
         expect("save trajectory came back", true, form.trajectory.isSelected());
         expect("save continuous trace came back", false, form.continuous.isSelected());
         expect("save discrete trace came back", true, form.discrete.isSelected());
-        expect("save dump came back", true, form.dump.isSelected());
+        expect("save initialization data came back", true, form.init.isSelected());
     }
 
     /**
@@ -357,7 +356,7 @@ public final class ScenarioHarness {
         expect("a file of missing keys reports nothing", "[]", loaded.problems().toString());
         expect("and applies cleanly", "[]", problems.toString());
         expect("an absent data row loads blank", "", form.data[0].getText());
-        expect("an absent checkbox loads cleared", false, form.dump.isSelected());
+        expect("an absent checkbox loads cleared", false, form.init.isSelected());
         expect("an absent type leaves the dropdown alone", "Latency",
                 form.types[0].getSelectedItem());
     }
@@ -365,11 +364,11 @@ public final class ScenarioHarness {
     private static void checkJunkBooleanIsReported() throws IOException {
         File dir = tempDir("junkbool");
         File cfg = temp(dir, "junk.cfg");
-        write(cfg, "stepss.format = 1", "record.dump = yes please");
+        write(cfg, "stepss.format = 1", "record.init = yes please");
 
         ScenarioFile.Loaded loaded = ScenarioFile.load(cfg);
-        expect("a junk boolean is read as false", false, loaded.scenario().saveDump());
-        expectMentions("a junk boolean is reported", loaded.problems(), "record.dump");
+        expect("a junk boolean is read as false", false, loaded.scenario().saveInit());
+        expectMentions("a junk boolean is reported", loaded.problems(), "record.init");
     }
 
     private static void checkUnknownObservableTypeIsReported() throws IOException {
@@ -389,11 +388,36 @@ public final class ScenarioHarness {
     private static void checkUnknownKeyIsReported() throws IOException {
         File dir = tempDir("unknownkey");
         File cfg = temp(dir, "typo.cfg");
-        write(cfg, "stepss.format = 1", "data.11 = eleventh.dat", "record.dumps = true");
+        write(cfg, "stepss.format = 1", "data.11 = eleventh.dat", "record.inits = true");
 
         List<String> problems = ScenarioFile.load(cfg).problems();
         expectMentions("a key past the last row is reported", problems, "data.11");
-        expectMentions("a misspelled key is reported", problems, "record.dumps");
+        expectMentions("a misspelled key is reported", problems, "record.inits");
+    }
+
+    /**
+     * The two names a file saved by an older STEPSS carries.
+     *
+     * <p>{@code record.dump} was renamed {@code record.init} and
+     * {@code observables.wizard} was dropped, both without a format bump and
+     * both without a compatibility read. That choice is only defensible while
+     * the user is told, so the sentence they get is what this pins: the file
+     * still loads, every other key still applies, and the initialisation tick
+     * comes back cleared rather than silently carrying the old value.
+     */
+    private static void checkRetiredKeysAreReported() throws IOException {
+        File dir = tempDir("retired");
+        File cfg = temp(dir, "old.cfg");
+        write(cfg, "stepss.format = 1", "data.1 = " + ScenarioFile.escape(touch(dir, "lf.dat")),
+                "observables.wizard = true", "record.dump = true");
+
+        ScenarioFile.Loaded loaded = ScenarioFile.load(cfg);
+        expectMentions("the renamed key is reported", loaded.problems(), "record.dump");
+        expectMentions("the dropped key is reported", loaded.problems(),
+                "observables.wizard");
+        expect("the retired keys do not carry over", false, loaded.scenario().saveInit());
+        expect("and the rest of the file still loads",
+                new File(dir, "lf.dat").getAbsolutePath(), loaded.scenario().data(0));
     }
 
     private static void checkMissingFilesAreReported() throws IOException {
@@ -413,7 +437,7 @@ public final class ScenarioHarness {
     private static void checkIsEmpty() {
         Scenario scenario = new Scenario();
         expect("a fresh scenario is empty", true, scenario.isEmpty());
-        scenario.setSaveDump(true);
+        scenario.setSaveInit(true);
         scenario.setRuntimeName(0, "g1");
         expect("settings alone do not make it a scenario", true, scenario.isEmpty());
         scenario.setData(9, "lf.dat");
@@ -424,9 +448,9 @@ public final class ScenarioHarness {
         Form form = new Form();
         try {
             new ScenarioBinding(Arrays.copyOf(form.data, Scenario.DATA_SLOTS - 1),
-                    form.disturbance, form.observables, form.diagram, form.wizard,
+                    form.disturbance, form.observables, form.diagram,
                     form.types, form.names, form.trajectory, form.continuous,
-                    form.discrete, form.dump);
+                    form.discrete, form.init);
             fail("a binding wired one field short is refused: no exception");
         } catch (IllegalArgumentException expected) {
             expect("a binding wired one field short is refused", true,
@@ -447,13 +471,12 @@ public final class ScenarioHarness {
         private final JTextField disturbance = new JTextField();
         private final JTextField observables = new JTextField();
         private final JTextField diagram = new JTextField();
-        private final JCheckBox wizard = new JCheckBox();
         private final JComboBox<?>[] types = new JComboBox<?>[Scenario.RUNTIME_ROWS];
         private final JTextField[] names = new JTextField[Scenario.RUNTIME_ROWS];
         private final JCheckBox trajectory = new JCheckBox();
         private final JCheckBox continuous = new JCheckBox();
         private final JCheckBox discrete = new JCheckBox();
-        private final JCheckBox dump = new JCheckBox();
+        private final JCheckBox init = new JCheckBox();
         private final ScenarioBinding binding;
 
         Form() {
@@ -467,12 +490,12 @@ public final class ScenarioHarness {
                 names[row] = new JTextField();
                 content.add(row(types[row], names[row]));
             }
-            content.add(row(disturbance, observables, diagram, wizard));
-            content.add(row(trajectory, continuous, discrete, dump));
+            content.add(row(disturbance, observables, diagram));
+            content.add(row(trajectory, continuous, discrete, init));
             // The third level, and the one that broke the old walk.
             new JScrollPane(content);
             binding = new ScenarioBinding(data, disturbance, observables, diagram,
-                    wizard, types, names, trajectory, continuous, discrete, dump);
+                    types, names, trajectory, continuous, discrete, init);
         }
 
         private static JPanel row(java.awt.Component... controls) {
@@ -490,7 +513,6 @@ public final class ScenarioHarness {
             disturbance.setText("");
             observables.setText("");
             diagram.setText("");
-            wizard.setSelected(false);
             for (int row = 0; row < Scenario.RUNTIME_ROWS; row++) {
                 types[row].setSelectedIndex(0);
                 names[row].setText("");
@@ -498,7 +520,7 @@ public final class ScenarioHarness {
             trajectory.setSelected(false);
             continuous.setSelected(false);
             discrete.setSelected(false);
-            dump.setSelected(false);
+            init.setSelected(false);
         }
     }
 

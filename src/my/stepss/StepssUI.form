@@ -981,7 +981,7 @@
                                       <Group type="102" alignment="0" attributes="0">
                                           <Component id="saveOutputTrajButton" min="-2" max="-2" attributes="0"/>
                                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                                          <Component id="saveDumpButton" min="-2" max="-2" attributes="0"/>
+                                          <Component id="saveInitButton" min="-2" max="-2" attributes="0"/>
                                       </Group>
                                       <Component id="observFileWizButton" alignment="0" min="-2" max="-2" attributes="0"/>
                                       <Component id="jPanel7" alignment="0" min="-2" pref="988" max="-2" attributes="0"/>
@@ -1020,7 +1020,7 @@
                           <EmptySpace type="unrelated" min="-2" max="-2" attributes="0"/>
                           <Group type="103" groupAlignment="3" attributes="0">
                               <Component id="saveOutputTrajButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                              <Component id="saveDumpButton" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="saveInitButton" alignment="3" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace min="-2" pref="9" max="-2" attributes="0"/>
                           <Component id="jLabel10" min="-2" pref="23" max="-2" attributes="0"/>
@@ -1084,11 +1084,11 @@
                     <Property name="name" type="java.lang.String" value="jLabel10" noResource="true"/>
                   </Properties>
                 </Component>
-                <Component class="javax.swing.JCheckBox" name="saveDumpButton">
+                <Component class="javax.swing.JCheckBox" name="saveInitButton">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Save initialization data"/>
-                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Activate to write the settings, the comments and the initialization data to dump.trace. &lt;br&gt;&#xa;Useful for debugging reasons.&lt;/html&gt;"/>
-                    <Property name="name" type="java.lang.String" value="saveDumpButton" noResource="true"/>
+                    <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Activate to write the settings, the comments and the initialization data to init.trace. &lt;br&gt;&#xa;Useful for debugging reasons.&lt;/html&gt;"/>
+                    <Property name="name" type="java.lang.String" value="saveInitButton" noResource="true"/>
                   </Properties>
                 </Component>
                 <Component class="javax.swing.JCheckBox" name="observFileWizButton">
@@ -1398,7 +1398,7 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="loadDiscTrace" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="loadDumpTraceButton" min="-2" max="-2" attributes="0"/>
+                                  <Component id="loadInitTraceButton" min="-2" max="-2" attributes="0"/>
                               </Group>
                           </Group>
                           <EmptySpace type="unrelated" max="-2" attributes="0"/>
@@ -1437,7 +1437,7 @@
                                   <Group type="103" groupAlignment="3" attributes="0">
                                       <Component id="loadContTrace" alignment="3" min="-2" max="-2" attributes="0"/>
                                       <Component id="loadDiscTrace" alignment="3" min="-2" max="-2" attributes="0"/>
-                                      <Component id="loadDumpTraceButton" alignment="3" min="-2" max="-2" attributes="0"/>
+                                      <Component id="loadInitTraceButton" alignment="3" min="-2" max="-2" attributes="0"/>
                                   </Group>
                               </Group>
                           </Group>
@@ -1532,15 +1532,15 @@
                     <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="clearSimulOutputActionPerformed"/>
                   </Events>
                 </Component>
-                <Component class="javax.swing.JButton" name="loadDumpTraceButton">
+                <Component class="javax.swing.JButton" name="loadInitTraceButton">
                   <Properties>
                     <Property name="text" type="java.lang.String" value="Load initialization"/>
                     <Property name="toolTipText" type="java.lang.String" value="&lt;html&gt;Click to see the initialization data of the simulation.&lt;br&gt;&#xa;This involves a detailed view of the initial state of the simulation.&lt;/html&gt;"/>
                     <Property name="enabled" type="boolean" value="false"/>
-                    <Property name="name" type="java.lang.String" value="loadDumpTraceButton" noResource="true"/>
+                    <Property name="name" type="java.lang.String" value="loadInitTraceButton" noResource="true"/>
                   </Properties>
                   <Events>
-                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loadDumpTraceButtonActionPerformed"/>
+                    <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loadInitTraceButtonActionPerformed"/>
                   </Events>
                 </Component>
                 <Component class="javax.swing.JButton" name="stopSimulationButton">

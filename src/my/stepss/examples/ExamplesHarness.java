@@ -67,10 +67,8 @@ public final class ExamplesHarness {
         for (Example example : examples) {
             check("id '" + example.id() + "' is unique", ids.add(example.id()));
             check("dir '" + example.dir() + "' is unique", dirs.add(example.dir()));
-            check(example.id() + " names at least one data file",
-                    !example.data().isEmpty());
-            check(example.id() + " fits the ten data slots",
-                    example.data().size() <= 10);
+            check(example.id() + " names a .cfg",
+                    example.cfg().endsWith(".cfg"));
             check(example.id() + " has a documentation URL",
                     example.docs().startsWith("https://"));
             // The extraction directory is joined onto the examples root, so a
@@ -81,10 +79,8 @@ public final class ExamplesHarness {
                             && !example.dir().equals(".") && !example.dir().equals(".."));
             check(example.id() + " retains its LICENSE",
                     example.retained().contains("LICENSE"));
-            check(example.id() + " names both a disturbance and observables, or neither",
-                    example.dist().isEmpty() == example.obs().isEmpty());
-            check(example.id() + " names an .svg in its diagram slot",
-                    example.diagram().isEmpty() || example.diagram().endsWith(".svg"));
+            check(example.id() + " retains its scenario file",
+                    example.retained().contains(example.cfg()));
         }
     }
 
@@ -96,50 +92,58 @@ public final class ExamplesHarness {
             + "pfonly.summary=A case with no dynamic data.\n"
             + "pfonly.docs=https://example.invalid/pfonly\n"
             + "pfonly.dir=pf-only\n"
-            + "pfonly.data=case.dat\n"
-            + "pfonly.svg=case.svg\n"
-            + "pfonly.extra=README.md, LICENSE\n";
+            + "pfonly.cfg=case.cfg\n"
+            + "pfonly.extra=case.dat, case.svg, README.md, LICENSE\n";
 
     /**
-     * An entry naming no disturbance and no observables parses, and does not
-     * carry an empty path into its retained set.
+     * A minimal entry parses, and its scenario file is retained without being
+     * repeated.
      *
-     * <p>The empty path is the failure that matters. {@code retained()} feeds
-     * {@code ExamplesPack}, which looks up each name in the upstream archive,
-     * so an empty string there fails the build with a message naming no file.
+     * <p>{@code retained()} feeds {@code ExamplesPack}, which looks up each
+     * name in the upstream archive, so a blank or duplicated entry there fails
+     * the build with a message naming no file or digests differently from the
+     * same content declared once.
      */
     private static void checkOptionalSlotsParse() throws IOException {
         List<Example> examples = ExampleCatalog.load(
                 new ByteArrayInputStream(PF_ONLY_DESCRIPTOR.getBytes("UTF-8")));
         check("a power-flow-only entry parses", examples.size() == 1);
         Example only = examples.get(0);
-        check("its disturbance slot is empty", only.dist().isEmpty());
-        check("its observables slot is empty", only.obs().isEmpty());
-        check("its diagram slot is read", "case.svg".equals(only.diagram()));
+        check("its scenario file is read", "case.cfg".equals(only.cfg()));
         check("nothing retained is blank", !only.retained().contains(""));
-        check("the diagram is retained", only.retained().contains("case.svg"));
+        check("the scenario file is retained", only.retained().contains("case.cfg"));
         check("retained holds exactly the named files, once each",
-                only.retained().size() == 4);
+                only.retained().size() == 5);
+
+        String repeated = PF_ONLY_DESCRIPTOR.replace(
+                "pfonly.extra=case.dat", "pfonly.extra=case.cfg, case.dat");
+        Example twice = ExampleCatalog.load(
+                new ByteArrayInputStream(repeated.getBytes("UTF-8"))).get(0);
+        check("a scenario file named twice is retained once",
+                twice.retained().size() == 5);
     }
 
-    /** A data file is still required, because an example without one is not one. */
+    /** A scenario file is still required, because an example without one is not one. */
     private static void checkDataIsStillRequired() {
-        String descriptor = PF_ONLY_DESCRIPTOR.replace("pfonly.data=case.dat\n", "");
+        String descriptor = PF_ONLY_DESCRIPTOR.replace("pfonly.cfg=case.cfg\n", "");
         try {
             ExampleCatalog.load(new ByteArrayInputStream(descriptor.getBytes("UTF-8")));
-            check("a descriptor with no data file is refused", false);
+            check("a descriptor with no scenario file is refused", false);
         } catch (IOException expected) {
-            check("a descriptor with no data file is refused",
-                    expected.getMessage().contains("pfonly.data"));
+            check("a descriptor with no scenario file is refused",
+                    expected.getMessage().contains("pfonly.cfg"));
         }
     }
 
     /**
      * The payload is in the jar, extracts, and leaves every named file behind.
      *
-     * <p>The slot files are checked for content as well as existence: a zero
-     * byte {@code .dat} would satisfy the build's completeness check and then
-     * fail in the engine.
+     * <p>Every file the scenario names is checked for content as well as
+     * existence: a zero byte {@code .dat} would satisfy the build's
+     * completeness check and then fail in the engine. The scenario is loaded
+     * the way {@code applyExample} loads it, so this is also the check that the
+     * shipped {@code .cfg} resolves against the directory it was extracted
+     * into, which is the whole reason the descriptor no longer transcribes it.
      */
     private static void checkInstalls(Example example) throws IOException {
         File dir = createTempDir("stepss-example-" + example.id());
@@ -151,17 +155,29 @@ public final class ExamplesHarness {
             List<String> missing = ExampleInstaller.missingFrom(example, dir);
             check(example.id() + " leaves nothing missing: " + missing, missing.isEmpty());
 
-            // Only the slots this example actually fills. An empty one would
-            // otherwise assert that a file named "" has content.
-            List<String> slots = new ArrayList<>(example.data());
-            for (String optional : new String[]{example.dist(), example.obs(),
-                example.diagram()}) {
+            my.stepss.config.ScenarioFile.Loaded loaded =
+                    my.stepss.config.ScenarioFile.load(new File(dir, example.cfg()));
+            check(example.id() + " scenario loads without problems: "
+                    + loaded.problems(), loaded.problems().isEmpty());
+
+            List<String> slots = new ArrayList<>();
+            my.stepss.config.Scenario scenario = loaded.scenario();
+            for (int i = 0; i < my.stepss.config.Scenario.DATA_SLOTS; i++) {
+                if (!scenario.data(i).isEmpty()) {
+                    slots.add(scenario.data(i));
+                }
+            }
+            for (String optional : new String[]{scenario.disturbance(),
+                scenario.observablesFile(), scenario.diagram()}) {
                 if (!optional.isEmpty()) {
                     slots.add(optional);
                 }
             }
+            check(example.id() + " scenario fills at least one data slot", !slots.isEmpty());
             for (String slot : slots) {
-                File file = new File(dir, slot);
+                // Absolute already: ScenarioFile resolves every stored path
+                // against the directory the .cfg was read from.
+                File file = new File(slot);
                 check(example.id() + " slot file " + slot + " has content",
                         file.isFile() && file.length() > 0);
             }

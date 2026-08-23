@@ -39,6 +39,15 @@ import java.util.Set;
  * {@link #reportUnknownKeys} and nothing else. That asymmetry is why a new
  * optional key is not a format change.
  *
+ * <p>It is also why {@code record.dump} becoming {@code record.init}, and
+ * {@code observables.wizard} being dropped, are not format changes either.
+ * Both are deliberately a clean break: a file saved before this build names
+ * them, gets one advisory sentence per key from {@link #reportUnknownKeys},
+ * and loads with the initialisation tick cleared. Bumping the format for that
+ * would refuse the whole file instead of the one setting, and reading the old
+ * names on the quiet would leave every hand-written file on a spelling this
+ * class does not document.
+ *
  * <p>Written by hand for the grouping and the section comments, read back with
  * {@link Properties#load(Reader)}. One small escaper against the standard
  * parser, rather than two halves of a format both written here.
@@ -66,11 +75,10 @@ public final class ScenarioFile {
     private static final String DISTURBANCE = "disturbance";
     private static final String DIAGRAM = "diagram";
     private static final String OBSERVABLES_FILE = "observables.file";
-    private static final String OBSERVABLES_WIZARD = "observables.wizard";
     private static final String RECORD_TRAJECTORY = "record.trajectory";
     private static final String RECORD_CONTINUOUS = "record.continuous";
     private static final String RECORD_DISCRETE = "record.discrete";
-    private static final String RECORD_DUMP = "record.dump";
+    private static final String RECORD_INIT = "record.init";
 
     private ScenarioFile() {
     }
@@ -150,7 +158,6 @@ public final class ScenarioFile {
             out.write("\n# Observables\n");
             write(out, OBSERVABLES_FILE,
                     ScenarioPaths.store(scenario.observablesFile(), cfgDir, workingDir));
-            write(out, OBSERVABLES_WIZARD, String.valueOf(scenario.observableWizard()));
             for (int row = 0; row < Scenario.RUNTIME_ROWS; row++) {
                 write(out, runtimeTypeKey(row), scenario.runtimeType(row));
                 write(out, runtimeNameKey(row), scenario.runtimeName(row));
@@ -160,7 +167,7 @@ public final class ScenarioFile {
             write(out, RECORD_TRAJECTORY, String.valueOf(scenario.saveTrajectory()));
             write(out, RECORD_CONTINUOUS, String.valueOf(scenario.saveContinuousTrace()));
             write(out, RECORD_DISCRETE, String.valueOf(scenario.saveDiscreteTrace()));
-            write(out, RECORD_DUMP, String.valueOf(scenario.saveDump()));
+            write(out, RECORD_INIT, String.valueOf(scenario.saveInit()));
         } finally {
             out.close();
         }
@@ -210,8 +217,6 @@ public final class ScenarioFile {
                 "The one-line diagram file", problems));
         scenario.setObservablesFile(path(properties, OBSERVABLES_FILE, cfgDir,
                 "The observables file", problems));
-        scenario.setObservableWizard(
-                flag(properties, OBSERVABLES_WIZARD, problems));
         for (int row = 0; row < Scenario.RUNTIME_ROWS; row++) {
             scenario.setRuntimeType(row, properties.getProperty(runtimeTypeKey(row), ""));
             scenario.setRuntimeName(row, properties.getProperty(runtimeNameKey(row), ""));
@@ -219,10 +224,54 @@ public final class ScenarioFile {
         scenario.setSaveTrajectory(flag(properties, RECORD_TRAJECTORY, problems));
         scenario.setSaveContinuousTrace(flag(properties, RECORD_CONTINUOUS, problems));
         scenario.setSaveDiscreteTrace(flag(properties, RECORD_DISCRETE, problems));
-        scenario.setSaveDump(flag(properties, RECORD_DUMP, problems));
+        scenario.setSaveInit(flag(properties, RECORD_INIT, problems));
 
         reportUnknownKeys(properties, problems);
         return new Loaded(scenario, problems);
+    }
+
+    /**
+     * Every path a scenario file names, exactly as it is stored.
+     *
+     * <p>Unresolved, unlike everything {@link #load} hands back, and that is
+     * the point: this answers "which files does this scenario refer to" for a
+     * caller that has the scenario file but not the directory it will live in.
+     * {@code ExamplesPack} is that caller. It reads a {@code .cfg} straight out
+     * of an upstream source archive at build time, to check that every file the
+     * scenario names is one the payload will carry, and a zip entry has no
+     * directory to resolve against.
+     *
+     * <p>Here rather than in the packer because the key names are this class's,
+     * once and nowhere else. A packer with its own list of key names is a
+     * second place for {@code observables.file} to be spelled, and it would go
+     * on passing the build while checking a key the format no longer has.
+     *
+     * <p>Empty slots are skipped, so the result is the files and nothing else.
+     * The format number, the run-time observable rows and the recording flags
+     * are not paths and are not returned.
+     *
+     * @param in the scenario file, read but not closed
+     * @return the stored values, in file order, without duplicates
+     * @throws IOException if the reader fails
+     */
+    public static List<String> storedPaths(Reader in) throws IOException {
+        Properties properties = new Properties();
+        properties.load(in);
+        Set<String> paths = new LinkedHashSet<>();
+        for (int slot = 0; slot < Scenario.DATA_SLOTS; slot++) {
+            addIfSet(paths, properties, dataKey(slot));
+        }
+        addIfSet(paths, properties, DISTURBANCE);
+        addIfSet(paths, properties, DIAGRAM);
+        addIfSet(paths, properties, OBSERVABLES_FILE);
+        return Collections.unmodifiableList(new ArrayList<>(paths));
+    }
+
+    private static void addIfSet(Set<String> paths, Properties properties, String key) {
+        String value = properties.getProperty(key, "").trim();
+        if (!value.isEmpty()) {
+            paths.add(value);
+        }
     }
 
     /**
@@ -270,6 +319,12 @@ public final class ScenarioFile {
      * <p>A typo in a hand-edited file is otherwise indistinguishable from a
      * setting that was never saved, which is the failure mode this whole
      * rewrite exists to remove.
+     *
+     * <p>Two names reach this method from files that were once correct rather
+     * than from a typo: {@code record.dump}, which is now {@code record.init},
+     * and {@code observables.wizard}, which is no longer saved at all. They are
+     * reported in the same words as any other unknown key, and re-saving the
+     * scenario writes the file without them.
      */
     private static void reportUnknownKeys(Properties properties, List<String> problems) {
         Set<String> known = knownKeys();
@@ -296,7 +351,6 @@ public final class ScenarioFile {
         keys.add(DISTURBANCE);
         keys.add(DIAGRAM);
         keys.add(OBSERVABLES_FILE);
-        keys.add(OBSERVABLES_WIZARD);
         for (int row = 0; row < Scenario.RUNTIME_ROWS; row++) {
             keys.add(runtimeTypeKey(row));
             keys.add(runtimeNameKey(row));
@@ -304,7 +358,7 @@ public final class ScenarioFile {
         keys.add(RECORD_TRAJECTORY);
         keys.add(RECORD_CONTINUOUS);
         keys.add(RECORD_DISCRETE);
-        keys.add(RECORD_DUMP);
+        keys.add(RECORD_INIT);
         return Collections.unmodifiableSet(keys);
     }
 

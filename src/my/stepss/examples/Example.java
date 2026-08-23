@@ -7,7 +7,14 @@ import java.util.List;
 
 /**
  * One entry from {@code examples.properties}: a bundled test system, what the
- * dialog says about it, and which of its files fills which slot.
+ * dialog says about it, and the scenario file that sets it up.
+ *
+ * <p>An entry names a {@code .cfg} rather than a slot per file. Which file
+ * belongs in which slot is the scenario file's job, and the example repositories
+ * now ship one written in the current format, with paths relative to its own
+ * folder. Restating the slots here would be a second answer to a question the
+ * shipped file already answers, and the two would drift the first time an
+ * example changed which load flow it opens on.
  *
  * <p>Immutable, and carries no path. An {@code Example} describes what an
  * example <em>is</em>; where a copy of it happens to live on disk belongs to
@@ -24,25 +31,18 @@ public final class Example {
     private final String summary;
     private final String docs;
     private final String dir;
-    private final List<String> data;
-    private final String dist;
-    private final String obs;
-    private final String diagram;
+    private final String cfg;
     private final List<String> extra;
 
     Example(String id, String name, String scale, String summary, String docs,
-            String dir, List<String> data, String dist, String obs, String diagram,
-            List<String> extra) {
+            String dir, String cfg, List<String> extra) {
         this.id = id;
         this.name = name;
         this.scale = scale;
         this.summary = summary;
         this.docs = docs;
         this.dir = dir;
-        this.data = Collections.unmodifiableList(new ArrayList<>(data));
-        this.dist = dist;
-        this.obs = obs;
-        this.diagram = diagram;
+        this.cfg = cfg;
         this.extra = Collections.unmodifiableList(new ArrayList<>(extra));
     }
 
@@ -76,33 +76,19 @@ public final class Example {
         return dir;
     }
 
-    /** Filenames for the system-data slots, in the order they should be filled. */
-    public List<String> data() {
-        return data;
-    }
-
-    /** The filename for the disturbance slot. */
-    public String dist() {
-        return dist;
-    }
-
-    /** The filename for the observables slot. */
-    public String obs() {
-        return obs;
-    }
-
     /**
-     * The filename of the annotated one-line diagram template, or "".
+     * The scenario file this example opens, relative to its directory.
      *
-     * <p>Optional because it exists only for cases whose repository ships one.
-     * When present it fills the diagram slot on the System Data tab, and Run
-     * Power Flow renders it through Helios' {@code 1} command.
+     * <p>Loaded through {@code ScenarioFile} exactly as File &gt; Load
+     * configuration loads any other, which is what makes the two paths one
+     * path: an example that opens wrong is a scenario file that is wrong, and
+     * it is wrong in the repository where it can be fixed.
      */
-    public String diagram() {
-        return diagram;
+    public String cfg() {
+        return cfg;
     }
 
-    /** Files that ship but fill no slot: variants, the README, the LICENCE. */
+    /** Every other file that ships: the case data, variants, README, LICENCE. */
     public List<String> extra() {
         return extra;
     }
@@ -115,45 +101,24 @@ public final class Example {
     /**
      * Every file this entry names, deduplicated, in declaration order.
      *
-     * <p>Derived rather than declared, which is the point of the descriptor's
-     * shape. Two properties follow from computing it here instead of reading a
-     * separate {@code retain} key:
+     * <p>{@code ExamplesPack} fails the build when an upstream release stops
+     * carrying one of them, and a file no entry knows about cannot be shipped,
+     * so the payload can never quietly grow a stale copy of something.
      *
-     * <ul>
-     * <li>{@code ExamplesPack} fails the build when an upstream release stops
-     * carrying a file an entry names, because the retain list and the list of
-     * files the interface will look for are the same list.
-     * <li>A file no entry knows about cannot be shipped, so the payload can
-     * never quietly grow a stale copy of something.
-     * </ul>
+     * <p>The scenario file is one of them, and it is also read: the packer
+     * parses it and refuses a payload whose {@code .cfg} names a file this list
+     * does not. That is what keeps the two halves honest without making
+     * {@code .extra} derived from a file the descriptor cannot see at run time.
      *
-     * <p>Deduplicated because nothing stops an entry naming the same file in
-     * two roles, and a manifest with a repeated path would digest differently
-     * from the same content declared once. Empty slots are skipped the same
-     * way: {@code dist}, {@code obs} and {@code diagram} are optional, and an
-     * unfilled one is not a filename to look up or dedupe against.
+     * <p>Deduplicated because nothing stops {@code .extra} naming the scenario
+     * file too, and a manifest with a repeated path would digest differently
+     * from the same content declared once.
      */
     public List<String> retained() {
-        LinkedHashSet<String> all = new LinkedHashSet<>(data);
-        addIfNamed(all, dist);
-        addIfNamed(all, obs);
-        addIfNamed(all, diagram);
+        LinkedHashSet<String> all = new LinkedHashSet<>();
+        all.add(cfg);
         all.addAll(extra);
         return Collections.unmodifiableList(new ArrayList<>(all));
-    }
-
-    /**
-     * Adds a slot's filename unless the slot is empty.
-     *
-     * <p>An unconditional add is what this replaces, and with optional slots it
-     * would put "" into the set. {@code ExamplesPack} looks up every retained
-     * name in the upstream archive, so that becomes a build failure naming no
-     * file, and the manifest digest would cover a path that is not a path.
-     */
-    private static void addIfNamed(LinkedHashSet<String> all, String name) {
-        if (!name.isEmpty()) {
-            all.add(name);
-        }
     }
 
     @Override
