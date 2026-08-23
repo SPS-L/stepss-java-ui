@@ -12,13 +12,12 @@ import java.util.regex.Pattern;
  * engine need not be it: a build adopted from the Codegen tab replaces it for
  * the rest of the session, and the pin says nothing about that build.
  *
- * <p>What it decides is what the engine's results will contain. From
- * {@link #EVERY_MODE_SINCE} the analysis writes participation factors and a
- * mode shape for every mode and leaves the filtering to whoever reads them;
- * before it, the engine filtered by a real_limit fixed on the EIG record and
- * wrote those two files for its dominant modes alone. Both open, and the
- * results window explains either, but only one of them can answer a question
- * about a mode the old engine dropped.
+ * <p>What it decides is whether the engine's small-signal results can be read
+ * at all. From {@link #READABLE_SSA_SINCE} the analysis writes v2 files:
+ * participation factors and a mode shape for every mode, with the filtering
+ * left to whoever reads them. Before it the engine wrote v1, filtering by a
+ * real_limit fixed on the EIG record. v1 is refused rather than read, so this
+ * gates the run with a warning instead of letting it finish and fail to open.
  *
  * <p>The record itself needs no check. It is a basename and a time, which is
  * the whole grammar now and was the two-argument form every older engine
@@ -33,12 +32,16 @@ import java.util.regex.Pattern;
 public final class EngineVersion {
 
     /**
-     * First RAMSES that writes results for every mode, i.e. that writes v2
-     * files. From here {@code EIG} takes a basename alone, the participation
-     * floor is the {@code $PF_THRES} solver setting, and the real part limit
-     * is applied when the results are read.
+     * First RAMSES whose small-signal results this build can read, i.e. the
+     * first that writes v2 files. From here {@code EIG} takes a basename
+     * alone, the participation floor is the {@code $PF_THRES} solver setting,
+     * and the real part limit is applied when the results are read.
+     *
+     * <p>Older engines still run every other kind of study. Only their
+     * small-signal output is unreadable, because {@code SsaModes} reads v2 and
+     * refuses v1 rather than guessing at a column that moved.
      */
-    public static final double EVERY_MODE_SINCE = 3.79;
+    public static final double READABLE_SSA_SINCE = 3.79;
 
     /**
      * The banner prints the version with Fortran {@code f5.2} from a single
@@ -80,14 +83,14 @@ public final class EngineVersion {
     }
 
     /**
-     * Whether a version writes participation factors and mode shapes for
-     * every mode.
+     * Whether a version writes small-signal results this build can read.
      *
      * <p>An unreadable version is treated as not doing so. That is the safe
-     * direction: it shows a note a current engine does not need, where the
-     * other way round hides one an old engine does.
+     * direction: it warns before a run that a current engine does not need,
+     * where the other way round lets an old engine run the analysis and fail
+     * only when its results will not open.
      */
-    public static boolean writesEveryMode(double version) {
-        return !Double.isNaN(version) && version >= EVERY_MODE_SINCE - EPS;
+    public static boolean writesReadableSsa(double version) {
+        return !Double.isNaN(version) && version >= READABLE_SSA_SINCE - EPS;
     }
 }

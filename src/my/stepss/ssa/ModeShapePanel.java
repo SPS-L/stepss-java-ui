@@ -22,14 +22,13 @@ import javax.swing.JPanel;
  * basis-dependent: it would come out differently on another machine while
  * looking exactly as authoritative. Refusing is the honest option.
  *
- * <p>A simple mode with no entries is a second case, and which explanation is
- * honest there depends on {@link Mode#dominant}, never on the emptiness
- * alone. A current engine writes a mode shape for every mode, so the flag is
- * null and an absence means the file is missing or incomplete. Only an
- * archive saved by a v1 engine can carry {@link Boolean#FALSE}, which is the
- * one case where real_limit really is the reason and saying so is correct.
- * Naming it anywhere else would invent a cause for an absence that has
- * another one. &lt;base&gt;_ms.dat is optional to {@link SsaResults#load}, and
+ * <p>A simple mode with no entries is a second case. The engine writes a mode
+ * shape for every mode, so an absence means the file is missing or
+ * incomplete, and that is the only explanation offered. There used to be a
+ * second, naming the real_limit a v1 engine filtered by; v1 results are no
+ * longer read at all, so the flag that distinguished the two is gone and
+ * naming real_limit would now invent a cause.
+ * &lt;base&gt;_ms.dat is optional to {@link SsaResults#load}, and
  * the copy-out in StepssUI copies only the files that exist, so the missing
  * case is reachable on either version. The no-selection state, reached
  * through {@link #clear()}, is a third case again: no mode has been chosen
@@ -43,7 +42,6 @@ public final class ModeShapePanel extends JPanel {
 
     private List<ModeShapeEntry> entries = new ArrayList<ModeShapeEntry>();
     private boolean simple = true;
-    private Boolean dominant;
     private int modeIndex;
     private boolean noSelection = true;
 
@@ -73,29 +71,23 @@ public final class ModeShapePanel extends JPanel {
     /**
      * No mode selected yet: the plain dial, with no arrows and no message.
      * Distinct from a simple mode that turned out to have no entries, which
-     * {@link #show} reports as filtered rather than as this blank state.
+     * {@link #show} reports as a missing file rather than as this blank state.
      */
     public void clear() {
         this.entries = new ArrayList<ModeShapeEntry>();
         this.modeIndex = 0;
         this.simple = true;
-        this.dominant = null;
         this.noSelection = true;
         repaint();
     }
 
     /**
      * @param simple the mode's smp flag, false for a degenerate eigenvalue
-     * @param dominant the mode's {@link Mode#dominant}, null on any current
-     *     results file, and what distinguishes a mode a v1 engine filtered
-     *     from one it kept but wrote no rows for
      */
-    public void show(List<ModeShapeEntry> entries, int modeIndex, boolean simple,
-            Boolean dominant) {
+    public void show(List<ModeShapeEntry> entries, int modeIndex, boolean simple) {
         this.entries = new ArrayList<ModeShapeEntry>(entries);
         this.modeIndex = modeIndex;
         this.simple = simple;
-        this.dominant = dominant;
         this.noSelection = false;
         repaint();
     }
@@ -109,7 +101,7 @@ public final class ModeShapePanel extends JPanel {
         if (noSelection) {
             renderBlank(sink, width, height);
         } else {
-            render(sink, entries, simple, dominant, width, height);
+            render(sink, entries, simple, width, height);
         }
         return sink.toSvg();
     }
@@ -124,7 +116,7 @@ public final class ModeShapePanel extends JPanel {
         if (noSelection) {
             renderBlank(new SwingSink(g, dark), getWidth(), getHeight());
         } else {
-            render(new SwingSink(g, dark), entries, simple, dominant,
+            render(new SwingSink(g, dark), entries, simple,
                     getWidth(), getHeight());
         }
         g.dispose();
@@ -147,7 +139,7 @@ public final class ModeShapePanel extends JPanel {
     }
 
     static void render(PlotSink sink, List<ModeShapeEntry> entries, boolean simple,
-            Boolean dominant, int width, int height) {
+            int width, int height) {
         double cx = width / 2.0;
         double cy = height / 2.0;
         double radius = radius(width, height);
@@ -167,33 +159,17 @@ public final class ModeShapePanel extends JPanel {
         }
 
         if (entries.isEmpty()) {
-            // Same absence the participation panel reports, and split the same
-            // way. Boolean.FALSE, and nothing else, means a v1 engine filtered
-            // this mode out by real_limit; on every current file the flag is
-            // null and naming real_limit would state a cause that did not
-            // happen. Compared rather than unboxed, because null is the
-            // ordinary case here and would throw.
-            if (Boolean.FALSE.equals(dominant)) {
-                sink.group("filtered");
-                sink.text(cx, cy - 8.0, "This mode was filtered out by real_limit.",
-                        "middle", "title");
-                sink.text(cx, cy + 12.0,
-                        "The engine that saved this run wrote mode shapes only for"
-                        + " modes above it, so there is none to show.",
-                        "middle", "label");
-                sink.text(cx, cy + 28.0,
-                        "Re-running the analysis writes one for every mode.",
-                        "middle", "label");
-            } else {
-                sink.group("no-rows");
-                sink.text(cx, cy - 8.0,
-                        "No mode shape rows were written for this mode.",
-                        "middle", "title");
-                sink.text(cx, cy + 12.0,
-                        "Every mode should have one, so the mode-shape file is"
-                        + " missing from this directory or is incomplete.",
-                        "middle", "label");
-            }
+            // The one honest explanation left. The engine writes a mode shape
+            // for every mode, so an empty one is a missing or incomplete file
+            // rather than a threshold.
+            sink.group("no-rows");
+            sink.text(cx, cy - 8.0,
+                    "No mode shape rows were written for this mode.",
+                    "middle", "title");
+            sink.text(cx, cy + 12.0,
+                    "Every mode should have one, so the mode-shape file is"
+                    + " missing from this directory or is incomplete.",
+                    "middle", "label");
             sink.endGroup();
             return;
         }

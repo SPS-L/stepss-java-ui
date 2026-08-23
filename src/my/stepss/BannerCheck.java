@@ -5,7 +5,7 @@ package my.stepss;
  *
  * <p>This repository has no unit-test framework and is not gaining one, so
  * this main() is the substitute, in the shape {@code ConsoleSinkCheck} and
- * {@code PreferencesCheck} already use. Only {@link InlineBanner#oneLine} is
+ * {@code ConsoleSinkCheck} already use. Only {@link InlineBanner#oneLine} is
  * exercised, because it is the part with a trap in it and the only part that
  * runs without a display: the banner itself is a Swing component and is
  * covered by acceptance against a running window.

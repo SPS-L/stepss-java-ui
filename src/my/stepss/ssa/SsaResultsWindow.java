@@ -103,18 +103,6 @@ public final class SsaResultsWindow extends JFrame {
         super("Small-signal results - " + results.basename()
                 + " - " + results.directory().getAbsolutePath());
         this.results = results;
-        // An archived v1 run recorded the limit it was analysed under. Using
-        // it here is not a filter the file imposes -- the tick still starts
-        // off -- but it makes the box, when ticked, reproduce what that run
-        // actually contains rather than some other number's worth of it.
-        Double recorded = results.modes().realLimit();
-        if (recorded != null) {
-            this.realLimitValue = recorded.doubleValue();
-        }
-        Double recordedPf = results.modes().pfThreshold();
-        if (recordedPf != null) {
-            this.pfThresholdValue = recordedPf.doubleValue();
-        }
         this.model = new ModesTableModel(visible());
         this.table = new JTable(model);
 
@@ -405,15 +393,8 @@ public final class SsaResultsWindow extends JFrame {
                 + "    " + m.nstates() + " states, " + m.nalg() + " algebraic"));
         // What the run recorded, not what the window is filtering by: the
         // thresholds beside the table are the reader's and change freely,
-        // while these describe the file and cannot. A v2 run has no
-        // real_limit at all, so naming one here would be an invention.
+        // while these describe the file and cannot.
         StringBuilder line = new StringBuilder();
-        if (m.realLimit() != null) {
-            line.append("real_limit ").append(show(m.realLimit())).append("    ");
-        }
-        if (m.pfThreshold() != null) {
-            line.append("pf_threshold ").append(show(m.pfThreshold())).append("    ");
-        }
         if (m.pfFloor() != null) {
             line.append("pf_floor ").append(show(m.pfFloor())).append("    ");
         }
@@ -506,19 +487,7 @@ public final class SsaResultsWindow extends JFrame {
                     rows.add(p);
                 }
             }
-            if (inFile.isEmpty() && Boolean.FALSE.equals(mode.dominant)) {
-                // Only an archive from a v1 engine can reach this. That
-                // engine wrote participation for modes above real_limit
-                // alone, so the absence really is the filter, and this is the
-                // one place naming it is not inventing a cause.
-                text.append("Mode ").append(mode.index)
-                        .append(" is below the real_limit of ")
-                        .append(show(results.modes().realLimit()))
-                        .append(" that this run was analysed under, so the engine")
-                        .append(" wrote no participation factors for it.\n\n")
-                        .append("Re-running the analysis writes them for every")
-                        .append(" mode.\n");
-            } else if (inFile.isEmpty()) {
+            if (inFile.isEmpty()) {
                 // Every mode gets participation now, and normalisation puts
                 // one entry at exactly 1 in each, so no mode can fall below
                 // pf_floor either. An empty mode is therefore a missing file
@@ -592,7 +561,7 @@ public final class SsaResultsWindow extends JFrame {
         shape.show(mode.simple
                 ? results.shapes().forMode(mode.index)
                 : new java.util.ArrayList<ModeShapeEntry>(),
-                mode.index, mode.simple, mode.dominant);
+                mode.index, mode.simple);
     }
 
     /** The modes table. */

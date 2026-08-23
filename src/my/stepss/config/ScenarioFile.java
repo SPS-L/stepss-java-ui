@@ -60,13 +60,7 @@ import java.util.Set;
  */
 public final class ScenarioFile {
 
-    /**
-     * The format this build writes and the only one it reads.
-     *
-     * <p>Its presence is also how a file from before this rewrite is
-     * recognised. Those carry no format key at all, so the check costs a
-     * version number that was going to be needed anyway.
-     */
+    /** The format this build writes and the only one it reads. */
     public static final int FORMAT = 1;
 
     /** The key carrying {@link #FORMAT}, and the first line of every file. */
@@ -277,22 +271,20 @@ public final class ScenarioFile {
     /**
      * Refuses a file this build has no business interpreting.
      *
-     * <p>The older format is rejected rather than read on a best-effort basis.
-     * Those files store absolute paths belonging to whoever last saved them -
-     * every {@code .cfg} in stepss-test-systems names a home directory on
-     * someone else's machine - so loading one would fill the form with ten
-     * paths that resolve to nothing, and the first sign of it would be a run
-     * that failed for reasons the form does not show. A sentence saying so is
-     * more use than a form full of dead paths.
+     * <p>A missing {@link #FORMAT_KEY} is treated as "not a scenario file",
+     * with no special case for the format that predates this one. There was
+     * one, explaining that such a file came from an older STEPSS and holding
+     * absolute paths from the machine that saved it; the files it described
+     * have since been deleted from stepss-test-systems and nothing this
+     * project ships writes one, so the explanation named a situation that no
+     * longer arises and a build that no longer exists. What is left is the
+     * same refusal without the history lesson.
      */
     private static void checkFormat(Properties properties, File file) throws IOException {
         String declared = properties.getProperty(FORMAT_KEY);
         if (declared == null) {
-            throw new IOException(file.getName() + " was written by an older STEPSS"
-                    + " release and cannot be loaded.\n\nThose files store absolute"
-                    + " paths belonging to the machine that saved them, so the case"
-                    + " they name almost certainly does not exist here. Set the case"
-                    + " up on the System Data and Observables tabs and save it again.");
+            throw new IOException(file.getName() + " is not a STEPSS scenario file:"
+                    + " it declares no " + FORMAT_KEY + ".");
         }
         int format;
         try {

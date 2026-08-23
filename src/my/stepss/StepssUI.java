@@ -930,7 +930,7 @@ public class StepssUI extends javax.swing.JFrame {
 
     // Nothing is remembered from one launch to the next except the licence
     // flag and the three settings the user ticked a box for; see
-    // PreferenceMigration.forgetSession.
+    // preferences().
     //
     // A rememberSession() used to sit here, writing the window geometry and
     // the working directory down at exit and reading them back in the
@@ -4102,7 +4102,7 @@ public class StepssUI extends javax.swing.JFrame {
             lastRunDir = new File(myTempDir.getAbsolutePath());
             lastRunManifest = new my.stepss.ssa.SsaArchive.Manifest(base,
                     Double.isNaN(engineVersion) ? null : Double.valueOf(engineVersion),
-                    Double.valueOf(analysisTime), null, null, getVersion());
+                    Double.valueOf(analysisTime), getVersion());
             saveDynJac.setEnabled(true);
 
             showSsaResults(resultsDir, base);
@@ -6552,10 +6552,6 @@ public class StepssUI extends javax.swing.JFrame {
      * dialog" and "wants it every launch" are the same state - which is the one
      * the feature exists for.
      *
-     * <p>Lives in the same node as everything else, so
-     * {@link PreferenceMigration} carries it across the legacy node for free:
-     * that class copies every key rather than an enumerated list, precisely
-     * because an enumeration silently drops whatever is added later.
      */
     static final String SHOW_EXAMPLES_KEY = "showExamplesAtStartup";
 
@@ -6568,9 +6564,7 @@ public class StepssUI extends javax.swing.JFrame {
      * <p>That is the whole list, and it is meant to stay the whole list.
      * Nothing about a session belongs here: not the window, not the working
      * directory, not the files that were loaded. A launch starts with an
-     * empty window and no working directory, and
-     * {@link PreferenceMigration#forgetSession} is what makes that true of
-     * installations that predate the rule.
+     * empty window and no working directory.
      *
      * <p>The name is a literal, not {@code getClass().getName()}, which is
      * what it used to be. That tied the node to the class name, so renaming
@@ -6578,37 +6572,20 @@ public class StepssUI extends javax.swing.JFrame {
      * stored-preferences key is a compatibility surface and has no business
      * following a refactor on its own.
      *
-     * <p>It did follow this one, deliberately: the node was
-     * {@code my.ramses.RamsesUI} until the package became {@code my.stepss},
-     * and {@link PreferenceMigration} is what makes the corrected name free
-     * rather than costing every user their settings. Do not remove that call.
-     * Installations that predate it still have the old node on disk.
+     * <p>Nothing is carried across from the {@code my.ramses.RamsesUI} node
+     * the package rename in v3.74.7 left behind, and nothing converts the
+     * first-run flag from the empty-string key it used before that. A
+     * {@code PreferenceMigration} class did both, and deleting it is a
+     * deliberate clean break rather than an oversight: an installation older
+     * than v3.74.7 starts as a fresh one, in the default theme, with no
+     * remembered settings and the licence to accept again. Do not reintroduce
+     * it. Its third job, dropping the seven session keys those installations
+     * carry, went with it; nothing reads them, so they sit inert in the old
+     * node and nothing brings them back.
      */
     static Preferences preferences() {
         if (cachedNode == null) {
-            Preferences root = Preferences.userRoot();
-            try {
-                cachedNode = PreferenceMigration.node(root, LEGACY_NODE, PREFERENCES_NODE);
-            } catch (java.util.prefs.BackingStoreException | RuntimeException ex) {
-                // A preference store that cannot be read - or that throws
-                // something unchecked, such as a value the backing store
-                // reports but cannot actually return - is not a reason not to
-                // start. The defaults apply for this session and the next
-                // launch tries the migration again.
-                Logger.getLogger(StepssUI.class.getName()).log(Level.WARNING,
-                        "Could not migrate saved preferences", ex);
-                cachedNode = root.node(PREFERENCES_NODE);
-            }
-            // Outside the try: firstRunKey() declares no checked exception, and
-            // running it unconditionally means a migration failure still does
-            // not skip converting the first-run flag on whichever node startup
-            // ends up using, on either path above.
-            PreferenceMigration.firstRunKey(cachedNode);
-            // Here, and not in the constructor, so that it has happened before
-            // the first read on every path: Splash.open reads the theme before
-            // any frame exists, and a check or a harness can call this without
-            // building one at all.
-            PreferenceMigration.forgetSession(cachedNode);
+            cachedNode = Preferences.userRoot().node(PREFERENCES_NODE);
         }
         return cachedNode;
     }
@@ -6617,9 +6594,6 @@ public class StepssUI extends javax.swing.JFrame {
 
     /** The node this application uses, matching the package it belongs to. */
     private static final String PREFERENCES_NODE = "my.stepss.StepssUI";
-
-    /** The node it used before v3.74.7's package rename, migrated on first read. */
-    private static final String LEGACY_NODE = "my.ramses.RamsesUI";
 
     /** Whether the licence agreement still has to be shown. */
     static final String FIRST_RUN = "stepssFirstTime";
@@ -7136,7 +7110,7 @@ public class StepssUI extends javax.swing.JFrame {
         double version = my.stepss.ssa.EngineVersion.parseBanner(engineBanner());
         engineVersion = version;
         resultsCarryEveryMode =
-                my.stepss.ssa.EngineVersion.writesEveryMode(version);
+                my.stepss.ssa.EngineVersion.writesReadableSsa(version);
 
         // Which engine is actually answering, in the status bar. It is not
         // always the bundled one: a compiled simulator is adopted when this
@@ -7152,14 +7126,12 @@ public class StepssUI extends javax.swing.JFrame {
         // window, where turning one re-filters what is already on screen
         // instead of requiring the case to be run again.
         //
-        // What is left to say is the reverse of what this note used to say.
-        // An engine older than the format change still runs, and its record
-        // is accepted unchanged, but it writes v1 results: participation
-        // factors and mode shapes for its own dominant modes alone, under a
-        // real_limit fixed at its default. The window reads those correctly
-        // and explains each absence, so this is a note and not a refusal --
-        // but a reader who filters a v1 run and finds half of it empty
-        // deserves to have been told why before running it.
+        // An engine older than the format change still runs every other kind
+        // of study, and the EIG record is accepted unchanged, but it writes v1
+        // results and this build refuses those rather than guessing at a
+        // column that moved. So the note is now a warning that the analysis
+        // will produce something unreadable, said before the run rather than
+        // after it.
         ssaEngineNote.setVisible(!resultsCarryEveryMode);
         if (!resultsCarryEveryMode) {
             // Naming the version read, rather than repeating a fixed sentence,
@@ -7171,12 +7143,13 @@ public class StepssUI extends javax.swing.JFrame {
                     : "it reports version " + String.format(java.util.Locale.ROOT, "%.2f", version);
             ssaEngineNote.setToolTipText("RAMSES "
                     + String.format(java.util.Locale.ROOT, "%.2f",
-                            my.stepss.ssa.EngineVersion.EVERY_MODE_SINCE)
+                            my.stepss.ssa.EngineVersion.READABLE_SSA_SINCE)
                     + " and newer write participation factors and a mode shape"
                     + " for every mode, and leave the filtering to this window."
                     + " The engine in use does not: " + seen
-                    + ". Its results open and read correctly, but the modes it"
-                    + " filtered out have nothing behind them.");
+                    + ". This build reads those results only, so an analysis run"
+                    + " with this engine will produce files it cannot open."
+                    + " Every other kind of study is unaffected.");
         }
     }
 

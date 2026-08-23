@@ -47,38 +47,6 @@ public final class ScenarioHarness {
         "Injector Observable"
     };
 
-    /**
-     * A real pre-rewrite {@code .cfg}, copied from what was then
-     * stepss-test-systems/stepss-Kundur-Two-Area-System/sim.cfg.
-     *
-     * <p>Embedded rather than read from disk: it is the file the refusal
-     * exists for, its Windows paths are the reason those files cannot be
-     * loaded here, and a check that depended on another repository being
-     * checked out beside this one would be skipped rather than run.
-     *
-     * <p>Embedding it is now the only reason a copy survives at all. Every
-     * test system carries a scenario file in the current format, and the twelve
-     * pre-format ones were deleted once those landed, so this array is the
-     * sample the refusal is checked against. Do not "modernise" it: a check
-     * that the old format is refused needs the old format, and the keys below
-     * are the ones real files carry, {@code saveDumpButton} among them.
-     */
-    private static final String[] LEGACY_CFG = {
-        "#Wed Dec 04 10:01:51 CET 2024",
-        "GP_REFRESH_RATE=",
-        "fileData1=C\\:\\\\Users\\\\tvanc\\\\OneDrive\\\\TRAVAIL\\\\dat\\\\Kundur\\\\lf.dat",
-        "fileData2=C\\:\\\\Users\\\\tvanc\\\\OneDrive\\\\TRAVAIL\\\\dat\\\\Kundur\\\\dyn.dat",
-        "fileDist=C\\:\\\\Users\\\\tvanc\\\\OneDrive\\\\TRAVAIL\\\\dat\\\\Kundur\\\\disturb.dst",
-        "fileObs=C\\:\\\\Users\\\\tvanc\\\\OneDrive\\\\TRAVAIL\\\\dat\\\\Kundur\\\\obs.dat",
-        "observFileWizButton=false",
-        "runtimeObsName=8",
-        "runtimeObsType=0",
-        "saveContTrace=false",
-        "saveDiscTrace=true",
-        "saveDumpButton=true",
-        "saveOutputTrajButton=true"
-    };
-
     private ScenarioHarness() {
     }
 
@@ -92,8 +60,8 @@ public final class ScenarioHarness {
         checkAConfigInAnotherDirectoryStillResolves();
         checkEmptyRowsKeepTheirSlot();
         checkWindowsPathsSurviveTheEscaper();
-        checkLegacyConfigIsRefused();
         checkNewerFormatIsRefused();
+        checkFormatlessFileIsRefused();
         checkUnreadableFormatIsRefused();
         checkAnEmptyFileLoadsWithoutThrowing();
         checkJunkBooleanIsReported();
@@ -325,18 +293,19 @@ public final class ScenarioHarness {
         expect("a hash is left alone", "case#1.dat", ScenarioFile.escape("case#1.dat"));
     }
 
-    private static void checkLegacyConfigIsRefused() throws IOException {
-        File dir = tempDir("legacy");
-        File cfg = temp(dir, "sim.cfg");
-        write(cfg, LEGACY_CFG);
-        expectRefused("a pre-rewrite .cfg is refused", cfg, "older STEPSS");
-    }
-
     private static void checkNewerFormatIsRefused() throws IOException {
         File dir = tempDir("newer");
         File cfg = temp(dir, "future.cfg");
         write(cfg, "stepss.format = 2", "data.1 = lf.dat");
         expectRefused("a newer format is refused", cfg, "newer STEPSS");
+    }
+
+    private static void checkFormatlessFileIsRefused() throws IOException {
+        File dir = tempDir("formatless");
+        File cfg = temp(dir, "plain.cfg");
+        write(cfg, "data.1 = lf.dat");
+        expectRefused("a file declaring no format is refused", cfg,
+                "is not a STEPSS scenario file");
     }
 
     private static void checkUnreadableFormatIsRefused() throws IOException {

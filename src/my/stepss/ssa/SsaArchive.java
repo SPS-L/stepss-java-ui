@@ -104,31 +104,29 @@ public final class SsaArchive {
      * What the archive records about the run inside it.
      *
      * <p>Every field but the basename may be null, and null means "not
-     * recorded" rather than zero. The two threshold fields are read but never
-     * written now: they carried the {@code real_limit} and {@code
-     * pf_threshold} of the EIG record, which no longer has either, and the
-     * one floor the engine still applies is written into the modes file
-     * itself as {@code pf_floor}. They stay on this class so that an archive
-     * saved by an older build still reports what it was analysed under. That
-     * is the same distinction {@link SsaModes} draws for the results header,
-     * and the results window already renders it as "not recorded".
+     * recorded" rather than zero.
+     *
+     * <p>There are no threshold fields. Two used to be read but never
+     * written, carrying the {@code real_limit} and {@code pf_threshold} of an
+     * EIG record that no longer has either, so that an archive from an older
+     * build still reported what it was analysed under. Those archives are no
+     * longer readable at all - their modes file is v1 - so the fields
+     * described a state that cannot occur. A manifest still carrying the two
+     * keys loads; they are ignored, like any other key this format does not
+     * know.
      */
     public static final class Manifest {
 
         private final String basename;
         private final Double engineVersion;
         private final Double time;
-        private final Double realLimit;
-        private final Double pfThreshold;
         private final String savedBy;
 
         public Manifest(String basename, Double engineVersion, Double time,
-                Double realLimit, Double pfThreshold, String savedBy) {
+                String savedBy) {
             this.basename = basename;
             this.engineVersion = engineVersion;
             this.time = time;
-            this.realLimit = realLimit;
-            this.pfThreshold = pfThreshold;
             this.savedBy = savedBy;
         }
 
@@ -143,14 +141,6 @@ public final class SsaArchive {
 
         public Double time() {
             return time;
-        }
-
-        public Double realLimit() {
-            return realLimit;
-        }
-
-        public Double pfThreshold() {
-            return pfThreshold;
         }
 
         /** The STEPSS version that wrote the archive, or null. */
@@ -186,8 +176,6 @@ public final class SsaArchive {
             text.append("basename ").append(basename).append('\n');
             append(text, "engine_version", engineVersion, "%.2f");
             append(text, "t", time, "%.6f");
-            append(text, "real_limit", realLimit, "%.6f");
-            append(text, "pf_threshold", pfThreshold, "%.6f");
             if (savedBy != null && !savedBy.isEmpty()) {
                 text.append("saved_by ").append(savedBy).append('\n');
             }
@@ -208,8 +196,6 @@ public final class SsaArchive {
             String basename = null;
             Double engineVersion = null;
             Double time = null;
-            Double realLimit = null;
-            Double pfThreshold = null;
             String savedBy = null;
             for (String raw : text.split("\r\n|\n|\r", -1)) {
                 String line = raw.trim();
@@ -235,10 +221,6 @@ public final class SsaArchive {
                     engineVersion = doubleOrNull(value);
                 } else if ("t".equals(key)) {
                     time = doubleOrNull(value);
-                } else if ("real_limit".equals(key)) {
-                    realLimit = doubleOrNull(value);
-                } else if ("pf_threshold".equals(key)) {
-                    pfThreshold = doubleOrNull(value);
                 } else if ("saved_by".equals(key)) {
                     savedBy = value;
                 }
@@ -259,8 +241,7 @@ public final class SsaArchive {
                 throw new IOException("its " + MANIFEST_NAME
                         + " names an unusable basename \"" + basename + "\".");
             }
-            return new Manifest(basename, engineVersion, time, realLimit,
-                    pfThreshold, savedBy);
+            return new Manifest(basename, engineVersion, time, savedBy);
         }
 
         private static void append(StringBuilder text, String key, Double value,

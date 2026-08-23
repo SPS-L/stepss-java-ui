@@ -217,7 +217,7 @@ public final class SsaHarness {
 
     private static void checkModeShapeRendersArrows() {
         SvgSink sink = new SvgSink(360, 360);
-        ModeShapePanel.render(sink, shapeFixture(), true, true, 360, 360);
+        ModeShapePanel.render(sink, shapeFixture(), true, 360, 360);
         String svg = sink.toSvg();
         // One arrow is three lines: the shaft and two head strokes.
         expect("two machines give six arrow strokes", 6,
@@ -235,7 +235,7 @@ public final class SsaHarness {
         SvgSink sink = new SvgSink(360, 360);
         // dominant true on purpose: degeneracy is a refusal that outranks the
         // dom flag, so the dial must not fall through to a dominant message.
-        ModeShapePanel.render(sink, shapeFixture(), false, true, 360, 360);
+        ModeShapePanel.render(sink, shapeFixture(), false, 360, 360);
         String svg = sink.toSvg();
         expect("a degenerate mode draws no arrows", 0,
                 countOf(svg, "class=\"shape\""));
@@ -245,32 +245,16 @@ public final class SsaHarness {
     }
 
     /**
-     * A v1 archive's dom == 0 with no rows: real_limit really is the reason,
-     * and this is the only case where saying so is honest.
-     */
-    private static void checkModeShapeReportsFilteredMode() {
-        SvgSink sink = new SvgSink(360, 360);
-        ModeShapePanel.render(sink, new java.util.ArrayList<ModeShapeEntry>(),
-                true, Boolean.FALSE, 360, 360);
-        String svg = sink.toSvg();
-        expect("a filtered mode draws no arrows", 0, countOf(svg, "class=\"shape\""));
-        expect("a filtered mode names real_limit", true,
-                svg.contains("real_limit"));
-    }
-
-    /**
-     * No rows on a file that should have some. Reached two ways: a v2 run,
-     * where the flag is null because the engine writes a mode shape for every
-     * mode, and a v1 run where the flag says the engine kept this one. Both
-     * mean the file is missing or incomplete, and neither may blame
-     * real_limit, which would state a cause that did not happen.
+     * No rows on a file that should have some. The engine writes a mode shape
+     * for every mode, so this means the file is missing or incomplete, and it
+     * may not blame real_limit, which would state a cause that did not happen.
      */
     private static void checkModeShapeReportsMissingRows() {
-        for (Boolean dominant : new Boolean[] {null, Boolean.TRUE}) {
-            String what = dominant == null ? "a v2 mode" : "a mode the engine kept";
+        {
+            String what = "a simple mode";
             SvgSink sink = new SvgSink(360, 360);
             ModeShapePanel.render(sink, new java.util.ArrayList<ModeShapeEntry>(),
-                    true, dominant, 360, 360);
+                    true, 360, 360);
             String svg = sink.toSvg();
             expect(what + " with no rows draws no arrows", 0,
                     countOf(svg, "class=\"shape\""));
@@ -284,7 +268,7 @@ public final class SsaHarness {
     /** Below 60 px the margin exceeds the half-extent, and r must not go negative. */
     private static void checkModeShapeClampsTinyRadius() {
         SvgSink sink = new SvgSink(40, 40);
-        ModeShapePanel.render(sink, shapeFixture(), true, true, 40, 40);
+        ModeShapePanel.render(sink, shapeFixture(), true, 40, 40);
         String svg = sink.toSvg();
         expect("a tiny dial emits no negative radius", false,
                 svg.contains("r=\"-"));
@@ -295,7 +279,7 @@ public final class SsaHarness {
         checkModesHeader();
         checkModesTime();
         checkModesPartialHeader();
-        checkModesV1Layout();
+        checkModesV1IsRefused();
         checkModesRejectsAnUnknownVersion();
         checkModesOriginZeta();
         checkModesRejectsAMangledNumber();
@@ -324,7 +308,6 @@ public final class SsaHarness {
         checkSplaneManualZoom();
         checkModeShapeRendersArrows();
         checkModeShapeRefusesDegenerate();
-        checkModeShapeReportsFilteredMode();
         checkModeShapeReportsMissingRows();
         checkModeShapeClampsTinyRadius();
         checkDisturbanceDefaultTime();
@@ -385,39 +368,31 @@ public final class SsaHarness {
         expect("a negative zeta survives the sign column", -0.0233,
                 round(m.modes().get(3).zeta, 4));
         expect("the degenerate mode is flagged", false, m.modes().get(4).simple);
-        // v2 carries no dominance column at all, and null is how that is
-        // said. A reader that unboxed this would throw; one that defaulted it
-        // to false would report every mode as filtered.
         expect("the fixture is v2", 2, m.formatVersion());
-        expect("v2 carries no dominance flag", null, m.modes().get(0).dominant);
-        expect("nor on the degenerate mode", null, m.modes().get(4).dominant);
     }
 
     /**
-     * The v1 layout still reads, because saved archives carry it. The dom
-     * column sat exactly where smp sits now, so getting this wrong produces
-     * numbers rather than an error: the fixture gives modes 5 and 6 opposite
-     * flags precisely so a swap is visible.
+     * v1 is refused, not read.
+     *
+     * <p>This is the check that matters most in the file, because v1's dom
+     * column sits exactly where v2's smp sits, at the same width with the same
+     * two legal values. A reader that guessed would produce numbers rather
+     * than an error, and the fixture gives modes 5 and 6 opposite flags
+     * precisely so that such a swap would be visible. Refusing on the banner
+     * means it can never get that far.
      */
-    private static void checkModesV1Layout() {
+    private static void checkModesV1IsRefused() {
         try {
-            SsaModes m = SsaModes.parse(v1ModesFixture());
-            expect("v1 is recognised", 1, m.formatVersion());
-            expect("v1 mode count", 6, m.modes().size());
-            expect("v1 records the real_limit it ran under", -1.0, m.realLimit());
-            expect("v1 records its pf_threshold", 0.05, round(m.pfThreshold(), 4));
-            expect("v1 carries no pf_floor", null, m.pfFloor());
-            // Mode 5 is dom 1, smp 0 and mode 6 is dom 0, smp 1. Reading the
-            // columns the v2 way would report both the other way round.
-            expect("v1 dom is read from its own column", Boolean.TRUE,
-                    m.modes().get(4).dominant);
-            expect("v1 smp is read from the column after it", false,
-                    m.modes().get(4).simple);
-            expect("and the reverse pair the other way", Boolean.FALSE,
-                    m.modes().get(5).dominant);
-            expect("v1 smp on the reverse pair", true, m.modes().get(5).simple);
-        } catch (java.io.IOException ex) {
-            fail("v1 modes fixture parses: threw " + ex);
+            SsaModes.parse(v1ModesFixture());
+            fail("a v1 modes file is refused: no exception");
+        } catch (java.io.IOException expected) {
+            String message = String.valueOf(expected.getMessage());
+            expect("the refusal names the version it found: " + message,
+                    true, message.contains("version 1"));
+            expect("and says which one this build reads: " + message,
+                    true, message.contains("v2"));
+            expect("and points at the engine that wrote it: " + message,
+                    true, message.contains("3.79"));
         }
     }
 
@@ -458,11 +433,6 @@ public final class SsaHarness {
         expect("nalg", 7, m.nalg());
         expect("pf_floor", 1.0e-3, m.pfFloor());
         expect("gap_tol", 1.0e-6, m.gapTol());
-        // The two retired keys are absent, not zero. A reader that defaulted
-        // them would report a v2 run as having been analysed under thresholds
-        // nobody chose.
-        expect("v2 records no real_limit", null, m.realLimit());
-        expect("v2 records no pf_threshold", null, m.pfThreshold());
     }
 
     private static void checkModesTime() {
@@ -480,8 +450,6 @@ public final class SsaHarness {
             expect("partial header nstates", 3, m.nstates());
             expect("partial header nalg", 4, m.nalg());
             expect("partial header time is null", null, m.time());
-            expect("partial header real_limit is null", null, m.realLimit());
-            expect("partial header pf_threshold is null", null, m.pfThreshold());
             expect("partial header pf_floor is null", null, m.pfFloor());
             expect("partial header gap_tol is null", null, m.gapTol());
         } catch (java.io.IOException ex) {
@@ -720,9 +688,9 @@ public final class SsaHarness {
      */
     private static void checkFittedWindowContainsOrigin() {
         java.util.List<Mode> far = new java.util.ArrayList<Mode>();
-        far.add(new Mode(195, -1.7412, 2.2194, 0.6172, 0.3532, null, true));
-        far.add(new Mode(191, -0.6703, 4.7440, 0.1399, 0.7550, null, true));
-        far.add(new Mode(171, -97.7880, 10.8712, 0.9939, 1.7302, null, true));
+        far.add(new Mode(195, -1.7412, 2.2194, 0.6172, 0.3532, true));
+        far.add(new Mode(191, -0.6703, 4.7440, 0.1399, 0.7550, true));
+        far.add(new Mode(171, -97.7880, 10.8712, 0.9939, 1.7302, true));
 
         SplanePanel.Bounds b = SplanePanel.bounds(far, null, 500, 400);
         expect("the fitted window reaches Re = 0", true, b.reLo <= 0.0 && b.reHi >= 0.0);
@@ -1000,7 +968,7 @@ public final class SsaHarness {
                 countOf(groupBody(svg, "legend"), "<line"));
 
         java.util.List<Mode> stable = new java.util.ArrayList<Mode>();
-        stable.add(new Mode(1, -0.43, 3.92, 0.11, 0.62, true, true));
+        stable.add(new Mode(1, -0.43, 3.92, 0.11, 0.62, true));
         SvgSink none = new SvgSink(500, 400);
         SplanePanel.render(none, stable, null, 500, 400);
         String stableSvg = none.toSvg();
@@ -1013,7 +981,7 @@ public final class SsaHarness {
     private static void checkSplaneMinimumExtentExpands() {
         // A mode outside the notebook's window must still be inside the axes.
         java.util.List<Mode> wide = new java.util.ArrayList<Mode>();
-        wide.add(new Mode(1, -12.0, 40.0, 0.29, 6.37, true, true));
+        wide.add(new Mode(1, -12.0, 40.0, 0.29, 6.37, true));
         SvgSink sink = new SvgSink(500, 400);
         SplanePanel.render(sink, wide, null, 500, 400);
         String svg = sink.toSvg();
@@ -1033,8 +1001,8 @@ public final class SsaHarness {
         // A conjugate pair with both positive and negative imaginary parts must
         // fit inside the expanded window without clipping.
         java.util.List<Mode> pair = new java.util.ArrayList<Mode>();
-        pair.add(new Mode(1, -0.43, 3.92, 0.11, 0.62, true, true));
-        pair.add(new Mode(2, -0.43, -3.92, 0.11, 0.62, true, true));
+        pair.add(new Mode(1, -0.43, 3.92, 0.11, 0.62, true));
+        pair.add(new Mode(2, -0.43, -3.92, 0.11, 0.62, true));
         SvgSink sink = new SvgSink(500, 400);
         SplanePanel.render(sink, pair, null, 500, 400);
         String svg = sink.toSvg();
@@ -1258,7 +1226,7 @@ public final class SsaHarness {
         expect("an older banner still parses", 3.74,
                 round(EngineVersion.parseBanner(OLD_BANNER), 2));
         expect("and is not mistaken for a current one", false,
-                EngineVersion.writesEveryMode(EngineVersion.parseBanner(OLD_BANNER)));
+                EngineVersion.writesReadableSsa(EngineVersion.parseBanner(OLD_BANNER)));
         expect("banner with no version line", true,
                 Double.isNaN(EngineVersion.parseBanner("no banner here")));
         expect("null banner", true,
@@ -1272,21 +1240,21 @@ public final class SsaHarness {
      */
     private static void checkEngineVersionGuardsTheBoundary() {
         expect("3.78 writes the old format", false,
-                EngineVersion.writesEveryMode(3.78));
+                EngineVersion.writesReadableSsa(3.78));
         expect("3.79 writes every mode", true,
-                EngineVersion.writesEveryMode(3.79));
+                EngineVersion.writesReadableSsa(3.79));
         expect("3.79 parsed from a banner writes every mode", true,
-                EngineVersion.writesEveryMode(
+                EngineVersion.writesReadableSsa(
                         EngineVersion.parseBanner(BANNER)));
         expect("3.80 writes every mode", true,
-                EngineVersion.writesEveryMode(3.80));
+                EngineVersion.writesReadableSsa(3.80));
         expect("4.00 writes every mode", true,
-                EngineVersion.writesEveryMode(4.00));
+                EngineVersion.writesReadableSsa(4.00));
         // An engine that could not be read must not be treated as new enough:
         // the note it then shows is harmless, and the one it would otherwise
         // hide is not.
         expect("unknown version treated as old", false,
-                EngineVersion.writesEveryMode(Double.NaN));
+                EngineVersion.writesReadableSsa(Double.NaN));
     }
 
     /**
@@ -1404,9 +1372,8 @@ public final class SsaHarness {
     private static final String[] EQS_LINES = {"1 2 3", "4 5 6"};
 
     private static SsaArchive.Manifest fixtureManifest() {
-        return new SsaArchive.Manifest("run", Double.valueOf(3.74),
-                Double.valueOf(0.001), Double.valueOf(-1.0),
-                Double.valueOf(0.05), "3.74.12");
+        return new SsaArchive.Manifest("run", Double.valueOf(3.79),
+                Double.valueOf(0.001), "3.74.12");
     }
 
     /**
@@ -1446,10 +1413,8 @@ public final class SsaHarness {
             SsaArchive.Manifest written = fixtureManifest();
             SsaArchive.Manifest read = SsaArchive.Manifest.parse(written.text());
             expect("basename survives the manifest", "run", read.basename());
-            expect("engine version survives", Double.valueOf(3.74), read.engineVersion());
+            expect("engine version survives", Double.valueOf(3.79), read.engineVersion());
             expect("analysis time survives", Double.valueOf(0.001), read.time());
-            expect("real_limit survives", Double.valueOf(-1.0), read.realLimit());
-            expect("pf_threshold survives", Double.valueOf(0.05), read.pfThreshold());
             expect("the writing version survives", "3.74.12", read.savedBy());
             // Whoever opens the archive in a file manager reads this file and
             // nothing else, so it has to say what is and is not in there.
@@ -1461,27 +1426,18 @@ public final class SsaHarness {
     }
 
     /**
-     * An engine older than EIG_PARAMETERS_SINCE never sees the two parameters,
-     * so the archive must record that they are unknown rather than record the
-     * zeros the disabled fields hold. The results window renders null as
-     * "not recorded", and a recorded 0.0 would be a claim about a run.
+     * A field the run could not record is omitted rather than written as zero.
+     * The results window renders null as "not recorded", and a recorded 0.0
+     * would be a claim about a run.
      */
     private static void checkManifestOmitsWhatWasNotRecorded() {
         try {
             SsaArchive.Manifest sparse = new SsaArchive.Manifest("run", null,
-                    Double.valueOf(0.001), null, null, null);
+                    Double.valueOf(0.001), null);
             String text = sparse.text();
-            expect("an unknown real_limit is not written", false,
-                    text.contains("real_limit"));
-            expect("an unknown pf_threshold is not written", false,
-                    text.contains("pf_threshold"));
             expect("an unread engine version is not written", false,
                     text.contains("engine_version"));
             SsaArchive.Manifest read = SsaArchive.Manifest.parse(text);
-            expect("an absent real_limit reads back as unknown, not zero",
-                    null, read.realLimit());
-            expect("an absent pf_threshold reads back as unknown", null,
-                    read.pfThreshold());
             expect("an absent engine version reads back as unknown", null,
                     read.engineVersion());
             expect("what was recorded still is", Double.valueOf(0.001), read.time());
@@ -1660,7 +1616,7 @@ public final class SsaHarness {
             SsaArchive.Loaded loaded = SsaArchive.load(target, elsewhere);
             expect(label + ": the run keeps its name", "run",
                     loaded.results().basename());
-            expect(label + ": the manifest comes back", Double.valueOf(3.74),
+            expect(label + ": the manifest comes back", Double.valueOf(3.79),
                     loaded.manifest().engineVersion());
             expect(label + ": every mode comes back", 6,
                     loaded.results().modes().modes().size());
@@ -1879,18 +1835,18 @@ public final class SsaHarness {
      */
     private static void checkArchiveNamesTheEngineThatAnalysedIt() {
         SsaArchive.Manifest known = fixtureManifest();
-        String same = SsaArchive.describe(known, "run.zip", 3.74);
+        String same = SsaArchive.describe(known, "run.zip", 3.79);
         expect("the run and the file are named", true,
                 same.contains("\"run\"") && same.contains("run.zip"));
         expect("the engine that analysed it is named", true,
-                same.contains("RAMSES 3.74"));
+                same.contains("RAMSES 3.79"));
         expect("the same engine is not reported as a difference", false,
                 same.contains("loaded here"));
         // The banner prints f5.2 from a single precision constant, so two
         // readings of one build can differ by an ulp. Reporting that as two
         // builds would cry wolf on every load.
         expect("an ulp of difference is still the same engine", false,
-                SsaArchive.describe(known, "run.zip", 3.7400001)
+                SsaArchive.describe(known, "run.zip", 3.7900001)
                         .contains("loaded here"));
         String other = SsaArchive.describe(known, "run.zip", 3.80);
         expect("a different engine is reported", true,
@@ -1901,9 +1857,9 @@ public final class SsaHarness {
         expect("an unreadable local engine is not reported as a difference",
                 false, noEngine.contains("loaded here"));
         expect("but the archive's own engine is still named", true,
-                noEngine.contains("RAMSES 3.74"));
+                noEngine.contains("RAMSES 3.79"));
         String unknown = SsaArchive.describe(
-                new SsaArchive.Manifest("run", null, null, null, null, null),
+                new SsaArchive.Manifest("run", null, null, null),
                 "run.zip", 3.74);
         expect("an archive that recorded no engine says so", true,
                 unknown.contains("does not record which engine"));
