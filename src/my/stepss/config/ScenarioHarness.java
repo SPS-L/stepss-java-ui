@@ -48,13 +48,20 @@ public final class ScenarioHarness {
     };
 
     /**
-     * A real pre-rewrite {@code .cfg}, copied from
+     * A real pre-rewrite {@code .cfg}, copied from what was then
      * stepss-test-systems/stepss-Kundur-Two-Area-System/sim.cfg.
      *
      * <p>Embedded rather than read from disk: it is the file the refusal
      * exists for, its Windows paths are the reason those files cannot be
      * loaded here, and a check that depended on another repository being
      * checked out beside this one would be skipped rather than run.
+     *
+     * <p>Embedding it is now the only reason a copy survives at all. Every
+     * test system carries a scenario file in the current format, and the twelve
+     * pre-format ones were deleted once those landed, so this array is the
+     * sample the refusal is checked against. Do not "modernise" it: a check
+     * that the old format is refused needs the old format, and the keys below
+     * are the ones real files carry, {@code saveDumpButton} among them.
      */
     private static final String[] LEGACY_CFG = {
         "#Wed Dec 04 10:01:51 CET 2024",
