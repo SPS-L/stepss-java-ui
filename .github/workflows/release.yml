@@ -530,8 +530,143 @@ jobs:
           iconutil -c icns stepss.iconset -o packaging/stepss.icns
           file packaging/stepss.icns
 
+      # With paths left empty the action imports the identity into a
+      # temporary keychain, checks the certificate's expiry and stops there.
+      # Nothing is signed here: jpackage signs the app image itself, because
+      # it assembles the bundled runtime and lays out the .app, and anything
+      # signed before it runs would be resigned or invalidated by it. All the
+      # step exists for is the keychain path it reports, which is what
+      # --mac-signing-keychain is pointed at below.
+      - name: Open the signing keychain (macOS)
+        id: signing
+        if: matrix.os == 'macos-latest'
+        uses: SPS-L/stepss-ci/sign-macos@v1
+        with:
+          mode: sign
+          paths: ""
+        env:
+          APPLE_SIGNING_P12: ${{ secrets.APPLE_SIGNING_P12 }}
+          APPLE_SIGNING_P12_PASSWORD: ${{ secrets.APPLE_SIGNING_P12_PASSWORD }}
+
       - name: Build the installer
-        run: ant bundle "-Dbundle.type=--type ${{ matrix.type }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The two mac properties travel together: build.xml drops every
+          # signing argument unless the keychain one is set, so a Mac without
+          # a certificate still builds an unsigned bundle. The identity
+          # carries its full "Developer ID Application: " prefix; see the
+          # comment beside the condition in build.xml for why.
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            ant bundle "-Dbundle.type=--type ${{ matrix.type }}" \
+                "-Dmac.signing.keychain=${{ steps.signing.outputs.keychain-path }}" \
+                "-Dmac.signing.identity=Developer ID Application: Cyprus University of Technology (SWZD63F3C7)"
+          else
+            ant bundle "-Dbundle.type=--type ${{ matrix.type }}"
+          fi
+
+      # jpackage supplies its own entitlements and --mac-entitlements would
+      # replace them wholesale rather than add to them, taking the JVM's own
+      # allow-jit and allow-unsigned-executable-memory with it. So the
+      # outcome is asserted instead of dictated. Without this key the app
+      # cannot load Homebrew's gfortran and every simulation fails.
+      #
+      # The app image is looked for under bundle/ first, where jpackage
+      # leaves its intermediates: build.xml passes --temp ${bundle.dir}/work
+      # and jpackage keeps a temp directory it was given a path for. A .dmg
+      # build that left nothing behind but the image is covered by mounting
+      # it. Finding no app at all fails the leg: an assertion that passes
+      # because it had nothing to check is worse than no assertion.
+      - name: Assert the app image carries disable-library-validation
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mounted=""
+          cleanup() {
+            if [ -n "$mounted" ]; then
+              hdiutil detach "$mounted" >/dev/null 2>&1 || true
+            fi
+          }
+          trap cleanup EXIT
+
+          app="$(find bundle -name 'STEPSS.app' -print -quit)"
+          if [ -z "$app" ]; then
+            dmg="$(find bundle -maxdepth 1 -name '*.dmg' -print -quit)"
+            if [ -z "$dmg" ]; then
+              echo "No STEPSS.app and no .dmg under bundle/. Nothing to check."
+              ls -lR bundle | head -n 50
+              exit 1
+            fi
+            mounted="$RUNNER_TEMP/dmg-mount"
+            mkdir -p "$mounted"
+            hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mounted"
+            app="$(find "$mounted" -maxdepth 2 -name 'STEPSS.app' -print -quit)"
+          fi
+          if [ -z "$app" ]; then
+            echo "No STEPSS.app found, neither under bundle/ nor inside the disk image."
+            exit 1
+          fi
+          echo "Asserting against $app"
+
+          ents="$RUNNER_TEMP/entitlements.xml"
+          # --xml is what makes the dump a bare plist rather than one behind a
+          # blob header. Older codesigns want it and newer ones emit the plist
+          # without it, so a refusal falls back rather than failing the leg;
+          # the grep below reads either form, and plutil is only there to put
+          # the list in the log.
+          if ! codesign -d --entitlements - --xml "$app" > "$ents"; then
+            codesign -d --entitlements - "$app" > "$ents"
+          fi
+          plutil -p "$ents" || true
+          grep -q 'com.apple.security.cs.disable-library-validation' "$ents" || {
+            echo "The app image lacks disable-library-validation."
+            echo "The engines will fail to load Homebrew's gfortran at run time."
+            echo "Pass --mac-entitlements with a plist that reproduces the"
+            echo "jpackage defaults plus this key. See the note recorded under"
+            echo "docs/superpowers/notes/."
+            exit 1
+          }
+
+      # Read off disk rather than constructed. jpackage names the image from
+      # src/my/stepss/version.txt while needs.release.outputs.version is the
+      # tag, which carries a leading "v", so the two spellings differ and
+      # only one of them exists. More than one image means a stale bundle/
+      # and the wrong one would be notarized, so that fails here rather than
+      # shipping quietly.
+      - name: Locate the disk image
+        id: dmg
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(bundle/*.dmg)
+          if [ "${#images[@]}" -ne 1 ]; then
+            echo "Expected exactly one .dmg under bundle/, found ${#images[@]}."
+            ls -l bundle || true
+            exit 1
+          fi
+          echo "path=${images[0]}" >> "$GITHUB_OUTPUT"
+
+      # Stapling rewrites the image, so this has to happen before the asset
+      # is attached. A stapled .dmg opens on a machine that has never been
+      # online; without the ticket Gatekeeper has to ask Apple, and refuses
+      # when it cannot. The action submits, waits, staples and then runs
+      # spctl over the result, so a rejected submission fails the leg and the
+      # draft is discarded with no tag cut.
+      - name: Notarize and staple the .dmg
+        if: matrix.os == 'macos-latest'
+        uses: SPS-L/stepss-ci/sign-macos@v1
+        with:
+          mode: notarize
+          bundle: ${{ steps.dmg.outputs.path }}
+        env:
+          APPLE_SIGNING_P12: ${{ secrets.APPLE_SIGNING_P12 }}
+          APPLE_SIGNING_P12_PASSWORD: ${{ secrets.APPLE_SIGNING_P12_PASSWORD }}
+          APPLE_NOTARY_KEY_P8: ${{ secrets.APPLE_NOTARY_KEY_P8 }}
+          APPLE_NOTARY_KEY_ID: ${{ vars.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ vars.APPLE_NOTARY_ISSUER_ID }}
 
       # Before the upload, so a package that cannot be installed is never
       # published. Docker is on the hosted image already. See the script for why

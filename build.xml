@@ -565,6 +565,43 @@
    </and>
   </condition>
   <property name="bundle.resource.arg" value=""/>
+
+  <!-- macOS Developer ID signing. Absent when mac.signing.keychain is unset,
+       so a local build on a developer's Mac still produces an unsigned bundle
+       rather than failing for want of a certificate: only the release CI has
+       the identity, and it passes both properties together.
+
+       The identity is passed with its "Developer ID Application: " prefix
+       already on it. jpackage accepts either form, and its help text asks for
+       the team name alone, but the no-prefix path builds the search key by
+       concatenating its own constant, which has no trailing space, onto the
+       name. Whether the result still matches what `security` prints was not
+       something the option probe could test, having no certificate to sign
+       with; passing the full string takes that path out of play. See
+       docs/superpowers/notes/2026-09-22-jpackage-mac-options.md.
+
+       No mac-entitlements option. jpackage's own default entitlements already
+       carry com.apple.security.cs.disable-library-validation, which is what
+       lets the app load Homebrew's gfortran, alongside the JVM's allow-jit
+       and allow-unsigned-executable-memory. A custom file replaces all of
+       them rather than adding to them, so the release workflow asserts the
+       key is present on the built app instead of dictating the whole list.
+
+       The package identifier is written out rather than left to default to
+       the main class name, for the reason the win-upgrade-uuid comment above
+       gives: an identifier the operating system uses to recognise one
+       installation as the successor of another must not move because
+       somebody renamed a package. my.stepss is the package as of v3.74.7,
+       and a defaulted identifier would have followed that rename. -->
+  <condition property="bundle.sign.args"
+             value="--mac-sign --mac-signing-key-user-name '${mac.signing.identity}' --mac-signing-keychain '${mac.signing.keychain}' --mac-package-identifier my.stepss">
+   <and>
+    <os family="mac"/>
+    <isset property="mac.signing.keychain"/>
+   </and>
+  </condition>
+  <property name="bundle.sign.args" value=""/>
+
   <exec executable="jpackage" failonerror="true">
    <arg line="--name STEPSS"/>
    <arg line="--app-version ${stepss.version}"/>
@@ -582,6 +619,7 @@
    <arg line="--dest ${bundle.dir}"/>
    <arg line="--temp ${bundle.dir}/work"/>
    <arg line="${bundle.platform.args}"/>
+   <arg line="${bundle.sign.args}"/>
    <arg line="${bundle.resource.arg}"/>
    <arg line="${bundle.type}"/>
   </exec>
