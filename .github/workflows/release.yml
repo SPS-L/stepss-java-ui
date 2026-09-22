@@ -559,6 +559,44 @@ jobs:
           APPLE_SIGNING_P12: ${{ secrets.APPLE_SIGNING_P12 }}
           APPLE_SIGNING_P12_PASSWORD: ${{ secrets.APPLE_SIGNING_P12_PASSWORD }}
 
+      # sign.sh is reached through a checkout rather than through the
+      # composite action above, and not by preference. The action opens a
+      # keychain of its own on every mode that signs, this job already has
+      # one open at that same path under keep-keychain, and a second
+      # `security create-keychain` there fails. So the step below calls the
+      # script directly, against the keychain that is already open, and the
+      # action stays the single place the codesign flags and the entitlements
+      # are written down. The repository is public, so this needs no token,
+      # and the ref is v1, the same one the action is used at above, which is
+      # what keeps the script and the action from drifting apart.
+      - name: Check out the signing scripts (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: actions/checkout@v7
+        with:
+          repository: SPS-L/stepss-ci
+          ref: v1
+          path: .stepss-ci
+
+      # Apple's notary service opens jar files and inspects the Mach-O
+      # binaries inside them. jpackage does not: it signs the .app and the
+      # runtime it assembles, and copies --input verbatim into Contents/app.
+      # STEPSS 3.82 was rejected over exactly that gap, four unsigned FlatLaf
+      # dylibs, two in flatlaf-3.7.2.jar and two more in the fat stepss.jar
+      # that -post-jar merges them into, each reported as "The binary is not
+      # signed" with no secure timestamp.
+      #
+      # lib/ as well as dist/, deliberately. `ant bundle` depends on the jar
+      # target, so the next step rebuilds dist/ from lib/ before jpackage ever
+      # runs, and signing dist/ alone would be undone in silence. See the
+      # header of the script; the assertion after the build is what proves it
+      # was not.
+      - name: Sign the native libraries inside the jars (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        env:
+          SIGN_SH: ${{ github.workspace }}/.stepss-ci/sign-macos/sign.sh
+        run: bash tools/sign-jar-natives.sh sign lib dist
+
       # Every value this script needs arrives through env: and is read as a
       # quoted shell variable, per the rule at the top of this file. A step
       # output is the case that rule is for: it is text produced by something
@@ -593,6 +631,20 @@ jobs:
           else
             ant bundle "-Dbundle.type=--type $BUNDLE_TYPE"
           fi
+
+      # The other half of the jar-native signing above, and the reason it can
+      # be trusted rather than hoped for. dist/ is what jpackage has just
+      # packaged into Contents/app, verbatim, so checking it here answers for
+      # the bundle without mounting anything, and it answers after the jar
+      # target rebuilt dist/ from lib/ rather than before. The step fails on a
+      # binary whose signature does not verify and on finding no binaries at
+      # all, which are the two ways this quietly stops working: the second is
+      # the one that matters, because a scan that finds nothing is exactly
+      # what a passing step looked like before the fix existed.
+      - name: Assert the packaged jars carry signed natives (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: bash tools/sign-jar-natives.sh verify dist
 
       # jpackage supplies its own entitlements and --mac-entitlements would
       # replace them wholesale rather than add to them, taking the JVM's own
