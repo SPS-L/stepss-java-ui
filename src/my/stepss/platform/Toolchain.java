@@ -33,13 +33,13 @@ public final class Toolchain {
 
         s.add(new ToolSpec(RAMSES)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "payload/ramses-windows-x86_64-v3.81.zip", ToolSpec.Kind.ZIP,
+                "payload/ramses-windows-x86_64-v3.82.zip", ToolSpec.Kind.ZIP,
                 "ramses.exe", "dynsim.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "payload/ramses-linux-x86_64-v3.81.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/ramses-linux-x86_64-v3.82.tar.gz", ToolSpec.Kind.TGZ,
                 "ramses", "dynsim", true))
             .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
-                "payload/ramses-macos-arm64-v3.81.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/ramses-macos-arm64-v3.82.tar.gz", ToolSpec.Kind.TGZ,
                 "ramses", "dynsim", true)));
 
         s.add(new ToolSpec(HELIOS)
@@ -55,24 +55,24 @@ public final class Toolchain {
 
         s.add(new ToolSpec(DYNGRAPH)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "payload/dyngraph-windows-x86_64-v1.3.0.zip", ToolSpec.Kind.ZIP,
+                "payload/dyngraph-windows-x86_64-v1.4.0.zip", ToolSpec.Kind.ZIP,
                 "dyngraph.exe", "dyngraph.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "payload/dyngraph-linux-x86_64-v1.3.0.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/dyngraph-linux-x86_64-v1.4.0.tar.gz", ToolSpec.Kind.TGZ,
                 "dyngraph", "dyngraph", true))
             .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
-                "payload/dyngraph-macos-arm64-v1.3.0.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/dyngraph-macos-arm64-v1.4.0.tar.gz", ToolSpec.Kind.TGZ,
                 "dyngraph", "dyngraph", true)));
 
         s.add(new ToolSpec(CODEGEN)
             .on(Platform.WINDOWS_X86_64, new ToolSpec.Payload(
-                "payload/codegen-windows-x86_64-v5.3.zip", ToolSpec.Kind.ZIP,
+                "payload/codegen-windows-x86_64-v5.4.zip", ToolSpec.Kind.ZIP,
                 "CODEGEN.exe", "CODEGEN.exe", true))
             .on(Platform.LINUX_X86_64, new ToolSpec.Payload(
-                "payload/codegen-linux-x86_64-v5.3.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/codegen-linux-x86_64-v5.4.tar.gz", ToolSpec.Kind.TGZ,
                 "CODEGEN", "CODEGEN", true))
             .on(Platform.MACOS_ARM64, new ToolSpec.Payload(
-                "payload/codegen-macos-arm64-v5.3.tar.gz", ToolSpec.Kind.TGZ,
+                "payload/codegen-macos-arm64-v5.4.tar.gz", ToolSpec.Kind.TGZ,
                 "CODEGEN", "CODEGEN", true)));
 
         s.add(new ToolSpec(URAMSES)
