@@ -591,10 +591,23 @@
        the main class name, for the reason the win-upgrade-uuid comment above
        gives: an identifier the operating system uses to recognise one
        installation as the successor of another must not move because
-       somebody renamed a package. my.stepss is the package as of v3.74.7,
-       and a defaulted identifier would have followed that rename. -->
+       somebody renamed a package. jpackage defaults it to the main class,
+       so my.stepss.StepssUI is what the derivation produced up to and
+       including v3.81.2 and what every installation out there carries. It
+       is written out here as exactly that value, unchanged, so that pinning
+       it costs nothing: a pin that differs from the field is not a pin but
+       a rename, performed on the release that introduces it.
+
+       THIS VALUE MUST NOT CHANGE, and in particular must not be shortened
+       to follow the my.stepss package. macOS keys Launch Services and the
+       privacy consents a user has granted on the bundle identifier, so a
+       new value is a different application rather than a successor: the
+       user is asked for every permission again and the association with
+       the installation they already have is lost, silently and on every
+       Mac at once. A package rename is not a reason to touch it; that is
+       the whole point of it being here. -->
   <condition property="bundle.sign.args"
-             value="--mac-sign --mac-signing-key-user-name '${mac.signing.identity}' --mac-signing-keychain '${mac.signing.keychain}' --mac-package-identifier my.stepss">
+             value="--mac-sign --mac-signing-key-user-name '${mac.signing.identity}' --mac-signing-keychain '${mac.signing.keychain}' --mac-package-identifier my.stepss.StepssUI">
    <and>
     <os family="mac"/>
     <isset property="mac.signing.keychain"/>
