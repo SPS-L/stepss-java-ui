@@ -537,6 +537,16 @@ jobs:
       # signed before it runs would be resigned or invalidated by it. All the
       # step exists for is the keychain path it reports, which is what
       # --mac-signing-keychain is pointed at below.
+      #
+      # keep-keychain is what makes that path mean anything. A composite
+      # action cannot declare post steps, because runs.post is available to
+      # JavaScript and Docker actions only, so the action's own close step
+      # runs inline at the end of this invocation rather than at the end of
+      # the job. Without this input the keychain would be created, reported
+      # and deleted before this step finished, and jpackage would be pointed
+      # at a file that no longer exists. Asking to keep it makes closing it
+      # the caller's job; that is the "Close the signing keychain" step at
+      # the end of the macOS path.
       - name: Open the signing keychain (macOS)
         id: signing
         if: matrix.os == 'macos-latest'
@@ -544,25 +554,44 @@ jobs:
         with:
           mode: sign
           paths: ""
+          keep-keychain: true
         env:
           APPLE_SIGNING_P12: ${{ secrets.APPLE_SIGNING_P12 }}
           APPLE_SIGNING_P12_PASSWORD: ${{ secrets.APPLE_SIGNING_P12_PASSWORD }}
 
+      # Every value this script needs arrives through env: and is read as a
+      # quoted shell variable, per the rule at the top of this file. A step
+      # output is the case that rule is for: it is text produced by something
+      # else, pasted into the script before bash sees the line.
       - name: Build the installer
         shell: bash
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+          BUNDLE_TYPE: ${{ matrix.type }}
+          MAC_SIGNING_KEYCHAIN: ${{ steps.signing.outputs.keychain-path }}
+          # A literal, kept here beside the keychain so the two read as the
+          # pair they are. The full "Developer ID Application: " prefix is
+          # deliberate; see the comment beside the condition in build.xml.
+          MAC_SIGNING_IDENTITY: "Developer ID Application: Cyprus University of Technology (SWZD63F3C7)"
         run: |
           set -euo pipefail
           # The two mac properties travel together: build.xml drops every
           # signing argument unless the keychain one is set, so a Mac without
-          # a certificate still builds an unsigned bundle. The identity
-          # carries its full "Developer ID Application: " prefix; see the
-          # comment beside the condition in build.xml for why.
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            ant bundle "-Dbundle.type=--type ${{ matrix.type }}" \
-                "-Dmac.signing.keychain=${{ steps.signing.outputs.keychain-path }}" \
-                "-Dmac.signing.identity=Developer ID Application: Cyprus University of Technology (SWZD63F3C7)"
+          # a certificate still builds an unsigned bundle.
+          if [ "$MATRIX_OS" = "macos-latest" ]; then
+            # An empty value here would be worse than a missing one: ant
+            # would set the property to the empty string, build.xml's isset
+            # test counts that as set, and jpackage would be handed an empty
+            # --mac-signing-keychain rather than no signing arguments.
+            if [ -z "$MAC_SIGNING_KEYCHAIN" ]; then
+              echo "The signing step reported no keychain path."
+              exit 1
+            fi
+            ant bundle "-Dbundle.type=--type $BUNDLE_TYPE" \
+                "-Dmac.signing.keychain=$MAC_SIGNING_KEYCHAIN" \
+                "-Dmac.signing.identity=$MAC_SIGNING_IDENTITY"
           else
-            ant bundle "-Dbundle.type=--type ${{ matrix.type }}"
+            ant bundle "-Dbundle.type=--type $BUNDLE_TYPE"
           fi
 
       # jpackage supplies its own entitlements and --mac-entitlements would
@@ -667,6 +696,22 @@ jobs:
           APPLE_NOTARY_KEY_P8: ${{ secrets.APPLE_NOTARY_KEY_P8 }}
           APPLE_NOTARY_KEY_ID: ${{ vars.APPLE_NOTARY_KEY_ID }}
           APPLE_NOTARY_ISSUER_ID: ${{ vars.APPLE_NOTARY_ISSUER_ID }}
+
+      # The other half of keep-keychain, and the last step on this leg that
+      # has anything to do with signing. always(), because a keychain holding
+      # a Developer ID private key must not outlive the job on a build that
+      # failed any more than on one that succeeded, and the steps above are
+      # all capable of failing. mode: close removes the keychain and nothing
+      # else: it skips the action's preflight, so it needs none of the
+      # credentials, and it succeeds when there is no keychain to remove,
+      # which is what makes it safe after a failure that happened before one
+      # existed. Notarizing does not need the keychain, but closing after it
+      # rather than between the two costs nothing and reads in order.
+      - name: Close the signing keychain (macOS)
+        if: always() && matrix.os == 'macos-latest'
+        uses: SPS-L/stepss-ci/sign-macos@v1
+        with:
+          mode: close
 
       # Before the upload, so a package that cannot be installed is never
       # published. Docker is on the hosted image already. See the script for why
