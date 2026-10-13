@@ -425,17 +425,17 @@ jobs:
   # next to it instead of taking the release down with it. The ordering is the
   # whole point, so `needs` is not negotiable here.
   #
-  # The Linux and Windows legs do more than the macOS one, for the same reason:
-  # each has a package manager serving its artifact rather than a person
-  # downloading it by hand. Linux checks the version orders, checks the package
-  # installs in a clean container, and tells stepss-apt to rebuild. Windows
-  # builds a second artifact, the portable app image, and tells stepss-scoop to
-  # update its manifest. macOS has one too, the Homebrew tap, which needs
-  # nothing built for it: the cask points at the .dmg itself. All of it sits
-  # in the legs themselves for the reason the promote job spells out. The
-  # dispatches used to live in these legs so a partial release still reached
-  # the package managers; they are in promote now, because a partial release
-  # is no longer published at all.
+  # The Linux and Windows legs do more than the macOS one, because of what
+  # their package managers serve. Linux checks the version orders and checks
+  # the package installs in a clean container, since stepss-apt serves that
+  # .deb unattended. Windows builds a second artifact, the portable app image,
+  # which is what stepss-scoop serves. macOS has a package manager too, the
+  # Homebrew tap, but it serves the .dmg itself and needs nothing extra built
+  # here; it does its own install check before publishing a cask.
+  #
+  # None of the three is told from these legs. The dispatches used to live
+  # here so a partial release still reached the package managers; they are in
+  # promote now, because a partial release is no longer published at all.
   bundles:
     needs: release
     if: needs.release.outputs.proceed == 'true'
@@ -897,8 +897,9 @@ jobs:
           echo "$VERSION is published with every platform artifact attached."
 
       # All three dispatches, now that there is a published release to announce.
-      # Ordered apt first only because its rebuild is the slowest of the three;
-      # none depends on another.
+      # Ordered apt first only because its rebuild is the slowest of the three.
+      # No rebuild depends on another, but as steps they run in order, so one
+      # that fails skips those after it; the weekly schedules cover that.
       #
       # STEPSS_TOKEN, not a name of its own: one configured secret across the
       # platform is what makes `grep -rho 'secrets\.[A-Z_]*'` answer the
@@ -934,8 +935,8 @@ jobs:
             -f "client_payload[tag]=$VERSION"
           echo "stepss-scoop asked to update its manifest for $VERSION."
 
-      # The .dmg is the one installer with no package manager of its own in
-      # this workflow's legs, so this is the only place the tap hears about it.
+      # Nothing in the macOS leg is built for the tap, so apart from the tap's
+      # own weekly schedule this is the only way it hears about a release.
       - name: Tell the Homebrew tap there is a new .dmg
         env:
           GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
