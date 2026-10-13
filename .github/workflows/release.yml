@@ -902,7 +902,7 @@ jobs:
       # that fails skips those after it; the weekly schedules cover that.
       #
       # STEPSS_TOKEN, not a name of its own: one configured secret across the
-      # platform is what makes `grep -rho 'secrets\.[A-Z_]*'` answer the
+      # platform is what makes `grep -rho 'secrets\.[A-Z0-9_]*'` answer the
       # question "what real secrets are there" unambiguously. A fine-grained
       # PAT scoped to a repository list has to name each target explicitly, and
       # a dispatch under a token that cannot reach one 401s here rather than
