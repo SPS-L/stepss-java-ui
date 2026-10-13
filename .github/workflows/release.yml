@@ -430,10 +430,12 @@ jobs:
   # downloading it by hand. Linux checks the version orders, checks the package
   # installs in a clean container, and tells stepss-apt to rebuild. Windows
   # builds a second artifact, the portable app image, and tells stepss-scoop to
-  # update its manifest. All of it sits in the legs themselves for the reason
-  # the promote job spells out. The dispatches used to live in these legs so a
-  # partial release still reached the package managers; they are in promote
-  # now, because a partial release is no longer published at all.
+  # update its manifest. macOS has one too, the Homebrew tap, which needs
+  # nothing built for it: the cask points at the .dmg itself. All of it sits
+  # in the legs themselves for the reason the promote job spells out. The
+  # dispatches used to live in these legs so a partial release still reached
+  # the package managers; they are in promote now, because a partial release
+  # is no longer published at all.
   bundles:
     needs: release
     if: needs.release.outputs.proceed == 'true'
@@ -865,8 +867,9 @@ jobs:
   # release had to be repaired by hand. Skipping a dispatch is the correct
   # behaviour when there is nothing worth announcing.
   #
-  # The weekly schedules in stepss-apt and stepss-scoop stay: they cost a week
-  # rather than forever if a dispatch is dropped, and both runs are idempotent.
+  # The weekly schedules in stepss-apt, stepss-scoop and homebrew-stepss stay:
+  # they cost a week rather than forever if a dispatch is dropped, and all
+  # three runs are idempotent.
   promote:
     needs: [release, bundles]
     if: needs.release.outputs.proceed == 'true'
@@ -893,9 +896,9 @@ jobs:
             -F draft=false -f make_latest=true --silent
           echo "$VERSION is published with every platform artifact attached."
 
-      # Both dispatches, now that there is a published release to announce.
-      # Ordered apt first only because its rebuild is the slower of the two;
-      # neither depends on the other.
+      # All three dispatches, now that there is a published release to announce.
+      # Ordered apt first only because its rebuild is the slowest of the three;
+      # none depends on another.
       #
       # STEPSS_TOKEN, not a name of its own: one configured secret across the
       # platform is what makes `grep -rho 'secrets\.[A-Z_]*'` answer the
@@ -930,6 +933,19 @@ jobs:
             -f event_type=stepss-release \
             -f "client_payload[tag]=$VERSION"
           echo "stepss-scoop asked to update its manifest for $VERSION."
+
+      # The .dmg is the one installer with no package manager of its own in
+      # this workflow's legs, so this is the only place the tap hears about it.
+      - name: Tell the Homebrew tap there is a new .dmg
+        env:
+          GH_TOKEN: ${{ secrets.STEPSS_TOKEN }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh api repos/SPS-L/homebrew-stepss/dispatches \
+            -f event_type=stepss-release \
+            -f "client_payload[tag]=$VERSION"
+          echo "homebrew-stepss asked to update its cask for $VERSION."
 
       # A draft that never got published is invisible but not free: it holds
       # the version number's assets and shows up in the repository's release
