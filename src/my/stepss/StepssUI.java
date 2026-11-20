@@ -4722,6 +4722,9 @@ public class StepssUI extends javax.swing.JFrame {
     }//GEN-LAST:event_searchTextFieldFocusGained
 
     private void stopSimulationButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_stopSimulationButtonActionPerformed
+        // Either press: the first asks the engine to finish (exit 0), the
+        // second kills it (non-zero), and neither is the engine's failure.
+        userStoppedRun = true;
         try {
             File fileTemp = new File(myTempDir.getAbsolutePath() + System.getProperty("file.separator") + ".kill_RAMSES");
             if (fileTemp.exists()) {
@@ -4917,6 +4920,13 @@ public class StepssUI extends javax.swing.JFrame {
         CommandLine command;
         loadOutputActionPerformed(evt);
         savedOutputBool = false;
+        // The console keeps earlier runs' text, so where this run's starts is
+        // noted here and the outcome below reads only what follows it. A
+        // small-signal run writes to the Analysis tab instead and reports its
+        // own outcome, so only a time-domain run is judged by RamsesOutcome.
+        final int outputStart = simulationOutput.getDocument().getLength();
+        final boolean timeDomain = !ssa;
+        userStoppedRun = false;
 
         if (ramsesExec == null || !ramsesExec.exists()) {
             JOptionPane.showMessageDialog(this, "<html>The file <B>dynsim</B> does not exist. .</html>", "Executable not found!", JOptionPane.ERROR_MESSAGE);
@@ -5048,6 +5058,11 @@ public class StepssUI extends javax.swing.JFrame {
                     Logger.getLogger(StepssUI.class.getName()).log(Level.SEVERE, null, ex);
                     Thread.currentThread().interrupt();
                 }
+                // Read here, once the process is gone. A run that never
+                // launched has no exit value and is not judged.
+                final int exitValue = launched && myHandler.hasResult()
+                        ? myHandler.getExitValue() : 0;
+                final boolean stoppedByUser = userStoppedRun;
                 // After the engine has exited, so its final flush has landed.
                 // LiveCurveWindow.finish does one last read on its own thread
                 // rather than here, and never throws, which matters because
@@ -5065,7 +5080,25 @@ public class StepssUI extends javax.swing.JFrame {
                 // have always been made from here, which mostly worked and
                 // was never right.
                 SwingUtilities.invokeLater(() -> {
-                    statusBar.finished("Simulation finished");
+                    // The exit value used to be ignored, so a run the engine
+                    // stopped early (a voltage guard, a divergence, a numerical
+                    // failure) said "Simulation finished" like one that reached
+                    // STOP. The console text is read here, on the EDT, after
+                    // the sink's queued appends: waitFor() joined the pumps
+                    // first, so every line of this run is already queued ahead.
+                    if (timeDomain) {
+                        String text = simulationOutput.getText();
+                        RamsesOutcome outcome = RamsesOutcome.of(exitValue, stoppedByUser,
+                                text.substring(Math.min(outputStart, text.length())));
+                        if (outcome.severity() == RamsesOutcome.Severity.ERROR) {
+                            statusBar.failed(outcome.headline());
+                            banner.warn(outcome.detail());
+                        } else {
+                            statusBar.finished(outcome.headline());
+                        }
+                    } else {
+                        statusBar.finished("Simulation finished");
+                    }
                     runSimulation.setEnabled(true);
                     saveTrajToFileButton.setEnabled(true);
                     if (saveOutputTrajButton.isSelected()) {
@@ -6808,6 +6841,11 @@ public class StepssUI extends javax.swing.JFrame {
     private static final String RELEASES_URL = "https://github.com/SPS-L/stepss-java-ui/releases";
     private static final String RELEASES_LATEST_URL = RELEASES_URL + "/latest";
     private boolean ssa = false;
+    /**
+     * Set by the Stop button, cleared when a run starts; read by the run's
+     * watcher thread, hence volatile. See RamsesOutcome.
+     */
+    private volatile boolean userStoppedRun = false;
     // The generated settings file the current small-signal run is to be given
     // after its data files, or null when no such run is in progress. A name
     // rather than a flag because createCommandFile writes it verbatim, and
